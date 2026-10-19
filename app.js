@@ -238,6 +238,9 @@
   }
 
   function renderFarming(profile) {
+    var useGlobalClimatePortal = !!(currentProvince && currentProvince.countryIso3 && currentProvince.countryIso3 !== 'IDN');
+    var climatePortalUrl = useGlobalClimatePortal ? 'https://climateknowledgeportal.worldbank.org/' : 'https://www.bmkg.go.id/';
+    var climatePortalLabel = useGlobalClimatePortal ? 'CHECK CLIMATE CONTEXT' : 'CHECK BMKG';
     var plans = {
       'humid-upland': [
         ['Map the plot first','Mark slope direction, water paths, shade and existing trees. Avoid clearing steep or unstable ground before getting local technical advice.'],
@@ -303,7 +306,7 @@
     return '<div class="tab-intro"><div class="eyebrow">FARMING GUIDE / HOW TO CULTIVATE</div><h2>Your farm, one step at a time 🚜</h2><p>This starter workflow is adapted to the broad landscape type for ' + esc(profile.name) + '. It deliberately avoids invented seed rates, spacing or fertilizer dosages; use local crop-specific extension recommendations for those details.</p></div>' +
       '<section class="soil-profile"><div class="soil-profile-icon">📍</div><div><span class="mini-code">PLANNING CONTEXT</span><h3>' + esc(profile.zone) + '</h3><p>Priority: ' + esc(profile.focus) + '. Start small, observe the response and scale only when the site, water and economics support it.</p><span class="data-tag green">CURATED STARTER WORKFLOW</span></div></section>' +
       '<div class="guide-grid">' + steps + '</div>' +
-      '<section class="source-strip"><div><span class="mini-code">LOCAL CALENDAR & EXTENSION</span><h3>Check the latest field guidance</h3><p>Exact planting month, plant spacing, seed rate, fertilizer rate and pest controls depend on crop variety and local conditions. Confirm them with extension staff and seasonal rainfall outlook.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bmkg.go.id/">CHECK BMKG ↗</a></section>';
+      '<section class="source-strip"><div><span class="mini-code">LOCAL CALENDAR & EXTENSION</span><h3>Check the latest field guidance</h3><p>Exact planting month, plant spacing, seed rate, fertilizer rate and pest controls depend on crop variety and local conditions. Confirm them with extension staff and seasonal rainfall outlook.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="' + climatePortalUrl + '">' + climatePortalLabel + ' ↗</a></section>';
   }
 
   function renderTechnology(profile) {
@@ -314,6 +317,25 @@
   }
 
   function renderSources(profile) {
+    var selectedIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : 'IDN';
+    if (selectedIso3 !== 'IDN') {
+      var selectedCountryName = currentProvince.countryName || selectedCountry && selectedCountry.name || selectedIso3;
+      var featureProps = currentProvince.feature && currentProvince.feature.properties ? currentProvince.feature.properties : {};
+      var boundaryMetadataUrl = featureProps._bt_source_metadata_url || '';
+      var boundaryLicense = featureProps._bt_boundary_license || 'See the source metadata for applicable license and attribution terms.';
+      var generalSources = [
+        {t:'FAO Hand-in-Hand geospatial catalogue',d:'Explore available land, water, climate and agricultural geospatial datasets. Coverage varies by country and layer.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL DATA'},
+        {t:'FAOSTAT',d:'Country-level agriculture, land-use and food-system indicators. These are national statistics, not measurements for this specific region.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL STATISTICS'},
+        {t:'World Bank Climate Change Knowledge Portal',d:'Country-level climate context to support further investigation. Validate local seasons and field conditions with national services and extension specialists.',u:'https://climateknowledgeportal.worldbank.org/',tag:'CLIMATE CONTEXT'},
+        {t:'WOCAT sustainable land management',d:'Browse documented soil, water and sustainable land management practices. A method should only be applied when the local conditions fit the documented context.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'FARMING PRACTICES'},
+        {t:'geoBoundaries administrative data',d:'Boundary provenance for the selected region. The represented year and license can differ between countries and administrative levels.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
+      ];
+      return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Regional field notes for <b>' + esc(selectedCountryName) + '</b>. These are discovery resources, not proof that a crop is suitable for a particular farm.</p></div>' +
+        '<div class="source-list">' + generalSources.map(function (source, i) {
+          return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
+        }).join('') + '</div>' +
+        '<section class="data-integrity"><span class="data-tag green">BOUNDARY METADATA</span><h3>Check the original source</h3><p><b>Administrative level:</b> ' + esc(currentProvince.adminLevel === 2 ? 'ADM2 · second-level local unit' : 'ADM1 · first-level region') + '.</p><p><b>Boundary license:</b> ' + esc(boundaryLicense) + '</p><p>Administrative names and legal categories differ between countries. Do not interpret this generic regional fieldbook as a verified local soil survey or crop prescription.</p></section>';
+    }
     var sources = [
       {t:'BPS — provincial rice statistics',d:'Official harvested area, productivity and production table. Open the source table and select the relevant year.',u:'https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html',tag:'OFFICIAL STATISTICS'},
       {t:'Kementerian Pertanian — soil and agricultural geodata',d:'Explore available soil and land-resource layers. Coverage, scale and licensing must be checked for each layer.',u:'https://geoportal.pertanian.go.id/',tag:'SOIL / GIS'},
@@ -492,7 +514,8 @@
     currentProvince.name = name;
     currentTab = 'overview';
     setText('modal-title', name);
-    setText('modal-subtitle', 'PROVINCE FIELD GUIDE · ' + profile.zone.toUpperCase());
+    var fieldbookLabel = currentProvince.adminLevel === 2 ? 'DISTRICT FIELD GUIDE' : (currentProvince.countryIso3 === 'IDN' ? 'PROVINCE FIELD GUIDE' : 'REGIONAL FIELD GUIDE');
+    setText('modal-subtitle', fieldbookLabel + ' · ' + profile.zone.toUpperCase());
     var levelLabel = currentProvince.adminLevel === 2 ? 'DISTRICT / ADM2' : 'REGION / ADM1';
     setText('modal-stamp', 'FIELD NOTE / ' + (feature ? (provinceFeatureCode(feature) || levelLabel) : levelLabel));
     if (el('btn-drill-down')) {
