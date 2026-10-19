@@ -258,10 +258,13 @@
       }
     }
     if (match) {
-      return {
-        code: firstValue(match, ['Area Code', 'Area Code (FAO)', 'Code', 'area_code']),
-        name: firstValue(match, ['Area', 'Area Name', 'Country', 'Name']) || countryName
-      };
+      var matchedCode = firstValue(match, ['Area Code', 'Area Code (FAO)', 'Code', 'area_code']);
+      if (matchedCode !== '') {
+        return {
+          code: matchedCode,
+          name: firstValue(match, ['Area', 'Area Name', 'Country', 'Name']) || countryName
+        };
+      }
     }
     if (iso3 && FALLBACK_AREA_CODES[iso3]) return { code: FALLBACK_AREA_CODES[iso3], name: countryName };
     return null;
@@ -376,7 +379,7 @@
         maxRecords: '10',
         startPosition: '1',
         constraintLanguage: 'CQL_TEXT',
-        constraint: "AnyText LIKE '%" + safeCountry + "%'"
+        constraint: "AnyText LIKE '%" + safeCountry + "%' AND (AnyText LIKE '%land%' OR AnyText LIKE '%soil%' OR AnyText LIKE '%water%' OR AnyText LIKE '%climate%' OR AnyText LIKE '%forest%')"
       });
       var endpoint = 'https://data.apps.fao.org/map/catalog/srv/eng/csw?' + params.toString();
       var response = await fetch(endpoint, {
