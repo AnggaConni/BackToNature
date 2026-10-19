@@ -167,7 +167,10 @@
       '<div class="btna-links"><a class="btna-btn" target="_blank" rel="noopener noreferrer" href="' + HIH_PORTAL + '">Open Hand-in-Hand map</a>' +
       '<a class="btna-btn" target="_blank" rel="noopener noreferrer" href="' + FAO_CATALOG + '">Open FAO data catalogue</a></div>' +
       '<p class="btna-muted">Suggested catalogue search: <strong id="btna-hih-query">' + escapeHTML(countryName + ' land degradation soil water climate restoration') + '</strong></p>' +
+      '<button id="btna-hih-search" class="btna-btn" type="button">Search live FAO catalogue</button>' +
       '<button id="btna-copy-hih" class="btna-btn" type="button">Copy search terms</button>' +
+      '<div id="btna-hih-status" class="btna-status pending">Catalogue search not run</div>' +
+      '<div id="btna-hih-results" class="btna-muted" aria-live="polite">Search for public FAO geospatial metadata related to this country. Search results link to their catalogue records.</div>' +
       '<div id="btna-hih-feedback" class="btna-muted" aria-live="polite"></div></section>' +
       '<div class="btna-foot">Data-source integrity: an “available” badge means the live request succeeded. If a source is unavailable, blocked by CORS, or requires authorization, this panel reports the limitation rather than substituting mock data.</div>';
 
@@ -203,6 +206,9 @@
       } catch (_) {
         feedback.textContent = 'Copy unavailable in this browser. Select the search terms above and copy them manually.';
       }
+    });
+    document.getElementById('btna-hih-search').addEventListener('click', function () {
+      if (selected) loadHihCatalog(selected.country, requestId);
     });
     return panel;
   }
@@ -342,6 +348,88 @@
       content.innerHTML = '<p class="btna-muted">' + escapeHTML(error.message || 'Unknown API error') + '</p>' +
         '<p class="btna-muted">No mock values were substituted. Try again later or open the official FAOSTAT portal.</p>';
     } finally {
+      if (button && id === requestId) button.disabled = false;
+    }
+  }
+
+
+  async function loadHihCatalog(countryName, id) {
+    var status = document.getElementById('btna-hih-status');
+    var resultsNode = document.getElementById('btna-hih-results');
+    var button = document.getElementById('btna-hih-search');
+    if (!status || !resultsNode) return;
+    status.className = 'btna-status pending';
+    status.textContent = 'Searching FAO geospatial metadata…';
+    resultsNode.textContent = 'Calling the public FAO Agro-informatics catalogue (CSW metadata service).';
+    if (button) button.disabled = true;
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 18000);
+    try {
+      var safeCountry = String(countryName || '').replace(/'/g, "''");
+      var params = new URLSearchParams({
+        service: 'CSW',
+        version: '2.0.2',
+        request: 'GetRecords',
+        resultType: 'results',
+        typeNames: 'csw:Record',
+        elementSetName: 'summary',
+        maxRecords: '10',
+        startPosition: '1',
+        constraintLanguage: 'CQL_TEXT',
+        constraint: "AnyText LIKE '%" + safeCountry + "%'"
+      });
+      var endpoint = 'https://data.apps.fao.org/map/catalog/srv/eng/csw?' + params.toString();
+      var response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Accept': 'application/xml, text/xml, */*' },
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      var xmlText = await response.text();
+      if (!response.ok) throw new Error('HTTP ' + response.status + ' from the FAO catalogue.');
+      if (id !== requestId) return;
+      var xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+      if (xml.getElementsByTagName('parsererror').length) throw new Error('The catalogue response could not be parsed as XML.');
+      var exception = xml.getElementsByTagNameNS('*', 'ExceptionText');
+      if (exception.length) throw new Error(exception[0].textContent || 'FAO catalogue returned an exception.');
+      var recordNodes = Array.from(xml.getElementsByTagNameNS('*', 'BriefRecord'));
+      if (!recordNodes.length) recordNodes = Array.from(xml.getElementsByTagNameNS('*', 'SummaryRecord'));
+      if (!recordNodes.length) recordNodes = Array.from(xml.getElementsByTagNameNS('*', 'Record'));
+      if (!recordNodes.length) {
+        status.className = 'btna-status pending';
+        status.textContent = 'Request succeeded; no catalogue records found';
+        resultsNode.textContent = 'The catalogue responded, but no records matched this country name. Try broader terms in the official FAO data catalogue.';
+        return;
+      }
+      var html = '<ul class="btna-list">';
+      recordNodes.slice(0, 10).forEach(function (record) {
+        var titleNodes = record.getElementsByTagNameNS('*', 'title');
+        var abstractNodes = record.getElementsByTagNameNS('*', 'abstract');
+        var idNodes = record.getElementsByTagNameNS('*', 'identifier');
+        var title = titleNodes.length ? titleNodes[0].textContent.trim() : 'FAO geospatial dataset';
+        var abstractText = abstractNodes.length ? abstractNodes[0].textContent.trim() : '';
+        var recordId = idNodes.length ? idNodes[0].textContent.trim() : '';
+        var recordUrl = /^[0-9a-f-]{36}$/i.test(recordId)
+          ? 'https://data.apps.fao.org/map/catalog/srv/eng/catalog.search#/metadata/' + encodeURIComponent(recordId)
+          : FAO_CATALOG;
+        html += '<li><strong>' + escapeHTML(title) + '</strong>' +
+          (abstractText ? '<br><span class="btna-muted">' + escapeHTML(abstractText.slice(0, 260)) + (abstractText.length > 260 ? '…' : '') + '</span>' : '') +
+          '<br><a target="_blank" rel="noopener noreferrer" href="' + escapeHTML(recordUrl) + '">Open catalogue record ↗</a></li>';
+      });
+      html += '</ul><p class="btna-muted">Showing up to 10 metadata records. Confirm each dataset’s coverage, licence, date and service link before using it as evidence.</p>';
+      resultsNode.innerHTML = html;
+      status.className = 'btna-status ok';
+      status.textContent = 'LIVE CATALOGUE · ' + recordNodes.length + ' records returned';
+    } catch (error) {
+      if (id !== requestId) return;
+      status.className = 'btna-status error';
+      status.textContent = 'Live catalogue request failed';
+      resultsNode.innerHTML = '<p class="btna-muted">' + escapeHTML(error && error.name === 'AbortError'
+        ? 'The catalogue request exceeded 18 seconds.'
+        : (error && error.message ? error.message : 'Browser CORS or network restrictions may block the catalogue endpoint.')) + '</p>' +
+        '<p class="btna-muted">No simulated catalogue records were substituted. Use the official FAO workspace or catalogue links above as a fallback.</p>';
+    } finally {
+      clearTimeout(timeout);
       if (button && id === requestId) button.disabled = false;
     }
   }
