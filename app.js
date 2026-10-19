@@ -33,6 +33,11 @@
   var selectedProvinceBounds = null;
   var activeAdminLevel = 1;
   var countryDataCache = {};
+  var climateResultsBySelection = {};
+  var climateStatusBySelection = {};
+  var climatePromisesBySelection = {};
+  var climatePhotoRequestId = 0;
+  var climatePhotosLoadedBySelection = {};
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -192,6 +197,324 @@
     }).join('') + '</div>';
   }
 
+  function climateSelectionKey(selection) {
+    selection = selection || currentProvince || {};
+    return [
+      String(selection.countryIso3 || selectedCountry && selectedCountry.iso3 || 'UNK').toUpperCase(),
+      String(selection.adminLevel || activeAdminLevel || 1),
+      norm(selection.name || 'unknown-region')
+    ].join('|');
+  }
+
+  function geometryCentroid(feature) {
+    var geometry = feature && feature.geometry;
+    if (!geometry || !geometry.coordinates) return null;
+    var polygonList = [];
+    if (geometry.type === 'Polygon') polygonList = [geometry.coordinates];
+    else if (geometry.type === 'MultiPolygon') polygonList = geometry.coordinates;
+    else return null;
+
+    function outerRingCentroid(ring) {
+      if (!Array.isArray(ring) || ring.length < 3) return null;
+      var twiceArea = 0, cx = 0, cy = 0;
+      for (var i = 0; i < ring.length - 1; i++) {
+        var first = ring[i], second = ring[i + 1];
+        if (!Array.isArray(first) || !Array.isArray(second)) continue;
+        var cross = Number(first[0]) * Number(second[1]) - Number(second[0]) * Number(first[1]);
+        twiceArea += cross;
+        cx += (Number(first[0]) + Number(second[0])) * cross;
+        cy += (Number(first[1]) + Number(second[1])) * cross;
+      }
+      if (Math.abs(twiceArea) < 1e-10) return null;
+      return {
+        longitude:cx / (3 * twiceArea),
+        latitude:cy / (3 * twiceArea),
+        weight:Math.abs(twiceArea) / 2
+      };
+    }
+
+    var centroids = polygonList.map(function (polygon) {
+      return outerRingCentroid(polygon && polygon[0]);
+    }).filter(function (point) {
+      return point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude);
+    });
+    if (centroids.length) {
+      var weight = centroids.reduce(function (sum, point) { return sum + point.weight; }, 0);
+      if (weight > 0) {
+        var longitude = centroids.reduce(function (sum, point) { return sum + point.longitude * point.weight; }, 0) / weight;
+        var latitude = centroids.reduce(function (sum, point) { return sum + point.latitude * point.weight; }, 0) / weight;
+        if (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+          return { latitude:latitude, longitude:longitude, method:'polygon area-weighted representative point' };
+        }
+      }
+    }
+
+    // Last-resort fallback for small or degenerate shapes; it is still only a proxy.
+    var points = [];
+    function collect(value) {
+      if (!Array.isArray(value)) return;
+      if (value.length >= 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+        points.push(value);
+        return;
+      }
+      value.forEach(collect);
+    }
+    collect(geometry.coordinates);
+    if (!points.length) return null;
+    var lon = points.reduce(function (sum, point) { return sum + point[0]; }, 0) / points.length;
+    var lat = points.reduce(function (sum, point) { return sum + point[1]; }, 0) / points.length;
+    return Number.isFinite(lat) && Number.isFinite(lon)
+      ? { latitude:lat, longitude:lon, method:'vertex-average fallback' }
+      : null;
+  }
+
+  function climateResultForSelection(selection) {
+    return climateResultsBySelection[climateSelectionKey(selection)] || null;
+  }
+
+  function climatePreviewMarkup() {
+    var levelName = currentProvince && currentProvince.adminLevel === 2 ? 'district' : 'province / region';
+    return '<section class="climate-preview-panel">' +
+      '<div class="climate-preview-icon">🌦️</div><div class="climate-preview-copy">' +
+      '<span class="mini-code">SEASONS / TEMPERATURE / WIND</span><h3>Climate & Planting Scout</h3>' +
+      '<p id="climate-preview-status" aria-live="polite">Preparing climate profile for this ' + levelName + '…</p>' +
+      '<p class="climate-preview-note">Historical monthly patterns help screen planting windows. They are not a farm-level forecast or a guarantee of crop suitability.</p>' +
+      '</div><button id="open-climate-tab" class="pixel-btn green" type="button">OPEN CLIMATE & PLANTING ↗</button>' +
+      '</section>';
+  }
+
+  function updateClimatePreview() {
+    var statusNode = el('climate-preview-status');
+    if (!statusNode || !currentProvince) return;
+    var key = climateSelectionKey(currentProvince);
+    var result = climateResultsBySelection[key];
+    var status = climateStatusBySelection[key];
+    if (result) {
+      var climate = result.climate;
+      var meanTemp = climate.monthly.map(function (month) { return month.temperatureMean; })
+        .filter(function (value) { return value != null; });
+      var annualRain = climate.monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
+      var tempValue = meanTemp.length ? (mean(meanTemp).toFixed(1) + ' °C') : 'n/a';
+      statusNode.textContent = climate.startYear + '–' + climate.endYear + ' climate ready · average temperature ' + tempValue +
+        ' · estimated annual rainfall ' + Math.round(annualRain) + ' mm. Open the climate tab for monthly patterns and crop windows.';
+    } else if (status && status.state === 'error') {
+      statusNode.textContent = 'Climate data unavailable: ' + status.message + ' You can retry in Climate & Planting.';
+    } else {
+      statusNode.textContent = 'Loading five complete years of monthly temperature, rainfall and wind for a representative point in this region…';
+    }
+  }
+
+  async function loadClimateForSelection(selection, force) {
+    if (!selection) return;
+    var key = climateSelectionKey(selection);
+    if (force) {
+      delete climateResultsBySelection[key];
+      delete climateStatusBySelection[key];
+      delete climatePromisesBySelection[key];
+    }
+    if (climateResultsBySelection[key]) {
+      if (currentProvince === selection) updateClimatePreview();
+      return climateResultsBySelection[key];
+    }
+    if (climatePromisesBySelection[key]) return climatePromisesBySelection[key];
+
+    var api = window.BackToNatureAPI;
+    var point = geometryCentroid(selection.feature);
+    if (!point) {
+      climateStatusBySelection[key] = { state:'error', message:'No representative map coordinate is available for this boundary.' };
+      if (currentProvince === selection) updateClimatePreview();
+      return null;
+    }
+    if (!api || !api.fetchHistoricalClimate || !api.rankPlantingWindows) {
+      climateStatusBySelection[key] = { state:'error', message:'The climate API module is not available. Reload the page and retry.' };
+      if (currentProvince === selection) updateClimatePreview();
+      return null;
+    }
+
+    climateStatusBySelection[key] = { state:'loading' };
+    if (currentProvince === selection) updateClimatePreview();
+    var promise = (async function () {
+      try {
+        var climate = await api.fetchHistoricalClimate(point.latitude, point.longitude, 5);
+        var recommendations = api.rankPlantingWindows(climate.monthly);
+        var result = { climate:climate, recommendations:recommendations, point:point };
+        climateResultsBySelection[key] = result;
+        climateStatusBySelection[key] = { state:'ready' };
+        return result;
+      } catch (error) {
+        climateStatusBySelection[key] = {
+          state:'error',
+          message:error && error.message ? error.message : 'The historical climate source could not be reached.'
+        };
+        return null;
+      } finally {
+        delete climatePromisesBySelection[key];
+        if (currentProvince === selection) {
+          updateClimatePreview();
+          if (currentTab === 'climate') {
+            renderTab('climate');
+          }
+        }
+      }
+    })();
+    climatePromisesBySelection[key] = promise;
+    return promise;
+  }
+
+  function numberOrDash(value, suffix) {
+    return value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('en-US', {
+      maximumFractionDigits:1,
+      minimumFractionDigits:0
+    }) + (suffix || '');
+  }
+
+  function renderClimateLoading(profile, status) {
+    var message = status && status.state === 'error'
+      ? status.message
+      : 'Retrieving and summarizing monthly weather from five complete calendar years…';
+    var isError = status && status.state === 'error';
+    return '<div class="tab-intro"><div class="eyebrow">CLIMATE & PLANTING / SEASON SCOUT</div>' +
+      '<h2>When should we plant? 🌦️</h2><p>Seasonal windows for ' + esc(currentProvince && currentProvince.name || profile.name) +
+      ', based on historical temperature, rainfall and wind at a representative point.</p></div>' +
+      '<section class="climate-loading-panel"><div class="climate-big-icon">' + (isError ? '🧭' : '🌦️') + '</div>' +
+      '<h3>' + (isError ? 'Could not build the climate profile' : 'Reading the seasons…') + '</h3><p>' + esc(message) + '</p>' +
+      (isError ? '<button id="climate-retry" class="pixel-btn green" type="button">↻ RETRY CLIMATE LOOKUP</button>' : '<div class="climate-loading-bar"><span></span></div>') +
+      '<p class="live-note">Source: Open-Meteo Historical Weather API. Network access or source availability may affect this panel.</p></section>';
+  }
+
+  function renderClimateAndPlanting(profile) {
+    var key = climateSelectionKey(currentProvince);
+    var result = climateResultsBySelection[key];
+    var status = climateStatusBySelection[key];
+    if (!result) return renderClimateLoading(profile, status);
+
+    var climate = result.climate;
+    var monthly = climate.monthly || [];
+    var recommendations = result.recommendations || [];
+    var annualRain = monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
+    var meanTemp = mean(monthly.map(function (month) { return month.temperatureMean; }));
+    var maxRain = Math.max(1, ...monthly.map(function (month) { return Number(month.precipitationMm) || 0; }));
+    var avgWind = mean(monthly.map(function (month) { return month.windMeanKmh; }));
+    var peakGust = Math.max.apply(null, monthly.map(function (month) { return Number(month.windGustMaxMeanKmh) || 0; }));
+    var region = currentProvince && currentProvince.name || profile.name;
+    var levelLabel = currentProvince && currentProvince.adminLevel === 2 ? 'ADM2 / district-level unit' : 'ADM1 / first-level region';
+    var monthCards = monthly.map(function (month) {
+      var barWidth = Math.max(2, Math.min(100, ((Number(month.precipitationMm) || 0) / maxRain) * 100));
+      var windCaution = Number(month.windMeanKmh) >= 25 || Number(month.windGustMaxMeanKmh) >= 50;
+      return '<article class="climate-month-card">' +
+        '<div class="climate-month-top"><b>' + esc(month.label) + '</b><span>' + esc(numberOrDash(month.precipitationMm,' mm')) + '</span></div>' +
+        '<div class="climate-rain-track" aria-label="Rainfall relative to the wettest month"><span style="width:' + barWidth + '%"></span></div>' +
+        '<div class="climate-month-metrics"><span>Mean temp</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
+        '<span>Typical low–high</span><b>' + esc(numberOrDash(month.temperatureMin,'–') + numberOrDash(month.temperatureMax,' °C')) + '</b>' +
+        '<span>Rain days / month</span><b>' + esc(numberOrDash(month.rainyDays,' days')) + '</b>' +
+        '<span>Mean wind</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windMeanKmh,' km/h')) + '</b>' +
+        '<span>Monthly peak gust</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windGustMaxMeanKmh,' km/h')) + '</b>' +
+        '<span>Dominant wind</span><b>' + esc(month.windDirection || '—') + '</b></div>' +
+        (windCaution ? '<p class="climate-wind-note">Wind exposure flag: consider local shelter and staking.</p>' : '') +
+        '</article>';
+    }).join('');
+
+    var cropCards = recommendations.slice(0,6).map(function (crop, index) {
+      var best = crop.bestWindow || {};
+      var reasons = (best.reasons || []).slice(0,2).map(function (reason) { return '<li>' + esc(reason) + '</li>'; }).join('');
+      var cautions = (best.cautions || []).slice(0,2).map(function (caution) { return '<li>' + esc(caution) + '</li>'; }).join('');
+      return '<article class="climate-crop-card">' +
+        '<div id="climate-photo-' + esc(crop.id) + '" class="climate-crop-photo"><div class="crop-image-placeholder"><span>🌱</span><b>Plant reference</b><small>Image loads from Wikimedia Commons</small></div></div>' +
+        '<div class="climate-crop-body"><div class="climate-crop-heading"><span class="data-tag green">CLIMATE PICK ' + String(index + 1).padStart(2,'0') + '</span><span class="crop-score">' + esc(best.score == null ? '—' : best.score) + '/100</span></div>' +
+        '<h3>' + esc(crop.name) + '</h3><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
+        '<p class="climate-start-month"><strong>Try planting window:</strong> ' + esc(best.month || '—') + ' · establishment screen ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' months</p>' +
+        '<p>' + esc(crop.note) + '</p>' +
+        '<div class="climate-crop-meta"><span>Temperature screen ' + esc(crop.climateRule.tempMin) + '–' + esc(crop.climateRule.tempMax) + ' °C</span><span>Window rainfall ' + esc(numberOrDash(best.totalRainMm,' mm')) + '</span><span>Mean wind ' + esc(numberOrDash(best.avgWindKmh,' km/h')) + '</span></div>' +
+        (reasons ? '<div class="crop-reason"><b>Why the climate matched</b><ul>' + reasons + '</ul></div>' : '') +
+        (cautions ? '<div class="crop-caution"><b>Check before planting</b><ul>' + cautions + '</ul></div>' : '') +
+        '<p class="crop-photo-credit" id="climate-credit-' + esc(crop.id) + '">Reference photo source and license appear here when available.</p>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search more crop photos ↗</a>' +
+        '</div></article>';
+    }).join('');
+
+    var methodWarnings = [];
+    if (avgWind != null && avgWind >= 25) methodWarnings.push('Long-term average wind is high enough to merit checking windbreaks, lodging and exposed sites.');
+    if (peakGust >= 50) methodWarnings.push('Monthly peak gust statistics show potentially damaging gust exposure in some months.');
+    if (!methodWarnings.length) methodWarnings.push('No generic high-wind flag was triggered by the monthly averages. This does not rule out storms, typhoons, squalls or field-level exposure.');
+
+    return '<div class="tab-intro"><div class="eyebrow">CLIMATE & PLANTING / SEASON SCOUT</div>' +
+      '<h2>What grows well, and when? 🌱</h2><p>Climate-based planting-window candidates for <b>' + esc(region) + '</b>. Month-by-month normals are estimated from daily observations for ' + esc(climate.startYear) + '–' + esc(climate.endYear) + ' at a representative point within the selected boundary.</p></div>' +
+      '<div class="climate-summary-grid">' +
+      '<article><span>HISTORICAL PROFILE</span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>five completed calendar years</small></article>' +
+      '<article><span>AVERAGE TEMPERATURE</span><b>' + esc(numberOrDash(meanTemp,' °C')) + '</b><small>mean of monthly averages</small></article>' +
+      '<article><span>AVERAGE ANNUAL RAIN</span><b>' + esc(numberOrDash(annualRain,' mm')) + '</b><small>sum of average monthly rainfall</small></article>' +
+      '<article><span>AVERAGE WIND</span><b>' + esc(numberOrDash(avgWind,' km/h')) + '</b><small>10 m above ground</small></article>' +
+      '</div>' +
+      '<section class="climate-method-note"><b>Where is this climate measured?</b><p>' + esc(levelLabel) + ' · approximate point ' + esc(climate.latitude) + ', ' + esc(climate.longitude) +
+      '. Large or island-rich regions can contain very different microclimates. The selected point is a proxy, not a measurement for every farm in the region.</p></section>' +
+      '<div class="section-title"><span class="mini-code">MONTH-BY-MONTH PATTERN</span><h3>Temperature, rain and wind</h3></div>' +
+      '<div class="climate-month-grid">' + monthCards + '</div>' +
+      '<div class="section-title"><span class="mini-code">PLANTING WINDOW SCREEN</span><h3>Top climate candidates</h3></div>' +
+      '<p class="live-explainer">Rankings compare broad temperature and accumulated rainfall windows with provisional crop profiles. Soil type, soil pH, irrigation, variety, pests and local planting calendars can change the decision. Wind warnings are general exposure signals, not a crop-specific wind-tolerance model.</p>' +
+      '<div class="climate-crop-grid">' + cropCards + '</div>' +
+      '<section class="climate-method-note"><b>Wind and storm check</b><ul>' + methodWarnings.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') + '</ul>' +
+      '<p>Wind speed and gust figures are historical reference values, not storm forecasts. For planting in the coming weeks, also consult the current national meteorological service and local agricultural extension.</p></section>' +
+      '<section class="climate-method-note"><b>Data provenance</b><p>Historical daily weather data via <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs/historical-weather-api">Open-Meteo Historical Weather API</a>. Crop temperature/rainfall bands are provisional screening rules in this app, not a verified global agronomic model. Confirm recommendations with local agricultural extension and soil tests before committing land, seed or money.</p></section>';
+  }
+
+  async function loadClimateCropPhotos(recommendations, selection) {
+    var api = window.BackToNatureAPI;
+    if (!api || !api.searchPlantImages) return;
+    var key = climateSelectionKey(selection);
+    var requestId = ++climatePhotoRequestId;
+    if (climatePhotosLoadedBySelection[key]) return;
+    climatePhotosLoadedBySelection[key] = true;
+    for (var i = 0; i < Math.min(recommendations.length,4); i += 2) {
+      var batch = recommendations.slice(i,i+2);
+      await Promise.all(batch.map(async function (crop) {
+        try {
+          var images = await api.searchPlantImages(crop, 5);
+          if (requestId !== climatePhotoRequestId || currentProvince !== selection) return;
+          var slot = el('climate-photo-' + crop.id);
+          var credit = el('climate-credit-' + crop.id);
+          if (!slot || !images.length) {
+            if (credit && !images.length) credit.textContent = 'No suitable reference photo returned. Use the photo search link below.';
+            return;
+          }
+          var image = images[0];
+          var imageUrl = safeHttps(image.imageUrl);
+          var fileUrl = safeHttps(image.fileUrl);
+          if (imageUrl === '#' || fileUrl === '#') return;
+          slot.innerHTML = '<a class="crop-image-link" href="' + esc(fileUrl) + '" target="_blank" rel="noopener noreferrer" title="Open the original image and its license"><img src="' + esc(imageUrl) + '" alt="' + esc(crop.name + ' (' + crop.scientific + ')') + '" loading="lazy" decoding="async"><span class="crop-image-open">OPEN IMAGE ↗</span></a>';
+          var imageNode = slot.querySelector('img');
+          if (imageNode) imageNode.addEventListener('error', function () {
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo unavailable</b><small>Open the original file page to investigate.</small></div>';
+          }, { once:true });
+          var licenseHref = safeHttps(image.licenseUrl);
+          if (credit) credit.innerHTML = 'Photo: <a target="_blank" rel="noopener noreferrer" href="' + esc(fileUrl) + '">' + esc(image.title.replace(/^File:/,'') ) + '</a><br>Credit: ' + esc(image.artist) + ' · License: ' +
+            (licenseHref !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(licenseHref) + '">' + esc(image.license) + '</a>' : esc(image.license));
+        } catch (_) {
+          if (requestId !== climatePhotoRequestId || currentProvince !== selection) return;
+          var failedCredit = el('climate-credit-' + crop.id);
+          if (failedCredit) failedCredit.textContent = 'Photo lookup is unavailable; use the photo search link below.';
+        }
+      }));
+    }
+  }
+
+  function wireClimatePreview() {
+    var button = el('open-climate-tab');
+    if (button) button.addEventListener('click', function () {
+      renderTab('climate');
+      if (currentProvince) loadClimateForSelection(currentProvince);
+    });
+  }
+
+  function wireClimateControls() {
+    var retryButton = el('climate-retry');
+    if (retryButton) retryButton.addEventListener('click', function () {
+      if (currentProvince) loadClimateForSelection(currentProvince, true);
+      renderTab('climate');
+    });
+    var result = climateResultForSelection(currentProvince);
+    if (result) loadClimateCropPhotos(result.recommendations, currentProvince);
+  }
+
   function renderOverview(profile) {
     return '<div class="tab-intro"><div class="eyebrow">PROVINCE FIELD NOTE / ' + esc(profile.name.toUpperCase()) +
       '</div><h2>Welcome to ' + esc(profile.name) + '!</h2><p>' + esc(profile.intro) + '</p>' +
@@ -203,7 +526,7 @@
       '</div>' +
       '<section class="quest-panel"><div class="quest-icon">📜</div><div><div class="mini-code">TODAY\'S FIELD QUEST</div><h3>Know the site before you plant</h3><p>Choose a specific farm or landscape unit, collect soil and water observations, check local rainfall and consult the agricultural extension service. A province is too large to have one universal soil profile.</p></div></section>' +
       '<section class="source-strip"><div><span class="mini-code">OFFICIAL PRODUCTION DATA</span><h3>Rice area, productivity and output by province</h3><p>BPS provides official provincial paddy statistics for 2024. This app links to the source instead of inventing statistics inside the profile.</p></div>' +
-      '<a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS TABLE ↗</a></section>';
+      '<a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS TABLE ↗</a></section>' + climatePreviewMarkup();
   }
 
   function renderSoil(profile) {
@@ -658,10 +981,13 @@
     content.innerHTML = tab === 'overview' ? renderOverview(profile) :
       tab === 'soil' ? renderSoil(profile) :
       tab === 'crops' ? renderCrops(profile) :
+      tab === 'climate' ? renderClimateAndPlanting(profile) :
       tab === 'farming' ? renderFarming(profile) :
       tab === 'technology' ? renderTechnology(profile) : renderSources(profile);
     if (tab === 'sources') wireSourceControls(profile);
     if (tab === 'crops') wireCropLab(profile);
+    if (tab === 'climate') wireClimateControls();
+    if (tab === 'overview') { wireClimatePreview(); updateClimatePreview(); }
     Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (button) {
       var active = button.getAttribute('data-tab') === tab;
       button.classList.toggle('active', active);
@@ -690,6 +1016,7 @@
     el('province-modal').setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
     renderTab('overview');
+    loadClimateForSelection(currentProvince);
     var close = el('modal-close');
     if (close) close.focus();
   }
@@ -704,9 +1031,10 @@
     {id:'overview',label:'01 OVERVIEW',icon:'🏡'},
     {id:'soil',label:'02 SOIL & LAND',icon:'🧪'},
     {id:'crops',label:'03 CROPS',icon:'🌾'},
-    {id:'farming',label:'04 FARMING GUIDE',icon:'🚜'},
-    {id:'technology',label:'05 TECHNOLOGY',icon:'🛠️'},
-    {id:'sources',label:'06 SOURCES',icon:'📚'}
+    {id:'climate',label:'04 CLIMATE & PLANTING',icon:'🌦️'},
+    {id:'farming',label:'05 FARMING GUIDE',icon:'🚜'},
+    {id:'technology',label:'06 TECHNOLOGY',icon:'🛠️'},
+    {id:'sources',label:'07 SOURCES',icon:'📚'}
   ];
   el('modal-tabs').innerHTML = tabs.map(function (t) {
     return '<button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="' + t.id + '">' + t.icon + ' ' + t.label + '</button>';
