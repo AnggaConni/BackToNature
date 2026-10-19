@@ -22,7 +22,7 @@
     'united states': ['united states of america', 'usa'],
     'russian federation': ['russia'],
     'republic of korea': ['south korea', 'korea, republic of'],
-    "democratic people's republic of korea": ['north korea', 'korea, democratic people\\'s republic of'],
+    "democratic people's republic of korea": ['north korea', "korea, democratic people's republic of"],
     'viet nam': ['vietnam'],
     'iran (islamic republic of)': ['iran'],
     "lao people's democratic republic": ['laos'],
