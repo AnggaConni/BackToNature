@@ -5,18 +5,19 @@ Monthly refresh of global administrative boundary data via the geoBoundaries `gb
 ## Data levels
 
 - ADM0: country boundaries, output to `data/countries.geojson`.
-- ADM1: first-level administrative units (province, state, region, etc.), output to `data/province.json`.
-- ADM2: second-level administrative units (district, county, regency, etc.), written as per-country files under `data/districts/ISO3.geojson`.
+- ADM1: first-level administrative units (province, state, region, etc.), split into `data/provinces/ISO3.geojson`.
+- `data/province.json`: lightweight ADM1 index that maps each ISO-3 country code to its per-country GeoJSON file.
+- ADM2: second-level administrative units (district, county, regency, etc.), split into `data/districts/ISO3.geojson`.
 - `data/countries.json`: lightweight country index.
 - `data/district-index.json`: maps ISO-3 country codes to the corresponding ADM2 GeoJSON file and source metadata.
 - `data/boundary-manifest.json`: metadata, boundary IDs, source URLs, update dates and per-boundary license information.
 - `data/boundary-update-report.json`: coverage, errors and output summary.
 
-The name `province.json` is retained for compatibility with the current app, but its contents become global ADM1. ADM1 and ADM2 are administrative levels, not identical legal labels across all countries.
+The name `province.json` is retained for compatibility but now acts as an index, not a combined GeoJSON FeatureCollection. ADM1 and ADM2 are administrative levels, not identical legal labels across all countries.
 
 ## Performance and safety
 
-The updater prefers geoBoundaries' `simplifiedGeometryGeoJSON` to reduce download time and file size, uses a small worker pool for concurrent downloads, and prints progress periodically. It validates every output and checks global coverage before replacing published files. ADM2 is split by country to avoid a single oversized file. Failed or suspiciously incomplete runs preserve existing generated data.
+The updater prefers geoBoundaries' `simplifiedGeometryGeoJSON` to reduce download time and file size, uses a small worker pool for concurrent downloads, and prints progress periodically. It splits ADM1 and ADM2 by country so no single global file grows beyond GitHub's 100 MiB per-file limit. It validates every output and checks global coverage before replacing published files. Failed or suspiciously incomplete runs preserve existing generated data.
 
 ## Run locally
 
