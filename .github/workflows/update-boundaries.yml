@@ -58,15 +58,19 @@ jobs:
                   raise SystemExit(f"Missing output: {filename}")
               json.loads(path.read_text(encoding="utf-8"))
               print(f"OK {filename}: {path.stat().st_size:,} bytes")
-          index = json.loads(Path("data/district-index.json").read_text(encoding="utf-8"))
-          missing = []
-          for item in index.get("countries", {}).values():
-              path = Path("data") / item["file"]
-              if not path.exists():
-                  missing.append(str(path))
-          if missing:
-              raise SystemExit("Missing indexed district files: " + ", ".join(missing[:20]))
-          print(f"OK district files: {len(index.get('countries', {}))} country datasets")
+          for index_name, directory in [
+              ("data/province.json", "provinces"),
+              ("data/district-index.json", "districts"),
+          ]:
+              index = json.loads(Path(index_name).read_text(encoding="utf-8"))
+              missing = []
+              for item in index.get("countries", {}).values():
+                  path = Path("data") / item["file"]
+                  if not path.exists():
+                      missing.append(str(path))
+              if missing:
+                  raise SystemExit(f"Missing files indexed by {index_name}: " + ", ".join(missing[:20]))
+              print(f"OK {directory}: {len(index.get('countries', {}))} country datasets")
           PY
 
       - name: Commit changes if data changed
