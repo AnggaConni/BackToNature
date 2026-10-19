@@ -1,30 +1,33 @@
 # BackToNature Boundary Data Pipeline
 
-Monthly workflow for refreshing global administrative boundaries through the geoBoundaries `gbOpen` API. `ADM0` means country boundary, `ADM1` first-level subnational unit (province/state/region depending on country), and `ADM2` second-level unit (which may correspond to a district/county, but terms differ between countries).
+Monthly refresh of global administrative boundary data via the geoBoundaries `gbOpen` API.
 
-## Generated data
+## Data levels
 
-- `data/countries.geojson`: global ADM0 polygons.
-- `data/countries.json`: country index and source metadata.
-- `data/province.json`: global ADM1 polygons (filename retained for compatibility with the current app).
-- `data/district.json`: global ADM2 polygons.
-- `data/boundary-manifest.json`: per-boundary metadata and license fields.
-- `data/boundary-update-report.json`: validation/run report.
+- ADM0: country boundaries, output to `data/countries.geojson`.
+- ADM1: first-level administrative units (province, state, region, etc.), output to `data/province.json`.
+- ADM2: second-level administrative units (district, county, regency, etc.), written as per-country files under `data/districts/ISO3.geojson`.
+- `data/countries.json`: lightweight country index.
+- `data/district-index.json`: maps ISO-3 country codes to the corresponding ADM2 GeoJSON file and source metadata.
+- `data/boundary-manifest.json`: metadata, boundary IDs, source URLs, update dates and per-boundary license information.
+- `data/boundary-update-report.json`: coverage, errors and output summary.
 
-The first GitHub Actions run creates the files. Subsequent monthly runs commit changes only when generated data changes. Use Actions → Update administrative boundaries → Run workflow for a manual update.
+The name `province.json` is retained for compatibility with the current app, but its contents become global ADM1. ADM1 and ADM2 are administrative levels, not identical legal labels across all countries.
 
-## Data safety and licensing
+## Performance and safety
 
-The script downloads into staging and checks coverage and errors before replacing files. It does not silently publish an empty or drastically incomplete world dataset. Some countries may have no valid data at a particular administrative level. Metadata/license is retained at the boundary collection level because licenses may differ per dataset; review it before redistribution and provide appropriate attribution.
+The updater prefers geoBoundaries' `simplifiedGeometryGeoJSON` to reduce download time and file size, uses a small worker pool for concurrent downloads, and prints progress periodically. It validates every output and checks global coverage before replacing published files. ADM2 is split by country to avoid a single oversized file. Failed or suspiciously incomplete runs preserve existing generated data.
 
-Monthly refresh means re-checking available sources, not that each country's borders are guaranteed to be current. Newly created units may not appear until the source provider updates its dataset. ADM levels are not semantically identical across countries, and disputed boundaries may have multiple interpretations.
-
-## Local run
+## Run locally
 
 ```bash
 python -m pip install -r requirements.txt
-python scripts/update_boundaries.py --levels ADM0 ADM1 --max-countries 5
-python scripts/update_boundaries.py
+python -u scripts/update_boundaries.py --levels ADM0 ADM1 --max-countries 5
+python -u scripts/update_boundaries.py
 ```
 
-The first command is only a smoke test and intentionally does not publish its limited output to production automatically. The normal run retrieves all countries for ADM0, ADM1, and ADM2.
+The first command is a smoke test and does not publish its limited dataset. The monthly GitHub Actions workflow can also be started manually from **Actions → Update administrative boundaries → Run workflow**.
+
+## Source and licensing
+
+Each ADM dataset retains metadata for source, represented year and license where supplied. Review `data/boundary-manifest.json` and comply with each source's attribution/license requirements before redistributing. Updates depend on the upstream provider and can lag official administrative changes. Disputed territories and varying national ADM definitions require care.
