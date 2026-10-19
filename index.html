@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#2b3a27">
-  <meta name="description" content="A Harvest Moon: Back to Nature-inspired provincial field guide for soil, crops, farming techniques and land restoration in Indonesia.">
+  <meta name="description" content="A Harvest Moon: Back to Nature-inspired global field guide for soil, crops, farming techniques and land restoration.">
   <title>BackToNature — Living Land Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -168,7 +168,7 @@
   </style>
 </head>
 <body>
-  <div id="map" role="application" aria-label="Interactive world and Indonesian province map"></div>
+  <div id="map" role="application" aria-label="Interactive world, region and district map"></div>
 
   <header class="screen-hud">
     <div class="logo-board">
@@ -218,7 +218,8 @@
       <nav id="modal-tabs" class="tab-bar" role="tablist" aria-label="Province field guide sections"></nav>
       <main id="modal-content" class="modal-content" tabindex="0"></main>
       <footer class="modal-footer">
-        <span>🌿 BACK TO NATURE · Provincial agriculture fieldbook</span>
+        <span>🌿 BACK TO NATURE · Regional agriculture fieldbook</span>
+        <button id="btn-drill-down" class="pixel-btn green" type="button" hidden>🏘 VIEW DISTRICTS</button>
         <span class="footer-controls">← → change tab · ESC close</span>
       </footer>
     </div>
