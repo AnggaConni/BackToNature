@@ -24,6 +24,16 @@ async function main() {
   assert.ok(recommendations.every((item) => item.pHText && item.scientific && Array.isArray(item.cautions)), 'results include transparent crop metadata');
   assert.ok(recommendations.some((item) => item.id === 'cassava'), 'sandy seasonal staple example includes cassava');
 
+  const mismatchedSoil = api.listCropRecommendations({
+    soil: 'saline',
+    ph: 6.3,
+    drainage: 'well',
+    water: 'reliable',
+    climate: 'humid-tropical',
+    use: 'market'
+  });
+  assert.ok(mismatchedSoil.every((item) => item.score <= 49), 'major soil mismatches cannot get reassuringly high scores');
+
   let requestedUrl = '';
   global.fetch = async function (url) {
     requestedUrl = String(url);
