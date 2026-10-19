@@ -1,6 +1,6 @@
 # BackToNature — Living Land Lab
 
-A retro, PlayStation-era farming fieldbook inspired by the cozy menus and dialogue panels of *Harvest Moon: Back to Nature*. The world map remains the starting screen. Click any country to open its available ADM1 regions, then click a region for the fieldbook and use **View Districts** to drill into ADM2 where available. **Indonesia Explorer** remains a shortcut to Indonesia's curated 38-province map.
+A retro, PlayStation-era farming fieldbook inspired by the cozy menus and dialogue panels of *Harvest Moon: Back to Nature*. The world map remains the starting screen. Click any country to open its available ADM1 regions, then click a region for the fieldbook and use **View Districts** to drill into ADM2 where available. The **Region Explorer** button returns to a world-focused view; click a country polygon to explore its available first- and second-level administrative units.
 
 ## What's in the provincial fieldbook?
 
@@ -35,7 +35,16 @@ The Sources tab can request the Land Use (RL) domain for Indonesia from the publ
 The Sources tab can query the FAO Agro-informatics CSW metadata catalogue for records mentioning the selected province and themes such as soil, land, water, climate, forest or agriculture. The connector returns metadata records if the browser can access the service; a link to the official catalogue is shown otherwise.
 
 ### WOCAT QCAT — sustainable land management technologies
-The Sources tab supports an optional query of WOCAT QCAT API v2. It requires an authorized token. The token is taken from the input for one request and is not stored in localStorage or committed to the repository. WOCAT results use an Indonesia/country-level filter; they are not guaranteed to be province-specific. QCAT may block direct browser access through CORS or reject credentials that lack authorization.
+The Sources tab can query WOCAT QCAT API v2 for the currently selected country. WOCAT states that reading/filtering the database does not require a database-user login, and that a free Database User account is available. API calls are a separate matter: the QCAT API documentation says requests to read configurations, questionnaire lists and questionnaire details require an activated WOCAT account and a token issued by the WOCAT Secretariat after the user explains the purpose of the API requests. The public documentation does not list a per-call API price, so confirm any special or high-volume usage terms with the Secretariat.
+
+The site takes a token only in a password field for one user-initiated query; it clears the input and does not save the token to localStorage or commit it to the repository. Do not hard-code tokens into the public GitHub Pages frontend. The live endpoint may still fail because of CORS, token permissions or changes in the API.
+
+If registration asks for an institution you do not have, do not invent an affiliation. WOCAT lists a free Database User registration route, and also has an Individual Member route for SLM professionals/experts with proven experience (including independent experts, subject to approval). If neither route fits your situation, ask the WOCAT Secretariat which account type supports your intended API use.
+
+Official links:
+- API authorization guide: https://qcat.readthedocs.io/en/latest/api/v2.html
+- Free database-user registration: https://wocat.net/en/account/register/
+- Membership and individual-member information: https://wocat.net/en/wocat-membership/
 
 ### CGIAR GARDIAN and OpenFarm
 The Sources tab links to CGIAR GARDIAN as a research-publication and dataset discovery portal. The current API access model and schema must be verified before adding an automated connector.
