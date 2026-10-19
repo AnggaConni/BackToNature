@@ -35,6 +35,11 @@ The Sources tab can query the FAO Agro-informatics CSW metadata catalogue for re
 ### WOCAT QCAT — sustainable land management technologies
 The Sources tab supports an optional query of WOCAT QCAT API v2. It requires an authorized token. The token is taken from the input for one request and is not stored in localStorage or committed to the repository. WOCAT results use an Indonesia/country-level filter; they are not guaranteed to be province-specific. QCAT may block direct browser access through CORS or reject credentials that lack authorization.
 
+### CGIAR GARDIAN and OpenFarm
+The Sources tab links to CGIAR GARDIAN as a research-publication and dataset discovery portal. The current API access model and schema must be verified before adding an automated connector.
+
+OpenFarm is deliberately **not** called as a live API: the OpenFarm maintainers announced that the service servers were shut down in April 2025 and the project was archived. The original repository remains linked as a reference, not as a working endpoint. Crop candidates in this site are curated starter ideas and are not presented as OpenFarm data.
+
 ### BPS — province-level paddy statistics
 The Overview tab links to BPS's official table for harvested area, productivity and production of paddy by province. The values are not copied into the site as fabricated or manually inferred figures; open the source table to verify the year and units.
 
