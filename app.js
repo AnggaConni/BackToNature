@@ -283,7 +283,7 @@
     var successCount = 0;
     var errorCount = 0;
     // Limit concurrent requests to reduce load on Commons; the API is also cached in memory.
-    for (var i = 0; i < Math.min(crops.length, 6); i += 2) {
+    for (var i = 0; i < Math.min(crops.length, 4); i += 2) {
       var batch = crops.slice(i, i + 2);
       await Promise.all(batch.map(async function (crop) {
         try {
@@ -324,6 +324,12 @@
       }));
     }
     if (requestId !== cropLabRequestId) return;
+    crops.slice(4).forEach(function (crop) {
+      var slot = el('crop-image-' + crop.id);
+      var credit = el('crop-credit-' + crop.id);
+      if (slot) slot.innerHTML = '<div class="crop-image-placeholder"><span>🌿</span><b>Photo search not run</b><small>To keep requests modest, photos load for the first four matches.</small></div>';
+      if (credit) credit.innerHTML = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search photos on Commons ↗</a>';
+    });
     if (successCount && errorCount) cropLabStatus('Crop screening complete. Some photo searches were blocked or returned no image; available images show their source and license.', 'success');
     else if (successCount) cropLabStatus('Crop screening complete. Open each photo source to review image identity, attribution and license.', 'success');
     else cropLabStatus('Crop matches are ready, but photo lookup did not return any usable images. Check the connection or open Wikimedia Commons manually.', 'pending');
@@ -365,7 +371,7 @@
           cropLabStatus('No screening matches. Change a filter or leave unknown fields open.', 'pending');
           return;
         }
-        cropLabStatus('Found ' + matches.length + ' crops to investigate. Loading reference photos for the first six…', 'pending');
+        cropLabStatus('Found ' + matches.length + ' crops to investigate. Loading reference photos for the first four…', 'pending');
         await loadCropPhotos(matches, requestId);
       } catch (error) {
         if (requestId === cropLabRequestId) cropLabStatus('Could not complete crop screening: ' + (error && error.message ? error.message : 'Unknown error'), 'error');
