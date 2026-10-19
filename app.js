@@ -4,6 +4,9 @@
 
   var WORLD_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
   var PROVINCE_URL = 'https://raw.githubusercontent.com/mashadinoor/Indonesia-Geojson-2026/main/Geojson/indonesia_provinsi.geojson';
+  var ADM1_INDEX_URL = './data/province.json';
+  var ADM2_INDEX_URL = './data/district-index.json';
+  var COUNTRIES_INDEX_URL = './data/countries.json';
   var map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([12, 105], 3);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -19,6 +22,17 @@
   var currentTab = 'overview';
   var profileByName = {};
   var worldRequestId = 0;
+  var adminLoadRequestId = 0;
+  var adm1Index = null;
+  var adm2Index = null;
+  var countriesIndex = null;
+  var countryByISO3 = {};
+  var countryByNormalizedName = {};
+  var activeAdminGeoJSON = null;
+  var selectedCountry = null;
+  var selectedProvinceBounds = null;
+  var activeAdminLevel = 1;
+  var countryDataCache = {};
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -52,11 +66,11 @@
 
   function provinceFeatureName(feature) {
     var p = feature && feature.properties ? feature.properties : {};
-    return p.name || p.PROVINSI || p.provinsi || p.NAME_1 || p.NAME || p._prov || 'Unknown province';
+    return p.shapeName || p.NAME_2 || p.NAME_1 || p.name || p.PROVINSI || p.provinsi || p.NAME || p._prov || 'Unknown region';
   }
   function provinceFeatureCode(feature) {
     var p = feature && feature.properties ? feature.properties : {};
-    return p.code || p.KODE_PROV || p.PROV_CODE || p.PROVNO || p.prov_code || '';
+    return p.shapeISO || p.shapeID || p.code || p.KODE_PROV || p.PROV_CODE || p.PROVNO || p.prov_code || '';
   }
 
   var profiles = [
@@ -471,13 +485,21 @@
     content.scrollTop = 0;
   }
 
-  function openModal(name, feature) {
+  function openModal(name, feature, context) {
     var profile = profileFor(name);
-    currentProvince = { name:name, feature:feature || null };
+    currentProvince = Object.assign({ name:name, feature:feature || null, adminLevel:activeAdminLevel }, context || {});
+    currentProvince.feature = feature || currentProvince.feature || null;
+    currentProvince.name = name;
     currentTab = 'overview';
     setText('modal-title', name);
     setText('modal-subtitle', 'PROVINCE FIELD GUIDE · ' + profile.zone.toUpperCase());
-    setText('modal-stamp', 'FIELD NOTE / ' + (feature ? (provinceFeatureCode(feature) || 'REGIONAL PROFILE') : 'REGIONAL PROFILE'));
+    var levelLabel = currentProvince.adminLevel === 2 ? 'DISTRICT / ADM2' : 'REGION / ADM1';
+    setText('modal-stamp', 'FIELD NOTE / ' + (feature ? (provinceFeatureCode(feature) || levelLabel) : levelLabel));
+    if (el('btn-drill-down')) {
+      var hasDistricts = !!(currentProvince.countryIso3 && adm2Index && adm2Index.countries && adm2Index.countries[currentProvince.countryIso3]);
+      el('btn-drill-down').hidden = !(currentProvince.adminLevel === 1 && hasDistricts);
+      el('btn-drill-down').textContent = currentProvince.countryIso3 === 'IDN' ? '🏘 VIEW KABUPATEN / CITIES' : '🏘 VIEW DISTRICTS';
+    }
     el('province-modal').classList.add('open');
     el('province-modal').setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
@@ -530,94 +552,277 @@
     el('map-status').classList.add('visible');
   }
   function hideMapStatus() { el('map-status').classList.remove('visible'); }
+  async function fetchJSON(url) {
+    var response = await fetch(url, { cache:'force-cache' });
+    if (!response.ok) throw new Error('HTTP ' + response.status + ' while loading ' + url);
+    return response.json();
+  }
+
+  async function ensureBoundaryIndexes() {
+    if (adm1Index && adm2Index && countriesIndex) return;
+    var results = await Promise.all([
+      fetchJSON(ADM1_INDEX_URL),
+      fetchJSON(ADM2_INDEX_URL),
+      fetchJSON(COUNTRIES_INDEX_URL)
+    ]);
+    adm1Index = results[0];
+    adm2Index = results[1];
+    countriesIndex = results[2];
+    countryByISO3 = {};
+    countryByNormalizedName = {};
+    (countriesIndex.countries || []).forEach(function (country) {
+      if (country.iso3) countryByISO3[country.iso3.toUpperCase()] = country;
+      [country.name, country.iso3].forEach(function (name) {
+        if (name) countryByNormalizedName[norm(name)] = country;
+      });
+    });
+  }
+
+  function countryIso3ForFeature(feature, countryName) {
+    var props = feature && feature.properties ? feature.properties : {};
+    var candidates = [
+      props.ISO_A3_EH, props.ISO_A3, props.ADM0_A3, props.SOV_A3,
+      props.GU_A3, props.iso_a3, props.ISO3, props.ISO3CD, props.shapeISO
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var code = String(candidates[i] || '').trim().toUpperCase();
+      if (/^[A-Z]{3}$/.test(code) && (countryByISO3[code] || (adm1Index && adm1Index.countries && adm1Index.countries[code]) || (adm2Index && adm2Index.countries && adm2Index.countries[code]))) {
+        return code;
+      }
+    }
+
+    var aliases = {
+      'united states of america':'united states',
+      'russia':'russian federation',
+      'south korea':'republic of korea',
+      'north korea':"democratic people's republic of korea",
+      'iran':'iran islamic republic of',
+      'syria':'syrian arab republic',
+      'tanzania':'united republic of tanzania',
+      'bolivia':'bolivia plurinational state of',
+      'venezuela':'venezuela bolivarian republic of',
+      'moldova':'republic of moldova',
+      'laos':"lao people's democratic republic",
+      'brunei':'brunei darussalam',
+      'ivory coast':"cote d ivoire",
+      'czechia':'czech republic',
+      'cape verde':'cabo verde',
+      'swaziland':'eswatini',
+      'macedonia':'north macedonia',
+      'vietnam':'viet nam',
+      'palestine':'state of palestine'
+    };
+    var normalizedName = norm(countryName || props.ADMIN || props.name || props.NAME || '');
+    var lookup = aliases[normalizedName] || normalizedName;
+    var match = countryByNormalizedName[lookup];
+    if (match && match.iso3) return match.iso3.toUpperCase();
+    return '';
+  }
+
   function fillProvinceSelect() {
     var select = el('province-select');
-    if (!select || !provincesGeoJSON) return;
-    var list = provincesGeoJSON.features.slice().sort(function (a, b) {
+    if (!select || !activeAdminGeoJSON) return;
+    var placeholder = activeAdminLevel === 1 ? 'JUMP TO REGION…' : 'JUMP TO DISTRICT…';
+    var list = (activeAdminGeoJSON.features || []).slice().sort(function (a, b) {
       return norm(provinceFeatureName(a)).localeCompare(norm(provinceFeatureName(b)));
     });
-    select.innerHTML = '<option value="">JUMP TO PROVINCE…</option>' + list.map(function (feature) {
-      var provinceName = provinceFeatureName(feature);
-      return '<option value="' + esc(provinceName) + '">' + esc(provinceName) + '</option>';
+    select.innerHTML = '<option value="">' + placeholder + '</option>' + list.map(function (feature, index) {
+      var displayName = provinceFeatureName(feature);
+      return '<option value="' + index + '">' + esc(displayName) + '</option>';
     }).join('');
   }
 
   function provinceStyle() {
-    return { color:'#513e2a', weight:2, opacity:1, fillColor:'#98bd68', fillOpacity:0.72 };
+    return activeAdminLevel === 2
+      ? { color:'#344f72', weight:1.4, opacity:1, fillColor:'#8cb6d8', fillOpacity:0.65 }
+      : { color:'#513e2a', weight:2, opacity:1, fillColor:'#98bd68', fillOpacity:0.72 };
   }
   function provinceHoverStyle() {
     return { color:'#fff2bd', weight:3, opacity:1, fillColor:'#e8bb53', fillOpacity:0.92 };
   }
 
-  async function enterProvinceMode() {
-    closeModal();
-    hideMapStatus();
-    if (worldLayer) { map.removeLayer(worldLayer); worldLayer = null; }
-    mode = 'provinces';
-    document.body.classList.add('province-mode');
-    setText('map-title', 'INDONESIA · PROVINCE EXPLORER');
+  function setExplorerChrome(label, level) {
+    setText('map-title', label);
     el('btn-world').hidden = false;
+    el('btn-world').textContent = level === 2 ? '↩ BACK TO REGIONS' : '🌍 WORLD MAP';
     el('btn-provinces').hidden = true;
     el('province-select-wrap').hidden = false;
-    showMapStatus('Loading province map…', 'Fetching boundaries for all 38 provinces. This is a one-time download per browser cache.');
-    try {
-      if (!provincesGeoJSON) {
-        var response = await fetch(PROVINCE_URL, { cache:'force-cache' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        provincesGeoJSON = await response.json();
+  }
+
+  async function fetchAdmin1ForCountry(iso3) {
+    if (countryDataCache['ADM1:' + iso3]) return countryDataCache['ADM1:' + iso3];
+    var data;
+    if (iso3 === 'IDN') {
+      // Keep the app's curated 38-province Indonesian layer while other countries use the global dataset.
+      data = await fetchJSON(PROVINCE_URL);
+    } else {
+      var entry = adm1Index && adm1Index.countries ? adm1Index.countries[iso3] : null;
+      if (!entry || !entry.file) throw new Error('No first-level administrative boundary is available for this country in the current dataset.');
+      data = await fetchJSON('./data/' + entry.file);
+    }
+    if (!data || data.type !== 'FeatureCollection' || !Array.isArray(data.features) || !data.features.length) {
+      throw new Error('The first-level boundary file was empty or had an unexpected format.');
+    }
+    countryDataCache['ADM1:' + iso3] = data;
+    return data;
+  }
+
+  async function fetchAdmin2ForCountry(iso3) {
+    if (countryDataCache['ADM2:' + iso3]) return countryDataCache['ADM2:' + iso3];
+    var entry = adm2Index && adm2Index.countries ? adm2Index.countries[iso3] : null;
+    if (!entry || !entry.file) throw new Error('No second-level administrative boundary is available for this country.');
+    var data = await fetchJSON('./data/' + entry.file);
+    if (!data || data.type !== 'FeatureCollection' || !Array.isArray(data.features) || !data.features.length) {
+      throw new Error('The district boundary file was empty or had an unexpected format.');
+    }
+    countryDataCache['ADM2:' + iso3] = data;
+    return data;
+  }
+
+  function drawAdministrativeLayer(data, level, focusBounds) {
+    if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
+    activeAdminGeoJSON = data;
+    activeAdminLevel = level;
+
+    var thisLayerGroup = L.geoJSON(data, {
+      style: provinceStyle,
+      onEachFeature:function (feature, layer) {
+        var name = provinceFeatureName(feature);
+        layer.bindTooltip(name, { sticky:true, direction:'auto', className:'retro-tooltip' });
+        layer.on('mouseover', function () {
+          layer.setStyle(provinceHoverStyle());
+          if (layer.bringToFront) layer.bringToFront();
+        });
+        layer.on('mouseout', function () { thisLayerGroup.resetStyle(layer); });
+        layer.on('click', function (event) {
+          if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+          var context = {
+            countryIso3: selectedCountry ? selectedCountry.iso3 : '',
+            countryName: selectedCountry ? selectedCountry.name : '',
+            adminLevel: level,
+            feature: feature
+          };
+          openModal(name, feature, context);
+        });
       }
-      if (provinceLayer) map.removeLayer(provinceLayer);
-      provinceLayer = L.geoJSON(provincesGeoJSON, {
-        style:provinceStyle,
-        onEachFeature:function (feature, layer) {
-          var name = provinceFeatureName(feature);
-          layer.bindTooltip(name, { sticky:true, direction:'auto', className:'retro-tooltip' });
-          layer.on('mouseover', function () { layer.setStyle(provinceHoverStyle()); if (layer.bringToFront) layer.bringToFront(); });
-          layer.on('mouseout', function () { provinceLayer.resetStyle(layer); });
-          layer.on('click', function (event) {
-            if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
-            openModal(name, feature);
-          });
-        }
-      }).addTo(map);
-      map.fitBounds(provinceLayer.getBounds(), { padding:[35,35] });
-      fillProvinceSelect();
-      setText('map-status-title', '38 provinces ready');
-      setText('map-status-text', 'Click a province for its full-screen field guide. Choose a province from the list if you prefer.');
-      setTimeout(hideMapStatus, 2600);
-      el('province-select').focus({preventScroll:true});
+    });
+    provinceLayer = thisLayerGroup.addTo(map);
+    fillProvinceSelect();
+
+    if (focusBounds && focusBounds.isValid && focusBounds.isValid()) {
+      map.fitBounds(focusBounds, { padding:[40,40], maxZoom:8 });
+    } else if (provinceLayer.getBounds().isValid()) {
+      map.fitBounds(provinceLayer.getBounds(), { padding:[35,35], maxZoom: level === 2 ? 9 : 7 });
+    }
+  }
+
+  async function enterCountryMode(iso3, countryName, focusBounds) {
+    var requestId = ++adminLoadRequestId;
+    closeModal();
+    hideMapStatus();
+    await ensureBoundaryIndexes();
+    if (worldLayer && map.hasLayer(worldLayer)) map.removeLayer(worldLayer);
+    if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
+    mode = 'provinces';
+    document.body.classList.add('province-mode');
+    selectedCountry = { iso3: iso3, name: countryName || (countryByISO3[iso3] && countryByISO3[iso3].name) || iso3 };
+    selectedProvinceBounds = focusBounds || null;
+    setExplorerChrome(String(selectedCountry.name).toUpperCase() + ' · REGIONS', 1);
+    showMapStatus('Loading ' + selectedCountry.name + '…', 'Loading first-level administrative boundaries from the monthly dataset.');
+    try {
+      var data = await fetchAdmin1ForCountry(iso3);
+      if (requestId !== adminLoadRequestId || mode !== 'provinces') return;
+      drawAdministrativeLayer(data, 1, focusBounds);
+      setText('map-status-title', (data.features || []).length + ' regions ready');
+      setText('map-status-text', 'Click a region for its fieldbook. Use the district button in the fieldbook to drill down further.');
+      setTimeout(hideMapStatus, 2800);
     } catch (error) {
-      showMapStatus('Could not load provincial boundaries', 'Check your connection and reload. ' + (error.message || 'The GeoJSON source was unavailable.'));
+      if (requestId !== adminLoadRequestId) return;
+      showMapStatus('Regional boundaries unavailable', (error && error.message ? error.message : 'Unknown boundary loading error') + ' Try another country or return to the world map.');
+    }
+  }
+
+  async function enterDistrictMode(iso3, countryName, focusBounds) {
+    var requestId = ++adminLoadRequestId;
+    closeModal();
+    hideMapStatus();
+    await ensureBoundaryIndexes();
+    if (worldLayer && map.hasLayer(worldLayer)) map.removeLayer(worldLayer);
+    if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
+    mode = 'districts';
+    document.body.classList.add('province-mode');
+    selectedCountry = { iso3: iso3, name: countryName || (countryByISO3[iso3] && countryByISO3[iso3].name) || iso3 };
+    selectedProvinceBounds = focusBounds || selectedProvinceBounds || null;
+    setExplorerChrome(String(selectedCountry.name).toUpperCase() + ' · DISTRICTS', 2);
+    showMapStatus('Loading districts…', 'Fetching available second-level administrative boundaries.');
+    try {
+      var data = await fetchAdmin2ForCountry(iso3);
+      if (requestId !== adminLoadRequestId || mode !== 'districts') return;
+      drawAdministrativeLayer(data, 2, selectedProvinceBounds);
+      setText('map-status-title', (data.features || []).length + ' districts / local units ready');
+      setText('map-status-text', 'This source labels ADM2 differently by country. Click a mapped unit to open its fieldbook.');
+      setTimeout(hideMapStatus, 3000);
+    } catch (error) {
+      if (requestId !== adminLoadRequestId) return;
+      showMapStatus('District boundaries unavailable', (error && error.message ? error.message : 'Unknown boundary loading error') + ' The country may not have ADM2 data.');
     }
   }
 
   function enterWorldMode() {
+    ++adminLoadRequestId;
     closeModal();
     mode = 'world';
+    selectedCountry = null;
+    selectedProvinceBounds = null;
     document.body.classList.remove('province-mode');
-    if (provinceLayer) { map.removeLayer(provinceLayer); provinceLayer = null; }
+    if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
+    provinceLayer = null;
     el('btn-world').hidden = true;
     el('btn-provinces').hidden = false;
     el('province-select-wrap').hidden = true;
     setText('map-title', 'GLOBAL LAND RESTORATION MAP');
-    if (!worldLayer) loadWorldLayer();
+    setText('map-help', 'Click any country to explore its regions. Drill into districts from a region fieldbook.');
+    if (worldLayer) {
+      if (!map.hasLayer(worldLayer)) worldLayer.addTo(map);
+    } else {
+      loadWorldLayer();
+    }
     map.setView([12, 105], 3);
   }
 
+  async function goBackFromAdminMode() {
+    if (mode === 'districts' && selectedCountry) {
+      await enterCountryMode(selectedCountry.iso3, selectedCountry.name, selectedProvinceBounds);
+    } else {
+      enterWorldMode();
+    }
+  }
+
   async function jumpToProvince(name) {
-    if (!name) return;
-    var feature = provincesGeoJSON && provincesGeoJSON.features.find(function (f) {
-      return norm(provinceFeatureName(f)) === norm(name);
-    });
+    if (!name || !activeAdminGeoJSON) return;
+    var index = Number(name);
+    var feature = Number.isInteger(index) && index >= 0
+      ? activeAdminGeoJSON.features[index]
+      : activeAdminGeoJSON.features.find(function (f) {
+          return norm(provinceFeatureName(f)) === norm(name);
+        });
     if (!feature) return;
-    if (mode !== 'provinces') await enterProvinceMode();
-    openModal(provinceFeatureName(feature) || name, feature);
+    var featureName = provinceFeatureName(feature);
+    openModal(featureName, feature, {
+      countryIso3: selectedCountry ? selectedCountry.iso3 : '',
+      countryName: selectedCountry ? selectedCountry.name : '',
+      adminLevel: activeAdminLevel,
+      feature: feature
+    });
     if (provinceLayer) {
       var targetLayer = null;
       provinceLayer.eachLayer(function (layer) {
-        if (norm(provinceFeatureName(layer.feature)) === norm(name)) targetLayer = layer;
+        if (layer.feature === feature) targetLayer = layer;
       });
-      if (targetLayer) map.fitBounds(targetLayer.getBounds(), { padding:[45,45], maxZoom:7 });
+      if (targetLayer) {
+        var bounds = targetLayer.getBounds();
+        map.fitBounds(bounds, { padding:[45,45], maxZoom:activeAdminLevel === 2 ? 9 : 8 });
+      }
     }
   }
 
@@ -625,40 +830,63 @@
     var id = ++worldRequestId;
     showMapStatus('Loading world map…', 'Getting country boundaries.');
     try {
-      var response = await fetch(WORLD_URL, { cache:'force-cache' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      var data = await response.json();
+      var data = await fetchJSON(WORLD_URL);
       if (id !== worldRequestId || mode !== 'world') return;
-      worldLayer = L.geoJSON(data, {
+      var thisWorldLayer = L.geoJSON(data, {
         style:function () { return { color:'#4c5a38', weight:1, fillColor:'#85a95f', fillOpacity:0.30 }; },
         onEachFeature:function (feature, layer) {
           var props = feature.properties || {};
-          var name = props.ADMIN || props.name || props.NAME || 'Unknown region';
+          var name = props.ADMIN || props.name || props.NAME || props.NAME_LONG || 'Unknown region';
           layer.bindTooltip(name, { sticky:true, className:'retro-tooltip' });
           layer.on('mouseover', function () { layer.setStyle({ color:'#ffebac', weight:2, fillColor:'#eac15d', fillOpacity:0.72 }); });
-          layer.on('mouseout', function () { worldLayer.resetStyle(layer); });
+          layer.on('mouseout', function () { thisWorldLayer.resetStyle(layer); });
           layer.on('click', function (event) {
             L.DomEvent.stopPropagation(event);
-            if (norm(name) === 'indonesia') {
-              enterProvinceMode();
-            } else {
-              showMapStatus(name + ' · country-level view', 'The detailed 38-province field explorer is currently focused on Indonesia. Click “Province Explorer” to open the Indonesian provincial map.');
-            }
+            (async function () {
+              try {
+                await ensureBoundaryIndexes();
+                var iso3 = countryIso3ForFeature(feature, name);
+                if (!iso3) {
+                  showMapStatus(name + ' · country selected', 'Could not match this map polygon to an ISO-3 code in the boundary index. Use the Indonesia Explorer button or choose another country.');
+                  return;
+                }
+                await enterCountryMode(iso3, name, layer.getBounds());
+              } catch (error) {
+                showMapStatus('Could not open ' + name, error && error.message ? error.message : 'Unknown error');
+              }
+            })();
           });
         }
-      }).addTo(map);
+      });
+      worldLayer = thisWorldLayer;
+      if (mode === 'world') worldLayer.addTo(map);
       setText('map-status-title', 'World map ready');
-      setText('map-status-text', 'Click Indonesia or use “Province Explorer” to explore all 38 provinces.');
-      setTimeout(hideMapStatus, 3000);
+      setText('map-status-text', 'Click any country to explore its regions. Use Indonesia Explorer as a shortcut.');
+      setTimeout(hideMapStatus, 2600);
     } catch (error) {
-      showMapStatus('World boundaries unavailable', 'The map tiles may still work. Reload to retry the country boundary data.');
+      showMapStatus('World boundaries unavailable', 'The map tiles may still work. ' + (error && error.message ? error.message : 'Reload to retry the country boundary data.'));
     }
   }
-
-  el('btn-provinces').addEventListener('click', enterProvinceMode);
-  el('btn-world').addEventListener('click', enterWorldMode);
-  el('btn-home').addEventListener('click', function () { closeModal(); map.setView([12,105],3); });
+  el('btn-provinces').textContent = '🇮🇩 INDONESIA EXPLORER';
+  el('btn-provinces').addEventListener('click', function () { enterCountryMode('IDN', 'Indonesia'); });
+  el('btn-world').addEventListener('click', goBackFromAdminMode);
+  el('btn-home').addEventListener('click', enterWorldMode);
   el('province-select').addEventListener('change', function () { jumpToProvince(this.value); });
+  var drillButton = el('btn-drill-down');
+  if (drillButton) drillButton.addEventListener('click', function () {
+    if (!currentProvince || !currentProvince.countryIso3 || currentProvince.adminLevel !== 1) return;
+    var bounds = null;
+    if (provinceLayer && currentProvince.feature) {
+      provinceLayer.eachLayer(function (layer) {
+        if (layer.feature === currentProvince.feature) bounds = layer.getBounds();
+      });
+    }
+    enterDistrictMode(
+      currentProvince.countryIso3,
+      currentProvince.countryName || currentProvince.countryIso3,
+      bounds
+    );
+  });
   el('open-current-province').addEventListener('click', function () {
     if (currentProvince) renderTab('overview');
   });
