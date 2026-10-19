@@ -31,7 +31,7 @@
   <meta name="twitter:image:alt" content="BackToNature Living Land Lab icon">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -42,7 +42,7 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0}
-    body{background:#253522;color:var(--ink);font-family:'VT323',monospace;font-size:21px;overflow:hidden}
+    body{background:#253522;color:var(--ink);font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.5;overflow:hidden}
     button,select,a{font:inherit}
     button{cursor:pointer}
     a{color:#245d88}
@@ -307,6 +307,60 @@
     .token-box input{width:min(470px,100%);padding:8px 10px;border:3px solid #87653d;background:#fff7de;color:#39281a;font:20px 'VT323',monospace}
     .token-box .pixel-btn{margin:7px 0}
     .modal-content::-webkit-scrollbar{width:12px}.modal-content::-webkit-scrollbar-track{background:#dbc69b;border-left:2px solid #8d6842}.modal-content::-webkit-scrollbar-thumb{background:#8d6842;border:2px solid #dbc69b}
+    /* Readability layer: keep the retro art direction, but use a modern body face for longer copy. */
+    .pixel-btn,.tab-btn,.modal-close,.leaflet-control-zoom a,.retro-tooltip,#province-select{font-family:'VT323',monospace}
+    .logo-subtitle,.modal-titles p,.modal-stamp,.modal-content,.region-summary-content,.modal-footer,
+    .bottom-hud p,.map-status p,.tab-intro p,.field-card p,.tile p,.crop-card p,.guide-card p,
+    .source-card p,.data-integrity p,.data-integrity li,.live-explainer,.live-note,.live-status,
+    .crop-control label,.crop-control input,.crop-control select,.crop-match-body>p,
+    .crop-reason,.crop-caution,.crop-reason li,.crop-caution li,.climate-method-note p,
+    .climate-method-note li,.climate-month-metrics,.climate-crop-body>p,
+    .region-summary-header p,.region-summary-hero p,.region-summary-section>p,
+    .region-summary-crop p,.region-summary-tech p,.region-summary-climate-crops p,
+    .region-summary-note p,.region-summary-footer,.translate-menu p,.translate-menu button {
+      font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+      line-height:1.45;
+    }
+    .pixel-btn{font-size:17px;line-height:1.15}
+    .tab-btn{font-size:17px;line-height:1.2}
+    .modal-close{font-size:10px;line-height:1.25}
+    .logo-subtitle{font-size:13px;letter-spacing:.1px}
+    .modal-titles p,.modal-stamp{font-size:13px;line-height:1.4}
+    .modal-footer{font-size:13px;line-height:1.4}
+    .bottom-hud p,.map-status p{font-size:15px;line-height:1.4}
+    .tab-intro p{font-size:17px;line-height:1.55}
+    .field-card p,.tile p,.crop-card p,.guide-card p,.source-card p,
+    .data-integrity p,.data-integrity li,.live-explainer,.live-note,.live-status {
+      font-size:15.5px;line-height:1.55;
+    }
+    .crop-match-body>p,.region-summary-hero p,.region-summary-section>p,
+    .region-summary-crop p,.region-summary-tech p,.region-summary-note p {
+      font-size:15.5px;line-height:1.5;
+    }
+    .crop-control label{font-size:15px;line-height:1.4}
+    .crop-control input,.crop-control select{font-size:15px;min-height:42px;line-height:1.35}
+    .crop-reason,.crop-caution{font-size:14px;line-height:1.45}
+    .crop-reason li,.crop-caution li{font-size:14px;line-height:1.45}
+    .climate-method-note p,.climate-method-note li,.climate-crop-body>p{font-size:15px;line-height:1.5}
+    .climate-month-metrics{font-size:13px;line-height:1.4}
+    .climate-month-metrics b{font-size:14px;line-height:1.4}
+    .region-summary-header p,.region-summary-footer,.translate-menu p,.translate-menu button{font-size:14px;line-height:1.45}
+    .translate-menu-title,.eyebrow,.mini-code,.pixel-label{font-family:'Press Start 2P',monospace}
+    .tab-intro h2,.region-summary-hero h2,.region-summary-header h2,
+    .field-card h3,.crop-card h3,.climate-crop-body h3,
+    .region-summary-section-heading h3,.region-summary-crop h4,
+    .region-summary-tech-title h4,.source-card h3,.climate-preview-copy h3 {
+      font-family:'VT323',monospace;
+      line-height:1.08;
+    }
+    .eyebrow,.mini-code{font-size:9px;line-height:1.7}
+    .region-summary-tags span,.region-summary-climate-metrics small{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.4}
+    .crop-match-meta span,.climate-crop-meta span{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;line-height:1.4}
+    .climate-summary-grid small{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.4}
+    .region-summary-climate-loading small{font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.45}
+    .source-card h3,.region-summary-tech-title h4,.region-summary-crop h4{font-size:23px}
+    .climate-preview-copy p{font-size:15px;line-height:1.5}
+    .pixel-btn:focus-visible,.tab-btn:focus-visible{outline-offset:3px}
     @media(max-width:850px){
       .screen-hud{top:7px;width:calc(100vw - 14px);gap:5px}.logo-board{padding:7px 9px;min-height:55px;gap:7px}.logo-sprite{width:29px;height:29px}.logo-subtitle{font-size:15px}
       .hud-actions{gap:5px}.pixel-btn{padding:7px 8px;font-size:17px;box-shadow:inset 0 0 0 2px #7196ba,2px 3px 0 var(--shadow)}
@@ -321,7 +375,7 @@
       .source-strip{align-items:flex-start;flex-direction:column}.source-strip .pixel-btn{align-self:flex-start}
     }
     @media(max-width:560px){
-      body{font-size:19px}.screen-hud{align-items:flex-start}.logo-board{padding:6px;min-height:48px}.logo-sprite{width:23px;height:23px}.logo-subtitle{display:none}.logo-copy .pixel-label{font-size:8px}.hud-actions{flex-direction:column;max-width:44%}.hud-actions .pixel-btn{font-size:15px;padding:6px 8px}.hud-actions #province-select-wrap{min-width:0}
+      body{font-size:16px}.screen-hud{align-items:flex-start}.logo-board{padding:6px;min-height:48px}.logo-sprite{width:23px;height:23px}.logo-subtitle{display:none}.logo-copy .pixel-label{font-size:8px}.hud-actions{flex-direction:column;max-width:44%}.hud-actions .pixel-btn{font-size:15px;padding:6px 8px}.hud-actions #province-select-wrap{min-width:0}
       .bottom-hud{max-width:calc(100vw - 16px);bottom:7px}.bottom-hud p{font-size:16px}.map-status{top:96px}
       .modal-shell{border-width:3px}.modal-header{padding:8px}.modal-heading{gap:8px}.modal-avatar{display:none}.modal-titles h1{font-size:25px}.modal-titles p{font-size:15px}.modal-stamp{font-size:9px}.modal-close{font-size:9px;padding:8px}
       .translate-trigger{font-size:12px;padding:6px 4px}.translate-menu{width:178px;right:-45px}
@@ -424,7 +478,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-summary-translate-v2"></script>
-  <script src="./app.js?v=20261020-summary-translate-v2"></script>
+  <script src="./api.js?v=20261020-readable-type-v1"></script>
+  <script src="./app.js?v=20261020-readable-type-v1"></script>
 </body>
 </html>
