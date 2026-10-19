@@ -235,6 +235,8 @@
       {t:'FAOSTAT',d:'Country-level agricultural indicators and land-use statistics. These are not provincial measurements.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL INDICATORS'},
       {t:'WOCAT QCAT',d:'Documented sustainable land management approaches and technologies. API access may require a token.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'RESTORATION METHODS'},
       {t:'FAO AGROVOC',d:'Multilingual agricultural vocabulary and concept relationships for structured discovery.',u:'https://agrovoc.fao.org/browse/agrovoc/en/',tag:'TAXONOMY'},
+      {t:'CGIAR GARDIAN',d:'Agricultural research and dataset discovery. The discovery portal is linked here; verify current API access, schema and authentication before building an automated connector.',u:'https://gardian.bigdata.cgiar.org/',tag:'RESEARCH DISCOVERY'},
+      {t:'OpenFarm growing guides — archived',d:'OpenFarm announced that its servers shut down in April 2025. The original growing-guide API is not treated as live; its archived repository is available for reference only.',u:'https://github.com/openfarmcc/OpenFarm',tag:'ARCHIVED / NOT LIVE'},
       {t:'Provincial boundary GeoJSON',d:'38 Indonesian province boundaries. Repository README cites Kepmendagri No. 300.2.2-2138/2025 and MIT licensing; review the original metadata when reusing.',u:'https://github.com/AlfianAliM/Indonesia-GeoJSON',tag:'MAP BOUNDARIES'}
     ];
     return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open source records to check update date, methodology, geographic coverage, license and units. This app separates a curated regional starter profile from measured statistics.</p></div>' +
