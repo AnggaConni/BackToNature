@@ -82,6 +82,10 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 - Browser API calls may fail due to CORS, network conditions, service availability, authentication or changes in source schemas. Failures are reported rather than replaced silently with invented observations.
 - This is a static GitHub Pages-compatible app; private API keys must not be stored in repository code.
 
+## Background music
+
+The mini-player uses the repository audio file `music/allicante-cozy-game-beats.mp3`, identified as “Cozy Game Beats — Alicante”. Playback is user-initiated only; `preload="none"` is used and the page does not autoplay the track. The player supports play/pause, volume, mute and seeking. The player links back to the track's Pixabay page for the current license terms.
+
 ## Files
 
 - `index.html` — page shell and retro game-inspired styles.
@@ -95,4 +99,5 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 2. Click **Province Explorer**, or click Indonesia on the world map.
 3. Click a province or choose it from the province dropdown.
 4. Explore **Overview**, **Soil & Land**, **Crops & Farming**, **Technology**, and **Sources**.
-5. In Sources, request FAOSTAT or the FAO catalogue. Enter a WOCAT token only if you have authorized access.
+5. Use the mini jukebox to start/pause the uploaded “Cozy Game Beats — Alicante” track, adjust volume, mute or scrub the timeline. Audio never starts until the Play button is pressed.
+6. In Sources, request FAOSTAT or the FAO catalogue. Enter a WOCAT token only if you have authorized access.
