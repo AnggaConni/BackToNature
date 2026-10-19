@@ -181,6 +181,35 @@
     {id:'sunn-hemp', name:'Sunn Hemp', local:'Crotalaria / sunn hemp', scientific:'Crotalaria juncea', category:'cover-crop', soils:['sandy','loam','volcanic','alluvial'], phMin:5.0, phMax:7.5, drainage:['well','moderate'], water:['seasonal','limited','reliable'], climates:['humid-tropical','seasonal-tropical','dry-tropical'], uses:['restoration'], note:'A warm-season cover/green-manure legume candidate for suitable rotations and soil-cover goals.', caution:'Check local regulations, toxicity to livestock, seed availability and avoid use where it could escape cultivation.'}
   ];
 
+  // Broad planting-window bands used only for initial screening. They must be
+  // calibrated against local crop calendars and agricultural-extension advice.
+  // Rainfall is accumulated over the establishment/growing window, not per month.
+  var CLIMATE_CROP_RULES = {
+    'rice': {months:4,tempMin:20,tempMax:32,rainMin:350,rainMax:1200},
+    'maize': {months:4,tempMin:18,tempMax:32,rainMin:180,rainMax:700},
+    'cassava': {months:6,tempMin:20,tempMax:34,rainMin:300,rainMax:1200},
+    'sweet-potato': {months:4,tempMin:18,tempMax:30,rainMin:180,rainMax:650},
+    'soybean': {months:4,tempMin:20,tempMax:30,rainMin:200,rainMax:650},
+    'mung-bean': {months:3,tempMin:20,tempMax:35,rainMin:100,rainMax:350},
+    'peanut': {months:4,tempMin:20,tempMax:30,rainMin:200,rainMax:600},
+    'sorghum': {months:4,tempMin:20,tempMax:35,rainMin:120,rainMax:500},
+    'millet': {months:3,tempMin:20,tempMax:35,rainMin:80,rainMax:300},
+    'tomato': {months:4,tempMin:15,tempMax:30,rainMin:180,rainMax:600},
+    'chili': {months:5,tempMin:18,tempMax:32,rainMin:250,rainMax:800},
+    'leafy-greens': {months:2,tempMin:15,tempMax:30,rainMin:80,rainMax:260},
+    'potato': {months:4,tempMin:10,tempMax:24,rainMin:180,rainMax:550},
+    'banana': {months:4,tempMin:22,tempMax:32,rainMin:300,rainMax:1000},
+    'coconut': {months:6,tempMin:22,tempMax:32,rainMin:450,rainMax:1500},
+    'coffee-arabica': {months:4,tempMin:15,tempMax:24,rainMin:300,rainMax:900},
+    'coffee-robusta': {months:4,tempMin:20,tempMax:30,rainMin:300,rainMax:1000},
+    'cacao': {months:6,tempMin:21,tempMax:32,rainMin:500,rainMax:1500},
+    'mango': {months:4,tempMin:24,tempMax:35,rainMin:150,rainMax:600},
+    'pineapple': {months:4,tempMin:20,tempMax:32,rainMin:180,rainMax:600},
+    'sago': {months:6,tempMin:24,tempMax:32,rainMin:600,rainMax:1800},
+    'vetiver': {months:3,tempMin:18,tempMax:35,rainMin:100,rainMax:450},
+    'sunn-hemp': {months:3,tempMin:20,tempMax:35,rainMin:100,rainMax:350}
+  };
+
   function listCropRecommendations(criteria) {
     criteria = criteria || {};
     var soil = String(criteria.soil || 'unknown');
@@ -317,11 +346,260 @@
     return images;
   }
 
+  var climateRequestCache = {};
+
+  function mean(values) {
+    var valid = values.filter(function (value) { return value != null && Number.isFinite(Number(value)); }).map(Number);
+    return valid.length ? valid.reduce(function (sum, value) { return sum + value; }, 0) / valid.length : null;
+  }
+
+  function round(value, digits) {
+    if (value == null || !Number.isFinite(Number(value))) return null;
+    var scale = Math.pow(10, digits || 0);
+    return Math.round(Number(value) * scale) / scale;
+  }
+
+  function degreesFromVector(sinSum, cosSum) {
+    if (!sinSum && !cosSum) return null;
+    return (Math.atan2(sinSum, cosSum) * 180 / Math.PI + 360) % 360;
+  }
+
+  function compassDirection(degrees) {
+    if (degrees == null || !Number.isFinite(Number(degrees))) return 'Not available';
+    return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][
+      Math.round(Number(degrees) / 22.5) % 16
+    ];
+  }
+
+  async function fetchHistoricalClimate(latitude, longitude, requestedYears) {
+    var lat = Number(latitude);
+    var lon = Number(longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+      throw new Error('A valid representative latitude and longitude are required for climate lookup.');
+    }
+    var years = Math.max(3, Math.min(10, Math.round(Number(requestedYears) || 5)));
+    var cacheKey = lat.toFixed(3) + ',' + lon.toFixed(3) + ':' + years;
+    if (climateRequestCache[cacheKey]) return climateRequestCache[cacheKey];
+
+    var promise = (async function () {
+      var currentYear = new Date().getFullYear();
+      var startYear = currentYear - years;
+      var endYear = currentYear - 1;
+      var params = new URLSearchParams({
+        latitude:lat.toFixed(5),
+        longitude:lon.toFixed(5),
+        start_date:startYear + '-01-01',
+        end_date:endYear + '-12-31',
+        daily:[
+          'temperature_2m_mean',
+          'temperature_2m_min',
+          'temperature_2m_max',
+          'precipitation_sum',
+          'wind_speed_10m_mean',
+          'wind_speed_10m_max',
+          'wind_gusts_10m_max',
+          'wind_direction_10m_dominant'
+        ].join(','),
+        timezone:'auto',
+        temperature_unit:'celsius',
+        precipitation_unit:'mm',
+        wind_speed_unit:'kmh'
+      });
+      var url = 'https://archive-api.open-meteo.com/v1/archive?' + params.toString();
+      var payload = await requestJSON(url);
+      var daily = payload && payload.daily;
+      if (!daily || !Array.isArray(daily.time) || daily.time.length < 300) {
+        throw new Error('The historical weather service returned too few daily observations for a seasonal profile.');
+      }
+      var variables = [
+        'temperature_2m_mean','temperature_2m_min','temperature_2m_max',
+        'precipitation_sum','wind_speed_10m_mean','wind_speed_10m_max',
+        'wind_gusts_10m_max','wind_direction_10m_dominant'
+      ];
+      var yearly = {};
+      daily.time.forEach(function (date, index) {
+        var month = Number(String(date).slice(5,7)) - 1;
+        var year = Number(String(date).slice(0,4));
+        if (month < 0 || month > 11 || !Number.isFinite(year)) return;
+        var key = year + '-' + month;
+        if (!yearly[key]) {
+          yearly[key] = {
+            year:year, month:month, days:0, temperatures:[], minima:[], maxima:[],
+            precipitation:0, rainyDays:0, windMeans:[], windMaxima:[], gustMaxima:[],
+            directionSin:0, directionCos:0, directionCount:0
+          };
+        }
+        var bucket = yearly[key];
+        bucket.days++;
+        var values = {};
+        variables.forEach(function (variable) {
+          var array = daily[variable];
+          values[variable] = Array.isArray(array) && array[index] != null && Number.isFinite(Number(array[index]))
+            ? Number(array[index]) : null;
+        });
+        if (values.temperature_2m_mean != null) bucket.temperatures.push(values.temperature_2m_mean);
+        if (values.temperature_2m_min != null) bucket.minima.push(values.temperature_2m_min);
+        if (values.temperature_2m_max != null) bucket.maxima.push(values.temperature_2m_max);
+        if (values.precipitation_sum != null) {
+          bucket.precipitation += values.precipitation_sum;
+          if (values.precipitation_sum >= 1) bucket.rainyDays++;
+        }
+        if (values.wind_speed_10m_mean != null) bucket.windMeans.push(values.wind_speed_10m_mean);
+        if (values.wind_speed_10m_max != null) bucket.windMaxima.push(values.wind_speed_10m_max);
+        if (values.wind_gusts_10m_max != null) bucket.gustMaxima.push(values.wind_gusts_10m_max);
+        if (values.wind_direction_10m_dominant != null) {
+          var radians = values.wind_direction_10m_dominant * Math.PI / 180;
+          bucket.directionSin += Math.sin(radians);
+          bucket.directionCos += Math.cos(radians);
+          bucket.directionCount++;
+        }
+      });
+
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var monthly = monthNames.map(function (name, monthIndex) {
+        var buckets = Object.keys(yearly).map(function (key) { return yearly[key]; })
+          .filter(function (bucket) { return bucket.month === monthIndex && bucket.days >= 20; });
+        var rainfall = buckets.map(function (bucket) { return bucket.precipitation; });
+        var rainDays = buckets.map(function (bucket) { return bucket.rainyDays; });
+        var tempMeans = buckets.map(function (bucket) { return mean(bucket.temperatures); });
+        var tempMins = buckets.map(function (bucket) { return mean(bucket.minima); });
+        var tempMaxs = buckets.map(function (bucket) { return mean(bucket.maxima); });
+        var windMeans = buckets.map(function (bucket) { return mean(bucket.windMeans); });
+        var windMaxima = buckets.map(function (bucket) { return bucket.windMaxima.length ? Math.max.apply(null, bucket.windMaxima) : null; });
+        var gustMaxima = buckets.map(function (bucket) { return bucket.gustMaxima.length ? Math.max.apply(null, bucket.gustMaxima) : null; });
+        var sin = buckets.reduce(function (sum, bucket) { return sum + bucket.directionSin; }, 0);
+        var cos = buckets.reduce(function (sum, bucket) { return sum + bucket.directionCos; }, 0);
+        var direction = degreesFromVector(sin, cos);
+        return {
+          month:monthIndex,
+          label:name,
+          yearsAvailable:buckets.length,
+          temperatureMean:round(mean(tempMeans),1),
+          temperatureMin:round(mean(tempMins),1),
+          temperatureMax:round(mean(tempMaxs),1),
+          precipitationMm:round(mean(rainfall),0),
+          rainyDays:round(mean(rainDays),1),
+          windMeanKmh:round(mean(windMeans),1),
+          windDailyMaxMeanKmh:round(mean(windMaxima),1),
+          windGustMaxMeanKmh:round(mean(gustMaxima),1),
+          windDirectionDegrees:round(direction,0),
+          windDirection:compassDirection(direction)
+        };
+      });
+      if (monthly.filter(function (month) { return month.temperatureMean != null && month.precipitationMm != null; }).length < 10) {
+        throw new Error('The historical record does not contain enough monthly climate observations.');
+      }
+      return {
+        latitude:round(lat,4),
+        longitude:round(lon,4),
+        startYear:startYear,
+        endYear:endYear,
+        yearsRequested:years,
+        monthly:monthly,
+        source:'Open-Meteo Historical Weather API',
+        sourceUrl:'https://open-meteo.com/en/docs/historical-weather-api',
+        retrievedAt:new Date().toISOString(),
+        note:'Historical point climate averages are a regional proxy, not a farm-level forecast or soil measurement.'
+      };
+    })();
+
+    climateRequestCache[cacheKey] = promise;
+    try {
+      return await promise;
+    } catch (error) {
+      delete climateRequestCache[cacheKey];
+      throw error;
+    }
+  }
+
+  function rankPlantingWindows(monthlyClimate) {
+    if (!Array.isArray(monthlyClimate) || monthlyClimate.length !== 12) {
+      throw new Error('Twelve monthly climate summaries are required to rank planting windows.');
+    }
+    var monthNames = monthlyClimate.map(function (month) { return month.label; });
+    return CROP_LIBRARY.map(function (crop) {
+      var rule = CLIMATE_CROP_RULES[crop.id];
+      if (!rule) return null;
+      var windows = [];
+      for (var start = 0; start < 12; start++) {
+        var months = [];
+        for (var offset = 0; offset < rule.months; offset++) {
+          months.push(monthlyClimate[(start + offset) % 12]);
+        }
+        var temps = months.map(function (item) { return item.temperatureMean; }).filter(function (v) { return v != null; });
+        var rains = months.map(function (item) { return item.precipitationMm; }).filter(function (v) { return v != null; });
+        var winds = months.map(function (item) { return item.windMeanKmh; }).filter(function (v) { return v != null; });
+        var gusts = months.map(function (item) { return item.windGustMaxMeanKmh; }).filter(function (v) { return v != null; });
+        if (!temps.length || rains.length !== months.length) continue;
+        var avgTemp = mean(temps);
+        var totalRain = rains.reduce(function (sum, value) { return sum + value; }, 0);
+        var avgWind = mean(winds);
+        var peakGust = gusts.length ? Math.max.apply(null, gusts) : null;
+        var tempScore = avgTemp >= rule.tempMin && avgTemp <= rule.tempMax ? 50 :
+          (avgTemp >= rule.tempMin - 3 && avgTemp <= rule.tempMax + 3 ? 28 : 6);
+        var rainScore = totalRain >= rule.rainMin && totalRain <= rule.rainMax ? 50 :
+          (totalRain >= rule.rainMin * 0.70 && totalRain <= rule.rainMax * 1.30 ? 28 : 6);
+        var cautions = [];
+        var reasons = [];
+        if (tempScore === 50) reasons.push('The average temperature across the establishment window is within the broad screening band (' + rule.tempMin + '–' + rule.tempMax + ' °C).');
+        else if (tempScore === 28) cautions.push('Average temperature is near but outside the broad screening band; variety, altitude and local extension guidance may change the result.');
+        else cautions.push('Average temperature is well outside this crop’s broad screening band; local verification is essential.');
+        if (rainScore === 50) reasons.push('Historical average rainfall across the ' + rule.months + '-month establishment window is within the provisional screen (' + rule.rainMin + '–' + rule.rainMax + ' mm).');
+        else if (rainScore === 28) cautions.push('Rainfall is near but outside the broad window. Irrigation, soil moisture, drainage and the exact crop calendar may change suitability.');
+        else cautions.push('Rainfall is outside this broad window; investigate dry spells, water supply, flooding and drainage before planting.');
+        if (avgWind != null && avgWind >= 25) cautions.push('Average wind is around 25 km/h or higher. This is a generic exposure flag, not a crop-specific wind tolerance threshold.');
+        if (peakGust != null && peakGust >= 50) cautions.push('Historical monthly maximum gusts average at least 50 km/h. Check local storm exposure, staking and windbreak needs.');
+        var rainDays = mean(months.map(function (item) { return item.rainyDays; }));
+        windows.push({
+          month:monthNames[start] || monthlyClimate[start].label,
+          monthIndex:start,
+          durationMonths:rule.months,
+          avgTemperatureC:round(avgTemp,1),
+          minTemperatureC:round(Math.min.apply(null, temps),1),
+          maxTemperatureC:round(Math.max.apply(null, temps),1),
+          totalRainMm:round(totalRain,0),
+          avgRainDaysPerMonth:round(rainDays,1),
+          avgWindKmh:round(avgWind,1),
+          maxGustKmh:round(peakGust,1),
+          windWarning:(avgWind != null && avgWind >= 25) || (peakGust != null && peakGust >= 50),
+          score:tempScore + rainScore,
+          reasons:reasons,
+          cautions:cautions
+        });
+      }
+      windows.sort(function (a, b) {
+        return b.score - a.score || (a.windWarning === b.windWarning ? 0 : (a.windWarning ? 1 : -1)) ||
+          a.monthIndex - b.monthIndex;
+      });
+      var selectedWindows = [];
+      windows.forEach(function (window) {
+        if (selectedWindows.length >= 3) return;
+        var spaced = selectedWindows.every(function (selected) {
+          var diff = Math.abs(selected.monthIndex - window.monthIndex);
+          return Math.min(diff, 12 - diff) >= 2;
+        });
+        if (spaced) selectedWindows.push(window);
+      });
+      if (!selectedWindows.length) selectedWindows = windows.slice(0,3);
+      return Object.assign({}, crop, {
+        climateRule:rule,
+        bestWindows:selectedWindows,
+        bestWindow:selectedWindows[0] || null,
+        climateScore:selectedWindows.length ? selectedWindows[0].score : 0,
+        climateProfile:'provisional temperature and rainfall window'
+      });
+    }).filter(Boolean).sort(function (a, b) {
+      return b.climateScore - a.climateScore || a.name.localeCompare(b.name);
+    }).slice(0,8);
+  }
+
   window.BackToNatureAPI = {
     fetchIndonesiaLandUse: fetchIndonesiaLandUse,
     searchFaoCatalog: searchFaoCatalog,
     fetchWocatTechnologies: fetchWocatTechnologies,
     listCropRecommendations: listCropRecommendations,
-    searchPlantImages: searchPlantImages
+    searchPlantImages: searchPlantImages,
+    fetchHistoricalClimate: fetchHistoricalClimate,
+    rankPlantingWindows: rankPlantingWindows
   };
 })();
