@@ -824,7 +824,8 @@
   }
 
   function renderSources(profile) {
-    var selectedIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : 'IDN';
+    var selectedIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
+    var wocatCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[selectedIso3] && countryByISO3[selectedIso3].name) || selectedIso3;
     if (selectedIso3 !== 'IDN') {
       var selectedCountryName = currentProvince.countryName || selectedCountry && selectedCountry.name || selectedIso3;
       var featureProps = currentProvince.feature && currentProvince.feature.properties ? currentProvince.feature.properties : {};
@@ -841,6 +842,10 @@
         '<div class="source-list">' + generalSources.map(function (source, i) {
           return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
         }).join('') + '</div>' +
+        '<details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary>' +
+        '<p>Search published sustainable land management technologies for <b>' + esc(wocatCountryName) + '</b>. Browsing the WOCAT database is free; API calls require an authorized token. The token is used for this request only and is not saved. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://qcat.readthedocs.io/en/latest/api/v2.html">API authorization guide ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wocat.net/en/account/register/">WOCAT registration ↗</a></p>' +
+        '<label for="live-wocat-token">WOCAT QCAT API token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste an authorized token for one request">' +
+        '<button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">No sample records are fabricated.</div></details>' +
         '<section class="data-integrity"><span class="data-tag green">BOUNDARY METADATA</span><h3>Check the original source</h3><p><b>Administrative level:</b> ' + esc(currentProvince.adminLevel === 2 ? 'ADM2 · second-level local unit' : 'ADM1 · first-level region') + '.</p><p><b>Boundary license:</b> ' + esc(boundaryLicense) + '</p><p>Administrative names and legal categories differ between countries. Do not interpret this generic regional fieldbook as a verified local soil survey or crop prescription.</p></section>';
     }
     var sources = [
@@ -858,9 +863,9 @@
       '<section class="live-connectors"><div class="section-title"><span class="mini-code">LIVE DATA TERMINAL</span><h3>Query the source systems</h3></div>' +
       '<p class="live-explainer">These connectors request real records when you press a button. National FAOSTAT observations provide country context only; they are not provincial soil or yield measurements.</p>' +
       '<div class="tile-grid">' +
-      '<article class="field-card"><div class="card-topline"><span class="card-emoji">📊</span><span class="mini-code">FAOSTAT / LIVE</span></div><h3>Land use · Indonesia</h3><p>Request Indonesia-level land-use observations from the public FAOSTAT API.</p><button id="live-faostat-btn" class="pixel-btn" type="button">FETCH NATIONAL DATA</button><div id="live-faostat-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-faostat-results" class="live-results">No values are shown until the live API responds.</div></article>' +
+      '<article class="field-card"><div class="card-topline"><span class="card-emoji">📊</span><span class="mini-code">FAOSTAT / LIVE</span></div><h3>Land use · Indonesia</h3><p>Request Indonesia-level land-use observations from the public FAOSTAT API.</p><button id="live-faostat-btn" class="pixel-btn" type="button">FETCH NATIONAL DATA</button><div id="live-faostat-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-faostat-results" class="live-results">No values are shown until the live API responds.</div></article>'
       '<article class="field-card"><div class="card-topline"><span class="card-emoji">🗺️</span><span class="mini-code">FAO CATALOGUE / LIVE</span></div><h3>Spatial metadata · ' + esc(profile.name) + '</h3><p>Search FAO catalogue metadata for records mentioning this province and soil, land, water, climate or agriculture.</p><button id="live-fao-catalog-btn" class="pixel-btn" type="button">SEARCH FAO CATALOGUE</button><div id="live-fao-catalog-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-fao-catalog-results" class="live-results">No catalogue results loaded.</div></article>' +
-      '</div><details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary><p>WOCAT results are searched at the Indonesia/country level because a province-specific technology filter is not guaranteed. The token is used for this request only and is not written to localStorage or the repository. Only enter a token you are authorized to use.</p><label for="live-wocat-token">WOCAT QCAT token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste token for one request"><button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">Live access requires a valid WOCAT token; no sample records are fabricated.</div></details></section>' +
+      '</div><details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary><p>Search published sustainable land management technologies for <b>' + esc(wocatCountryName) + '</b>. Browsing the WOCAT database is free; API calls require an authorized token. The token is used for this request only and is not saved. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://qcat.readthedocs.io/en/latest/api/v2.html">API authorization guide ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wocat.net/en/account/register/">WOCAT registration ↗</a></p><label for="live-wocat-token">WOCAT QCAT API token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste an authorized token for one request"><button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">No sample records are fabricated.</div></details></section>' +
       '<div class="source-list">' + sources.map(function (s, i) {
         return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(s.tag) + '</span><h3>' + esc(s.t) + '</h3><p>' + esc(s.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(s.u) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' +
@@ -883,6 +888,8 @@
 
   function wireSourceControls(profile) {
     var api = window.BackToNatureAPI;
+    var currentSourceIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
+    var currentSourceCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[currentSourceIso3] && countryByISO3[currentSourceIso3].name) || currentSourceIso3;
     var faoBtn = el('live-faostat-btn');
     if (faoBtn) faoBtn.addEventListener('click', async function () {
       if (!api || !api.fetchIndonesiaLandUse) {
@@ -971,10 +978,10 @@
         return;
       }
       wocatBtn.disabled = true;
-      setLiveStatus('live-wocat-status', 'Requesting authorized WOCAT records…', 'pending');
-      el('live-wocat-results').textContent = 'The token was removed from the input and will only be passed to this request.';
+      setLiveStatus('live-wocat-status', 'Requesting WOCAT records for ' + currentSourceCountryName + '…', 'pending');
+      el('live-wocat-results').textContent = 'The token was removed from the input. Query country: ' + currentSourceCountryName + ' (' + currentSourceIso3 + '). The token will only be passed to this request.';
       try {
-        var records = await api.fetchWocatTechnologies(token, 'IDN');
+        var records = await api.fetchWocatTechnologies(token, currentSourceIso3);
         if (!records.length) {
           setLiveStatus('live-wocat-status', 'Request succeeded; no records returned', 'pending');
           el('live-wocat-results').textContent = 'The API returned no technology records for the country-level query.';
@@ -1146,6 +1153,7 @@
       'swaziland':'eswatini',
       'macedonia':'north macedonia',
       'vietnam':'viet nam',
+      'east timor':'timor leste',
       'palestine':'state of palestine'
     };
     var normalizedName = norm(countryName || props.ADMIN || props.name || props.NAME || '');
@@ -1261,7 +1269,7 @@
     if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
     mode = 'provinces';
     document.body.classList.add('province-mode');
-    selectedCountry = { iso3: iso3, name: countryName || (countryByISO3[iso3] && countryByISO3[iso3].name) || iso3 };
+    selectedCountry = { iso3: iso3, name: (countryByISO3[iso3] && countryByISO3[iso3].name) || countryName || iso3 };
     selectedProvinceBounds = focusBounds || null;
     setExplorerChrome(String(selectedCountry.name).toUpperCase() + ' · REGIONS', 1);
     showMapStatus('Loading ' + selectedCountry.name + '…', 'Loading first-level administrative boundaries from the monthly dataset.');
@@ -1287,7 +1295,7 @@
     if (provinceLayer && map.hasLayer(provinceLayer)) map.removeLayer(provinceLayer);
     mode = 'districts';
     document.body.classList.add('province-mode');
-    selectedCountry = { iso3: iso3, name: countryName || (countryByISO3[iso3] && countryByISO3[iso3].name) || iso3 };
+    selectedCountry = { iso3: iso3, name: (countryByISO3[iso3] && countryByISO3[iso3].name) || countryName || iso3 };
     selectedProvinceBounds = focusBounds || selectedProvinceBounds || null;
     setExplorerChrome(String(selectedCountry.name).toUpperCase() + ' · DISTRICTS', 2);
     showMapStatus('Loading districts…', 'Fetching available second-level administrative boundaries.');
@@ -1403,8 +1411,12 @@
       showMapStatus('World boundaries unavailable', 'The map tiles may still work. ' + (error && error.message ? error.message : 'Reload to retry the country boundary data.'));
     }
   }
-  el('btn-provinces').textContent = '🇮🇩 INDONESIA EXPLORER';
-  el('btn-provinces').addEventListener('click', function () { enterCountryMode('IDN', 'Indonesia'); });
+  el('btn-provinces').textContent = '🌍 REGION EXPLORER';
+  el('btn-provinces').addEventListener('click', function () {
+    enterWorldMode();
+    map.setView([20, 0], 2);
+    showMapStatus('GLOBAL REGION EXPLORER', 'Click any country to open its available provinces, states or regions. From there, explore districts and climate-based planting windows.');
+  });
   el('btn-world').addEventListener('click', goBackFromAdminMode);
   el('btn-home').addEventListener('click', enterWorldMode);
   el('province-select').addEventListener('change', function () { jumpToProvince(this.value); });
