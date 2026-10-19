@@ -303,11 +303,22 @@
       var annualRain = climate.monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
       var tempValue = meanTemp.length ? (averageClimateValue(meanTemp).toFixed(1) + ' °C') : 'n/a';
       statusNode.textContent = climate.startYear + '–' + climate.endYear + ' climate ready · average temperature ' + tempValue +
-        ' · estimated annual rainfall ' + Math.round(annualRain) + ' mm. Open the climate tab for monthly patterns and crop windows.';
+        ' · estimated annual rainfall ' + Math.round(annualRain) + ' mm.';
+      var candidateNode = el('climate-preview-crops');
+      if (candidateNode) {
+        candidateNode.innerHTML = (result.recommendations || []).slice(0,3).map(function (crop) {
+          var window = crop.bestWindow || {};
+          return '<span class="climate-candidate-chip"><b>' + esc(crop.name) + '</b><small>Try ' + esc(window.month || '—') + ' · ' + esc(window.score == null ? '—' : window.score) + '/100</small></span>';
+        }).join('');
+      }';
     } else if (status && status.state === 'error') {
       statusNode.textContent = 'Climate data unavailable: ' + status.message + ' You can retry in Climate & Planting.';
     } else {
-      statusNode.textContent = 'Loading five complete years of monthly temperature, rainfall and wind for a representative point in this region…';
+      statusNode.textContent = status && status.state === 'error'
+        ? 'Climate data unavailable: ' + status.message + ' You can retry in Climate & Planting.'
+        : 'Loading five complete years of monthly temperature, rainfall and wind for a representative point in this region…';
+      var waitingNode = el('climate-preview-crops');
+      if (waitingNode) waitingNode.textContent = 'Planting candidates will appear when the climate lookup finishes.';
     }
   }
 
@@ -501,6 +512,9 @@
           if (failedCredit) failedCredit.textContent = 'Photo lookup is unavailable; use the photo search link below.';
         }
       }));
+    }
+    if (currentProvince !== selection || requestId !== climatePhotoRequestId) {
+      delete climatePhotosLoadedBySelection[key];
     }
   }
 
