@@ -73,8 +73,65 @@ async function main() {
   assert.equal(images[0].license, 'CC BY-SA 4.0', 'returns license metadata');
   assert.ok(images[0].imageUrl.startsWith('https://upload.wikimedia.org/'), 'returns a secure thumbnail URL');
 
+  const simulatedNormals = [
+    {label:'Jan',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:120,rainyDays:15,windMeanKmh:12,windGustMaxMeanKmh:28,windDirection:'E'},
+    {label:'Feb',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:140,rainyDays:16,windMeanKmh:12,windGustMaxMeanKmh:28,windDirection:'E'},
+    {label:'Mar',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:150,rainyDays:17,windMeanKmh:13,windGustMaxMeanKmh:30,windDirection:'E'},
+    {label:'Apr',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:130,rainyDays:14,windMeanKmh:13,windGustMaxMeanKmh:30,windDirection:'E'},
+    {label:'May',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:90,rainyDays:10,windMeanKmh:14,windGustMaxMeanKmh:31,windDirection:'E'},
+    {label:'Jun',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:60,rainyDays:7,windMeanKmh:15,windGustMaxMeanKmh:35,windDirection:'ESE'},
+    {label:'Jul',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:40,rainyDays:5,windMeanKmh:16,windGustMaxMeanKmh:38,windDirection:'ESE'},
+    {label:'Aug',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:35,rainyDays:4,windMeanKmh:17,windGustMaxMeanKmh:40,windDirection:'ESE'},
+    {label:'Sep',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:55,rainyDays:6,windMeanKmh:16,windGustMaxMeanKmh:36,windDirection:'E'},
+    {label:'Oct',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:100,rainyDays:11,windMeanKmh:14,windGustMaxMeanKmh:32,windDirection:'E'},
+    {label:'Nov',temperatureMean:27,temperatureMin:23,temperatureMax:32,precipitationMm:160,rainyDays:18,windMeanKmh:13,windGustMaxMeanKmh:30,windDirection:'E'},
+    {label:'Dec',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:180,rainyDays:19,windMeanKmh:12,windGustMaxMeanKmh:28,windDirection:'E'}
+  ];
+  const plantingWindows = api.rankPlantingWindows(simulatedNormals);
+  assert.ok(plantingWindows.length > 0 && plantingWindows.length <= 8, 'ranks a bounded list of climate candidates');
+  assert.ok(plantingWindows.every((crop) => crop.bestWindow && crop.bestWindow.month && crop.bestWindow.score >= 0 && crop.bestWindow.score <= 100), 'each climate candidate contains a scored planting window');
+  assert.ok(plantingWindows.every((crop, i) => i === 0 || plantingWindows[i - 1].climateScore >= crop.climateScore), 'climate candidates are ranked by score');
+
+  // Test the historical archive response mapper without calling any external API.
+  const dates = [];
+  for (let date = new Date('2024-01-01T00:00:00Z'); date <= new Date('2024-12-31T00:00:00Z'); date.setUTCDate(date.getUTCDate() + 1)) {
+    dates.push(date.toISOString().slice(0, 10));
+  }
+  let climateRequestUrl = '';
+  global.fetch = async function (url) {
+    climateRequestUrl = String(url);
+    const values = (value) => dates.map(() => value);
+    const weather = {
+      time: dates,
+      temperature_2m_mean: values(26),
+      temperature_2m_min: values(22),
+      temperature_2m_max: values(31),
+      precipitation_sum: values(5),
+      wind_speed_10m_mean: values(12),
+      wind_speed_10m_max: values(26),
+      wind_gusts_10m_max: values(35),
+      wind_direction_10m_dominant: values(90)
+    };
+    return {
+      ok:true,
+      status:200,
+      text:async function () { return JSON.stringify({ latitude:-6.2,longitude:106.8,daily:weather }); }
+    };
+  };
+  const climate = await api.fetchHistoricalClimate(-6.2,106.8,5);
+  assert.equal(climate.monthly.length,12,'historical weather is aggregated into twelve months');
+  assert.equal(climate.latitude,-6.2,'representative latitude is retained');
+  assert.equal(climate.monthly[0].temperatureMean,26,'monthly temperature is aggregated');
+  assert.ok(climate.monthly[0].precipitationMm >= 140 && climate.monthly[0].precipitationMm <= 160,'daily precipitation is aggregated into monthly rainfall');
+  assert.equal(climate.monthly[0].windDirection,'E','wind direction is translated to compass direction');
+  assert.match(climateRequestUrl,/archive-api\.open-meteo\.com\/v1\/archive/,'uses the Open-Meteo Historical Weather API');
+  const climateParams = new URL(climateRequestUrl).searchParams;
+  assert.ok(climateParams.get('daily').includes('wind_gusts_10m_max'),'asks for wind gust information');
+  assert.equal(climateParams.get('start_date'),(new Date().getFullYear()-5)+'-01-01','uses five complete calendar years');
+  assert.equal(climateParams.get('end_date'),(new Date().getFullYear()-1)+'-12-31','ends at the last complete calendar year');
+
   global.fetch = originalFetch;
-  console.log('Crop API smoke tests passed.');
+  console.log('Crop, planting-window and historical climate API smoke tests passed.');
 }
 
 main().catch((error) => {
