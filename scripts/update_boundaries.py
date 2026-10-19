@@ -258,6 +258,8 @@ def main() -> int:
                     raise RuntimeError(f"No valid features for {level}; existing data preserved.")
 
         output_payloads: dict[str, Any] = {}
+        province_files: dict[str, str] = {}
+        province_index: dict[str, dict[str, Any]] = {}
         district_files: dict[str, str] = {}
         district_index: dict[str, dict[str, Any]] = {}
 
@@ -269,45 +271,70 @@ def main() -> int:
                     collection["source"]["country_name"].casefold(),
                 ),
             )
-            if level == "ADM2":
+
+            if level == "ADM0":
+                features = [
+                    feature
+                    for collection in level_collections
+                    for feature in collection["features"]
+                ]
+                output_payloads["countries.geojson"] = {
+                    "type": "FeatureCollection",
+                    "name": "adm0-countries",
+                    "generated_at_utc": started,
+                    "sources": [collection["source"] for collection in level_collections],
+                    "features": features,
+                }
+
+            elif level in ("ADM1", "ADM2"):
                 grouped: dict[str, list[dict[str, Any]]] = {}
                 source_by_iso: dict[str, dict[str, Any]] = {}
                 for collection in level_collections:
                     iso3 = collection["source"]["country_iso3"]
                     grouped.setdefault(iso3, []).extend(collection["features"])
                     source_by_iso[iso3] = collection["source"]
+
+                is_adm1 = level == "ADM1"
+                target_files = province_files if is_adm1 else district_files
+                target_index = province_index if is_adm1 else district_index
+                directory = "provinces" if is_adm1 else "districts"
+
                 for iso3, features in grouped.items():
-                    filename = f"districts/{iso3}.geojson"
-                    district_files[filename] = iso3
-                    district_index[iso3] = {
+                    filename = f"{directory}/{iso3}.geojson"
+                    source = source_by_iso[iso3]
+                    target_files[filename] = iso3
+                    target_index[iso3] = {
                         "iso3": iso3,
-                        "country": source_by_iso[iso3]["country_name"],
+                        "country": source["country_name"],
                         "file": filename,
                         "feature_count": len(features),
-                        "admin_level": "ADM2",
-                        "source_metadata_url": source_by_iso[iso3]["source_metadata_url"],
-                        "license": source_by_iso[iso3]["license"],
-                        "year_represented": source_by_iso[iso3]["year_represented"],
+                        "admin_level": level,
+                        "source_metadata_url": source["source_metadata_url"],
+                        "license": source["license"],
+                        "year_represented": source["year_represented"],
                     }
                     output_payloads[filename] = {
                         "type": "FeatureCollection",
-                        "name": f"{iso3}-ADM2",
+                        "name": f"{iso3}-{level}",
                         "generated_at_utc": started,
-                        "source": source_by_iso[iso3],
+                        "source": source,
                         "features": features,
                     }
-            else:
-                features = [feature for collection in level_collections for feature in collection["features"]]
-                output_name = {"ADM0": "countries.geojson", "ADM1": "province.json"}.get(level, f"{level.lower()}.geojson")
-                output_payloads[output_name] = {
-                    "type": "FeatureCollection",
-                    "name": level.lower(),
-                    "generated_at_utc": started,
-                    "sources": [collection["source"] for collection in level_collections],
-                    "features": features,
-                }
 
-        output_payloads["countries.json"] = {
+                # Keep province.json as a small lookup index instead of a single huge
+                # FeatureCollection that exceeds GitHub's 100 MiB single-file limit.
+                if is_adm1:
+                    output_payloads["province.json"] = {
+                        "schema_version": 1,
+                        "name": "province-index",
+                        "generated_at_utc": started,
+                        "admin_level": "ADM1",
+                        "country_count": len(province_index),
+                        "countries": province_index,
+                        "note": "ADM1 names differ by country; see each source and metadata record.",
+                    }
+
+                output_payloads["countries.json"] = {
             "schema_version": 1,
             "name": "country-index",
             "generated_at_utc": started,
@@ -389,12 +416,17 @@ def main() -> int:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(stage / relative_path, destination)
 
-        # Remove only old ADM2 files after the new complete district index is written.
-        expected_files = set(district_files)
-        for old_file in district_dir.glob("*.geojson"):
-            relative = str(old_file.relative_to(DATA_DIR)).replace("\\", "/")
-            if relative not in expected_files:
-                old_file.unlink()
+        # Remove stale per-country files only after the replacement indexes are written.
+        for dirname, expected_files in (
+            ("provinces", set(province_files)),
+            ("districts", set(district_files)),
+        ):
+            output_dir = DATA_DIR / dirname
+            output_dir.mkdir(parents=True, exist_ok=True)
+            for old_file in output_dir.glob("*.geojson"):
+                relative = str(old_file.relative_to(DATA_DIR)).replace("\\", "/")
+                if relative not in expected_files:
+                    old_file.unlink()
 
         report["published"] = True
         report["finished_at_utc"] = utc_now()
@@ -405,6 +437,7 @@ def main() -> int:
             "catalogue_count_by_level": catalogue_counts,
             "successful_boundary_count_by_level": successes_by_level,
             "error_count": len(errors),
+            "province_country_file_count": len(province_files),
             "district_country_file_count": len(district_files),
             "note": "Review data/boundary-manifest.json for attribution/license requirements.",
         }, ensure_ascii=False, indent=2), flush=True)
