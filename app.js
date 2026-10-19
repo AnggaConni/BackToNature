@@ -401,7 +401,7 @@
     var annualRain = monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
     var meanTemp = averageClimateValue(monthly.map(function (month) { return month.temperatureMean; }));
     var maxRain = Math.max(1, ...monthly.map(function (month) { return Number(month.precipitationMm) || 0; }));
-    var avgWind = mean(monthly.map(function (month) { return month.windMeanKmh; }));
+    var avgWind = averageClimateValue(monthly.map(function (month) { return month.windMeanKmh; }));
     var peakGust = Math.max.apply(null, monthly.map(function (month) { return Number(month.windGustMaxMeanKmh) || 0; }));
     var region = currentProvince && currentProvince.name || profile.name;
     var levelLabel = currentProvince && currentProvince.adminLevel === 2 ? 'ADM2 / district-level unit' : 'ADM1 / first-level region';
