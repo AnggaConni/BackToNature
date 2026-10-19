@@ -457,7 +457,7 @@
     if (!methodWarnings.length) methodWarnings.push('No generic high-wind flag was triggered by the monthly averages. This does not rule out storms, typhoons, squalls or field-level exposure.');
 
     return '<div class="tab-intro"><div class="eyebrow">CLIMATE & PLANTING / SEASON SCOUT</div>' +
-      '<h2>What grows well, and when? 🌱</h2><p>Climate-based planting-window candidates for <b>' + esc(region) + '</b>. Month-by-month normals are estimated from daily observations for ' + esc(climate.startYear) + '–' + esc(climate.endYear) + ' at a representative point within the selected boundary.</p></div>' +
+      '<h2>What grows well, and when? 🌱</h2><p>Climate-based planting-window candidates for <b>' + esc(region) + '</b>. Month-by-month averages are calculated from daily observations for ' + esc(climate.startYear) + '–' + esc(climate.endYear) + ' at a representative point within the selected boundary.</p></div>' +
       '<div class="climate-summary-grid">' +
       '<article><span>HISTORICAL PROFILE</span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>five completed calendar years</small></article>' +
       '<article><span>AVERAGE TEMPERATURE</span><b>' + esc(numberOrDash(meanTemp,' °C')) + '</b><small>mean of monthly averages</small></article>' +
