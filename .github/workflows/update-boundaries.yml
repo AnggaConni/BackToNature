@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: boundary-data-refresh
+  group: boundary-data-refresh-v2
   cancel-in-progress: true
 
 jobs:
