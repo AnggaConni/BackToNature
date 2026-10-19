@@ -221,13 +221,169 @@
       '<section class="source-strip"><div><span class="mini-code">LANDSCAPE CONTEXT</span><h3>FAO Hand-in-Hand</h3><p>Use geospatial layers for broader context, then validate them against local observations and current official datasets.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://data.apps.fao.org/?lang=en">OPEN FAO MAP ↗</a></section>';
   }
 
+  var cropLabRequestId = 0;
+
+  function cropLabStatus(message, type) {
+    var node = el('crop-lab-status');
+    if (!node) return;
+    node.className = 'live-status ' + (type || 'pending');
+    node.textContent = message;
+  }
+
+  function renderCropLabForm() {
+    return '<section class="live-connectors crop-lab">' +
+      '<div class="section-title"><span class="mini-code">CROP & SOIL LAB / SMART FIELD GUIDE</span><h3>Find crops for your soil</h3></div>' +
+      '<p class="live-explainer">Choose what you know about the plot. The screener compares your inputs with broad crop profiles and explains the match. It is a planning aid, not a yield forecast or an agronomist’s diagnosis.</p>' +
+      '<div class="crop-lab-controls">' +
+      '<div class="crop-control"><label for="crop-soil">Soil group</label><select id="crop-soil">' +
+      '<option value="unknown">Not sure yet</option><option value="loam">Loam / balanced soil</option><option value="clay">Clay-rich soil</option><option value="sandy">Sandy / loose soil</option><option value="alluvial">Alluvial / river plain</option><option value="volcanic">Volcanic soil</option><option value="acidic">Strongly acidic soil</option><option value="peat">Peat / organic wetland</option><option value="saline">Coastal / saline soil</option>' +
+      '</select></div>' +
+      '<div class="crop-control"><label for="crop-ph">Soil pH (optional)</label><input id="crop-ph" type="number" min="0" max="14" step="0.1" inputmode="decimal" placeholder="e.g. 5.8"></div>' +
+      '<div class="crop-control"><label for="crop-drainage">Drainage</label><select id="crop-drainage"><option value="unknown">Not sure</option><option value="well">Drains well</option><option value="moderate">Stays moist sometimes</option><option value="waterlogged">Often waterlogged / flooded</option></select></div>' +
+      '<div class="crop-control"><label for="crop-water">Water availability</label><select id="crop-water"><option value="unknown">Not sure</option><option value="reliable">Reliable rain / irrigation</option><option value="seasonal">Seasonal water</option><option value="limited">Limited / dry season</option><option value="standing">Standing water available</option></select></div>' +
+      '<div class="crop-control"><label for="crop-climate">Climate / growing zone</label><select id="crop-climate"><option value="unknown">Not sure</option><option value="humid-tropical">Humid tropical lowland</option><option value="seasonal-tropical">Seasonal tropical</option><option value="dry-tropical">Dry / semi-arid tropical</option><option value="highland-tropical">Cool tropical highland</option><option value="subtropical">Subtropical</option><option value="temperate">Temperate / cool season</option></select></div>' +
+      '<div class="crop-control"><label for="crop-use">Main purpose</label><select id="crop-use"><option value="any">Any purpose</option><option value="staple">Staple food</option><option value="vegetable">Vegetables</option><option value="fruit">Fruit / perennial crop</option><option value="market">Market / cash crop</option><option value="restoration">Soil cover / restoration</option></select></div>' +
+      '</div>' +
+      '<div class="crop-lab-actions"><button id="crop-match-btn" class="pixel-btn green" type="button">🌱 FIND CROP MATCHES</button><span class="live-note">No location or personal data is sent by this soil screener.</span></div>' +
+      '<div id="crop-lab-status" class="live-status" aria-live="polite">Choose your soil and conditions, then find crop matches.</div>' +
+      '<div id="crop-match-results" class="crop-match-grid" aria-live="polite"></div>' +
+      '</section>';
+  }
+
+  function renderCropMatchCards(crops) {
+    if (!crops.length) return '<p>No screening matches were found. Try leaving uncertain fields as “Not sure” and check the local soil and climate data.</p>';
+    return crops.map(function (crop, index) {
+      var reasons = (crop.reasons || []).slice(0, 3).map(function (reason) {
+        return '<li>' + esc(reason) + '</li>';
+      }).join('');
+      var cautions = (crop.cautions || []).slice(0, 2).map(function (caution) {
+        return '<li>' + esc(caution) + '</li>';
+      }).join('');
+      return '<article class="crop-match-card">' +
+        '<div class="crop-match-image" id="crop-image-' + esc(crop.id) + '"><div class="crop-image-placeholder"><span>🌱</span><b>Searching plant photos…</b><small>Wikimedia Commons</small></div></div>' +
+        '<div class="crop-match-body">' +
+        '<div class="crop-match-topline"><span class="data-tag green">SCREEN ' + String(index + 1).padStart(2, '0') + '</span><span class="crop-score">' + esc(crop.score) + '/100</span></div>' +
+        '<h4>' + esc(crop.name) + '</h4><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
+        '<p>' + esc(crop.note) + '</p>' +
+        '<div class="crop-match-meta"><span>Screening pH ' + esc(crop.pHText) + '</span><span>' + esc(crop.category.replace(/-/g, ' ')) + '</span></div>' +
+        (reasons ? '<div class="crop-reason"><b>Why it matched</b><ul>' + reasons + '</ul></div>' : '') +
+        (cautions ? '<div class="crop-caution"><b>Before planting</b><ul>' + cautions + '</ul></div>' : '') +
+        '<p class="crop-photo-credit" id="crop-credit-' + esc(crop.id) + '">Photo credit and license will be shown when a suitable image is available.</p>' +
+        '</div></article>';
+    }).join('');
+  }
+
+  async function loadCropPhotos(crops, requestId) {
+    var api = window.BackToNatureAPI;
+    if (!api || !api.searchPlantImages) {
+      cropLabStatus('Crop matches are ready, but the photo API is not available. Reload the page and try again.', 'error');
+      return;
+    }
+
+    var successCount = 0;
+    var errorCount = 0;
+    // Limit concurrent requests to reduce load on Commons; the API is also cached in memory.
+    for (var i = 0; i < Math.min(crops.length, 6); i += 2) {
+      var batch = crops.slice(i, i + 2);
+      await Promise.all(batch.map(async function (crop) {
+        try {
+          var images = await api.searchPlantImages(crop, 5);
+          if (requestId !== cropLabRequestId) return;
+          var slot = el('crop-image-' + crop.id);
+          var credit = el('crop-credit-' + crop.id);
+          if (!slot) return;
+          if (!images.length) {
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌿</span><b>No suitable public photo found</b><small>Try another crop or search the Commons file library.</small></div>';
+            if (credit) credit.innerHTML = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search more photos ↗</a>';
+            return;
+          }
+          var image = images[0];
+          var imageUrl = safeHttps(image.imageUrl);
+          var fileUrl = safeHttps(image.fileUrl);
+          if (imageUrl === '#' || fileUrl === '#') {
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo URL unavailable</b></div>';
+            return;
+          }
+          slot.innerHTML = '<a class="crop-image-link" href="' + esc(fileUrl) + '" target="_blank" rel="noopener noreferrer" title="Open the original image and its license"><img src="' + esc(imageUrl) + '" alt="' + esc(crop.name + ' (' + crop.scientific + ')') + '" loading="lazy" decoding="async"><span class="crop-image-open">OPEN IMAGE ↗</span></a>';
+          var imgNode = slot.querySelector('img');
+          if (imgNode) imgNode.addEventListener('error', function () {
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo could not be loaded</b><small>Open the source file page to check availability.</small></div>';
+          }, { once:true });
+          if (credit) {
+            var licenseHref = safeHttps(image.licenseUrl);
+            credit.innerHTML = 'Photo: <a target="_blank" rel="noopener noreferrer" href="' + esc(fileUrl) + '">' + esc(image.title.replace(/^File:/, '')) + '</a><br>Credit: ' + esc(image.artist) + ' · License: ' +
+              (licenseHref !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(licenseHref) + '">' + esc(image.license) + '</a>' : esc(image.license));
+          }
+          successCount++;
+        } catch (_) {
+          if (requestId !== cropLabRequestId) return;
+          errorCount++;
+          var failedSlot = el('crop-image-' + crop.id);
+          if (failedSlot) failedSlot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo search unavailable</b><small>Crop matching still works without photos.</small></div>';
+        }
+      }));
+    }
+    if (requestId !== cropLabRequestId) return;
+    if (successCount && errorCount) cropLabStatus('Crop screening complete. Some photo searches were blocked or returned no image; available images show their source and license.', 'success');
+    else if (successCount) cropLabStatus('Crop screening complete. Open each photo source to review image identity, attribution and license.', 'success');
+    else cropLabStatus('Crop matches are ready, but photo lookup did not return any usable images. Check the connection or open Wikimedia Commons manually.', 'pending');
+  }
+
+  function wireCropLab(profile) {
+    var button = el('crop-match-btn');
+    var resultNode = el('crop-match-results');
+    if (!button || !resultNode) return;
+    button.addEventListener('click', async function () {
+      var api = window.BackToNatureAPI;
+      if (!api || !api.listCropRecommendations) {
+        cropLabStatus('Crop screening API is not available. Reload this page and try again.', 'error');
+        return;
+      }
+      var phInput = el('crop-ph');
+      var phValue = phInput ? phInput.value.trim() : '';
+      if (phValue && (!Number.isFinite(Number(phValue)) || Number(phValue) < 0 || Number(phValue) > 14)) {
+        cropLabStatus('Soil pH must be between 0 and 14. Leave it blank if you do not have a soil test.', 'error');
+        if (phInput) phInput.focus();
+        return;
+      }
+      var requestId = ++cropLabRequestId;
+      button.disabled = true;
+      cropLabStatus('Comparing soil, drainage, water and climate with the crop library…', 'pending');
+      resultNode.innerHTML = '';
+      try {
+        var matches = api.listCropRecommendations({
+          soil:el('crop-soil').value,
+          ph:phValue,
+          drainage:el('crop-drainage').value,
+          water:el('crop-water').value,
+          climate:el('crop-climate').value,
+          use:el('crop-use').value
+        });
+        if (requestId !== cropLabRequestId) return;
+        resultNode.innerHTML = renderCropMatchCards(matches);
+        if (!matches.length) {
+          cropLabStatus('No screening matches. Change a filter or leave unknown fields open.', 'pending');
+          return;
+        }
+        cropLabStatus('Found ' + matches.length + ' crops to investigate. Loading reference photos for the first six…', 'pending');
+        await loadCropPhotos(matches, requestId);
+      } catch (error) {
+        if (requestId === cropLabRequestId) cropLabStatus('Could not complete crop screening: ' + (error && error.message ? error.message : 'Unknown error'), 'error');
+      } finally {
+        if (requestId === cropLabRequestId) button.disabled = false;
+      }
+    });
+  }
+
   function renderCrops(profile) {
     var chips = profile.crops.map(function (crop, i) {
-      return '<article class="crop-card"><div class="crop-glyph">' + ['🌾','🌱','🌴','🥬','🍠'][i % 5] + '</div><div><span class="mini-code">CANDIDATE ' + String(i + 1).padStart(2, '0') + '</span><h3>' + esc(crop) + '</h3><p>Investigate local suitability, water needs, varieties, pest pressure, harvest window, costs and market access before choosing.</p></div></article>';
+      return '<article class="crop-card"><div class="crop-glyph">' + ['🌾','🌱','🌴','🥬','🍠'][i % 5] + '</div><div><span class="mini-code">REGIONAL CANDIDATE ' + String(i + 1).padStart(2, '0') + '</span><h3>' + esc(crop) + '</h3><p>Investigate local suitability, water needs, varieties, pest pressure, harvest window, costs and market access before choosing.</p></div></article>';
     }).join('');
-    return '<div class="tab-intro"><div class="eyebrow">CROPS / WHAT SHOULD WE PLANT?</div><h2>Choose a crop for the plot 🌾</h2><p>These are regionally relevant candidates to investigate—not an automated guarantee of suitability. The actual choice depends on the farm&apos;s soil, elevation, water, variety, local knowledge and buyer access.</p></div>' +
+    return '<div class="tab-intro"><div class="eyebrow">CROPS / WHAT SHOULD WE PLANT?</div><h2>Find the right plant for your plot 🌾</h2><p>Start with the soil and water you actually have. The screening results explain what matched and what still needs checking. Results are broad guides—not a parcel-level agronomic diagnosis, yield prediction or guarantee of success.</p></div>' +
+      renderCropLabForm() +
+      '<div class="section-title"><span class="mini-code">REGIONAL STARTING IDEAS</span><h3>Plants worth investigating in ' + esc(profile.name) + '</h3></div>' +
       '<div class="crop-list">' + chips + '</div>' +
-      '<div class="section-title"><span class="mini-code">CROP SELECTION CHECKLIST</span><h3>Before buying seed or seedlings</h3></div>' +
+      '<div class="section-title"><span class="mini-code">FIELD CHECKLIST</span><h3>Before buying seed or seedlings</h3></div>' +
       '<div class="tile-grid">' +
       '<article class="field-card"><div class="card-emoji">💧</div><h3>1. Water fit</h3><p>Is rain timing or irrigation reliable through the crop growth stages? Do not expand planted area beyond dependable water supply.</p></article>' +
       '<article class="field-card"><div class="card-emoji">🧪</div><h3>2. Soil fit</h3><p>Check soil depth, drainage, pH and nutrient status. Get a local soil test before deciding lime or fertilizer rates.</p></article>' +
@@ -499,6 +655,7 @@
       tab === 'farming' ? renderFarming(profile) :
       tab === 'technology' ? renderTechnology(profile) : renderSources(profile);
     if (tab === 'sources') wireSourceControls(profile);
+    if (tab === 'crops') wireCropLab(profile);
     Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (button) {
       var active = button.getAttribute('data-tab') === tab;
       button.classList.toggle('active', active);
