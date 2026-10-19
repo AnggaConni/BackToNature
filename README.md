@@ -1,6 +1,6 @@
 # BackToNature — Living Land Lab
 
-A retro, PlayStation-era farming fieldbook inspired by the cozy menus and dialogue panels of *Harvest Moon: Back to Nature*. The world map remains the starting screen; clicking Indonesia or choosing **Province Explorer** opens an interactive map of Indonesia's 38 provinces.
+A retro, PlayStation-era farming fieldbook inspired by the cozy menus and dialogue panels of *Harvest Moon: Back to Nature*. The world map remains the starting screen. Click any country to open its available ADM1 regions, then click a region for the fieldbook and use **View Districts** to drill into ADM2 where available. **Indonesia Explorer** remains a shortcut to Indonesia's curated 38-province map.
 
 ## What's in the provincial fieldbook?
 
@@ -23,7 +23,7 @@ The provincial map loads a GeoJSON FeatureCollection containing **38 provinces**
 - GeoJSON path: `Geojson/indonesia_provinsi.geojson`
 - The source repository README references Kepmendagri No. 100.1.1-6117/2022 for corrected province codes and provides information about the data source and reuse terms. Review the original metadata/license before redistributing the boundary data.
 
-The global map continues to use the public datasets/geo-countries GeoJSON source. OpenStreetMap provides the basemap and is attributed in the map.
+The world map uses the public datasets/geo-countries GeoJSON source. Monthly generated datasets under `data/` provide global ADM1/ADM2 regions, while the Indonesian explorer keeps the existing 38-province source. OpenStreetMap provides the basemap and is attributed in the map.
 
 ## Data connectors
 
@@ -57,7 +57,7 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 ## Files
 
 - `index.html` — page shell and retro game-inspired styles.
-- `app.js` — map interaction, 38 provincial field profiles, full-screen tabbed modal and source UI.
+- `app.js` — map interaction, country-to-region-to-district navigation, 38 Indonesian provincial field profiles, full-screen tabbed modal and source UI.
 - `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions used by the Sources tab.
 
 ## Try it
