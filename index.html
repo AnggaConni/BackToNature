@@ -76,6 +76,30 @@
     [hidden]{display:none!important}
     #province-select-wrap{pointer-events:auto;background:var(--paper);border:4px solid var(--wood-dark);box-shadow:4px 5px 0 var(--shadow);padding:5px;min-width:190px;display:flex;align-items:center}
     #province-select{background:#fff3d0;color:#39281a;border:2px solid #936944;padding:5px;width:100%;font-family:'VT323',monospace;font-size:19px}
+    .music-player{position:fixed;z-index:1150;right:16px;bottom:38px;width:min(355px,calc(100vw - 32px));padding:10px 12px;background:linear-gradient(180deg,#f4e4b8,#d3b77e);border:4px solid #573825;box-shadow:4px 5px 0 var(--shadow),inset 0 0 0 2px #fff1c9;color:#3c2b1d}
+    .music-player-heading{display:flex;align-items:center;gap:9px;min-width:0}
+    .music-player-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;background:#dce8c9;border:3px solid #607b45;color:#36502c;font-family:'VT323',monospace;font-size:28px}
+    .music-player-track{display:flex;flex:1;flex-direction:column;min-width:0;gap:2px}
+    .music-player-track strong{font-family:'VT323',monospace;font-size:22px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4c321e}
+    .music-player-track small{font-family:'Inter',system-ui,sans-serif;font-size:11px;line-height:1.3;color:#6d5435}
+    .music-player-status{flex:none;padding:4px 5px;background:#dce8c9;border:2px solid #6c874d;color:#36512d;font-family:'Press Start 2P',monospace;font-size:7px;line-height:1.4}
+    .music-player-status.is-playing{background:#dce8c9;border-color:#4d7438;color:#315329}
+    .music-player-status.is-error{background:#f4d7ca;border-color:#a64c3d;color:#812e25}
+    .music-player-controls{display:flex;align-items:center;gap:7px;margin-top:9px}
+    .music-control-play,.music-control-mute{display:inline-flex;align-items:center;justify-content:center;flex:none;min-height:34px;padding:6px 9px;background:linear-gradient(#315b91,#1a3965);border:3px solid #102747;box-shadow:inset 0 0 0 1px #7196ba,2px 3px 0 rgba(0,0,0,.28);color:#fff2c9;font-family:'VT323',monospace;font-size:18px;line-height:1}
+    .music-control-play:hover,.music-control-mute:hover{filter:brightness(1.13)}
+    .music-control-play:focus-visible,.music-control-mute:focus-visible,.music-player input:focus-visible{outline:3px dashed #244c79;outline-offset:3px}
+    .music-control-mute{width:36px;padding:5px;font-size:17px}
+    .music-volume-control{display:flex;align-items:center;gap:5px;flex:1;min-width:0;font-family:'Inter',system-ui,sans-serif;font-size:10px;font-weight:700;color:#65482b}
+    .music-volume-control input{width:100%;min-width:45px;accent-color:#55783a;cursor:pointer}
+    .music-volume-control output{flex:none;min-width:31px;text-align:right;font-size:10px}
+    .music-player-progress{display:flex;align-items:center;gap:7px;margin-top:8px;font-family:'Inter',system-ui,sans-serif;font-size:10px;font-variant-numeric:tabular-nums;color:#62482b}
+    .music-player-progress input{flex:1;min-width:0;height:12px;accent-color:#52743a;cursor:pointer}
+    .music-player-progress input:disabled{cursor:default;opacity:.6}
+    .music-player-credit{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:5px;font-family:'Inter',system-ui,sans-serif;font-size:10px;line-height:1.25}
+    .music-player-credit a{color:#315982;text-decoration:underline;font-weight:700;white-space:nowrap}
+    .music-player-credit span{color:#725a3a;text-align:right}
+
     .bottom-hud{position:fixed;z-index:450;bottom:18px;left:18px;max-width:min(560px,calc(100vw - 36px));padding:10px 16px;background:linear-gradient(180deg,#f7e8bd,#d9c08a);border:4px solid #573825;box-shadow:5px 6px 0 var(--shadow);display:flex;gap:12px;align-items:center}
     .bottom-hud .controller{font-size:27px;white-space:nowrap}
     .bottom-hud p{margin:0;line-height:1.08;font-size:20px}
@@ -377,6 +401,7 @@
     @media(max-width:560px){
       body{font-size:16px}.screen-hud{align-items:flex-start}.logo-board{padding:6px;min-height:48px}.logo-sprite{width:23px;height:23px}.logo-subtitle{display:none}.logo-copy .pixel-label{font-size:8px}.hud-actions{flex-direction:column;max-width:44%}.hud-actions .pixel-btn{font-size:15px;padding:6px 8px}.hud-actions #province-select-wrap{min-width:0}
       .bottom-hud{max-width:calc(100vw - 16px);bottom:7px}.bottom-hud p{font-size:16px}.map-status{top:96px}
+      .music-player{left:8px;right:8px;bottom:88px;width:auto;padding:8px 9px}.music-player-icon{width:30px;height:30px;font-size:23px}.music-player-track strong{font-size:20px}.music-player-controls{margin-top:6px;gap:6px}.music-control-play,.music-control-mute{min-height:31px;padding:5px 7px}.music-player-credit{font-size:9px}
       .modal-shell{border-width:3px}.modal-header{padding:8px}.modal-heading{gap:8px}.modal-avatar{display:none}.modal-titles h1{font-size:25px}.modal-titles p{font-size:15px}.modal-stamp{font-size:9px}.modal-close{font-size:9px;padding:8px}
       .translate-trigger{font-size:12px;padding:6px 4px}.translate-menu{width:178px;right:-45px}
       .region-summary-backdrop{padding:6px}.region-summary-shell{width:calc(100vw - 12px);max-height:96dvh;border-width:3px}.region-summary-header{padding:8px;gap:7px}.region-summary-header h2{font-size:24px}.region-summary-header p{font-size:17px}.region-summary-content{padding:9px}.region-summary-hero{padding:10px}.region-summary-hero h2{font-size:25px}.region-summary-hero p,.region-summary-section>p{font-size:18px}.region-summary-crops,.region-summary-tech-grid{grid-template-columns:1fr}.region-summary-crop{padding:8px}.region-summary-climate-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.region-summary-climate-metrics span{padding:6px}.region-summary-climate-metrics b{font-size:18px}.region-summary-climate-metrics small{font-size:13px}.region-summary-climate-crops{grid-template-columns:1fr}.region-summary-footer{gap:8px;padding:8px}.region-summary-footer .pixel-btn{width:100%}
@@ -424,6 +449,40 @@
       <button id="btn-home" class="pixel-btn" type="button" title="Return to starting map">⌂ HOME</button>
     </div>
   </header>
+
+
+  <aside id="music-player" class="music-player" role="region" aria-label="Background music player">
+    <audio id="background-music" preload="none" loop>
+      <source src="./music/allicante-cozy-game-beats.mp3" type="audio/mpeg">
+      Your browser does not support HTML audio.
+    </audio>
+    <div class="music-player-heading">
+      <span class="music-player-icon" aria-hidden="true">♫</span>
+      <div class="music-player-track">
+        <strong>Cozy Game Beats</strong>
+        <small>Alicante · Pixabay</small>
+      </div>
+      <span id="music-player-status" class="music-player-status" aria-live="polite">READY</span>
+    </div>
+    <div class="music-player-controls">
+      <button id="music-play-toggle" class="music-control-play" type="button" aria-label="Play background music" title="Start music">▶ PLAY</button>
+      <button id="music-mute-toggle" class="music-control-mute" type="button" aria-label="Mute music" title="Mute / unmute">🔊</button>
+      <label class="music-volume-control" for="music-volume">
+        <span>VOL</span>
+        <input id="music-volume" type="range" min="0" max="1" step="0.05" value="0.35" aria-label="Music volume">
+        <output id="music-volume-value" for="music-volume">35%</output>
+      </label>
+    </div>
+    <div class="music-player-progress">
+      <span id="music-current-time">0:00</span>
+      <input id="music-seek" type="range" min="0" max="1000" step="1" value="0" disabled aria-label="Track position">
+      <span id="music-duration">--:--</span>
+    </div>
+    <div class="music-player-credit">
+      <a href="https://pixabay.com/music/electronic-cozy-game-beats-332257/" target="_blank" rel="noopener noreferrer">Track &amp; license ↗</a>
+      <span>Music starts only when you press Play.</span>
+    </div>
+  </aside>
 
   <div id="map-status" class="map-status" role="status" aria-live="polite">
     <h2 id="map-status-title">Welcome, farmer!</h2>
@@ -478,7 +537,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-readable-type-v1"></script>
-  <script src="./app.js?v=20261020-readable-type-v1"></script>
+  <script src="./api.js?v=20261020-music-player-v1"></script>
+  <script src="./app.js?v=20261020-music-player-v1"></script>
 </body>
 </html>
