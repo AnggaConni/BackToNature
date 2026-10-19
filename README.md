@@ -14,7 +14,9 @@ Each province opens a full-screen, tabbed field guide:
 6. **Technology** — potential soil conservation, irrigation, agroforestry, wetland/peat or urban-growing practices selected according to the broad landscape type.
 7. **Sources** — official data portals plus optional live queries to FAOSTAT, the FAO geospatial metadata catalogue and WOCAT QCAT.
 
-The interface uses pixel fonts, wood-sign borders, parchment panels, controller-style prompts and a full-screen tab layout, while remaining usable on phones.
+When a user clicks an ADM1 region or ADM2 district, a compact recommendation brief opens first. It summarizes starter crop ideas, low-regret technologies and the climate-based planting hints; **Detailed Fieldbook** opens the full-screen tabbed guide. The interface uses pixel fonts, wood-sign borders, parchment panels, controller-style prompts and remains usable on phones.
+
+The header's **LANG** menu opens a Google Translate view of the current page in a new tab for Indonesian, English, Spanish, French, Japanese, Simplified Chinese or Arabic. This deliberately uses the public Translate website instead of Google's retired Website Translator embed widget. It is a convenience translation path; the full-screen map and interactive features may not behave identically through the translated proxy.
 
 ## Map boundary data
 
@@ -83,7 +85,7 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 ## Files
 
 - `index.html` — page shell and retro game-inspired styles.
-- `app.js` — map interaction, country-to-region-to-district navigation, 38 Indonesian provincial field profiles, full-screen tabbed modal and source UI.
+- `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary and Translate menu behavior.
 - `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, Wikimedia Commons plant photo search, and historical climate/planting-window functions.
 - `tests/crop-api.test.js` — offline smoke tests for crop screening, Commons image metadata mapping, historical weather aggregation and seasonal windows.
 
