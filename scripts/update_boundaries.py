@@ -382,12 +382,14 @@ def main() -> int:
             return 0
 
         # Publish only after every requested level and every staged JSON has passed checks.
-        for relative_path in sorted(output_payloads):
-            shutil.copy2(stage / relative_path, DATA_DIR / relative_path)
-
-        # Remove only old ADM2 files after the new complete district index is written.
         district_dir = DATA_DIR / "districts"
         district_dir.mkdir(parents=True, exist_ok=True)
+        for relative_path in sorted(output_payloads):
+            destination = DATA_DIR / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(stage / relative_path, destination)
+
+        # Remove only old ADM2 files after the new complete district index is written.
         expected_files = set(district_files)
         for old_file in district_dir.glob("*.geojson"):
             relative = str(old_file.relative_to(DATA_DIR)).replace("\\", "/")
