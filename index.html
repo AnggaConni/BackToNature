@@ -137,6 +137,39 @@
     .crop-glyph{display:grid;place-items:center;width:54px;height:54px;flex:none;background:#d6e2ba;border:3px solid #627b45;font-size:30px}
     .crop-card h3{font-size:25px;line-height:1.02;color:#5b4026;margin:4px 0}
     .crop-card p{font-size:18px;line-height:1.1;margin:6px 0 0}
+    .crop-lab{background:#e7d3a5}
+    .crop-lab-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+    .crop-control{min-width:0}
+    .crop-control label{display:block;margin:0 0 5px;color:#604127;font-size:19px}
+    .crop-control input,.crop-control select{display:block;width:100%;min-height:39px;padding:7px 9px;background:#fff5d8;color:#38271a;border:3px solid #87623c;font:19px 'VT323',monospace;border-radius:0}
+    .crop-lab-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0 5px}
+    .crop-lab-actions .live-note{max-width:420px}
+    .crop-match-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0}
+    .crop-match-card{min-width:0;overflow:hidden;background:#fff1cb;border:3px solid #8d6842;box-shadow:3px 4px 0 rgba(56,39,22,.16)}
+    .crop-match-image{position:relative;aspect-ratio:16/9;width:100%;overflow:hidden;background:#d7e0c4;border-bottom:3px solid #8d6842}
+    .crop-image-link{display:block;position:relative;width:100%;height:100%;color:#fff;text-decoration:none}
+    .crop-image-link img{display:block;width:100%;height:100%;object-fit:cover;background:#d7e0c4}
+    .crop-image-open{position:absolute;right:7px;bottom:7px;padding:4px 7px;background:rgba(25,48,32,.88);border:2px solid #e5d4a6;color:#fff2c9;font-size:15px}
+    .crop-image-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;height:100%;padding:12px;color:#4f633b;text-align:center}
+    .crop-image-placeholder>span{font-size:35px}
+    .crop-image-placeholder b{font-size:20px;line-height:1.05}
+    .crop-image-placeholder small{font-size:15px;line-height:1.05}
+    .crop-match-body{padding:13px}
+    .crop-match-topline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .crop-score{display:inline-block;padding:4px 8px;border:2px solid #4f6d37;background:#d7e7bf;color:#2f4a23;font-size:17px;white-space:nowrap}
+    .crop-match-body h4{margin:8px 0 3px;color:#5b4026;font-size:28px;line-height:1}
+    .crop-match-body>p{font-size:19px;line-height:1.12;margin:8px 0}
+    .crop-local-name{color:#6b512f}
+    .crop-match-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+    .crop-match-meta span{padding:4px 7px;border:2px solid #b29a6a;background:#f3e2b6;font-size:15px;text-transform:capitalize}
+    .crop-reason,.crop-caution{margin:9px 0 0;padding:9px;background:#e2ebd2;border-left:4px solid #617b44;font-size:17px;line-height:1.1}
+    .crop-caution{background:#f3dfc3;border-left-color:#a66a35}
+    .crop-reason ul,.crop-caution ul{margin:5px 0 0;padding-left:20px}
+    .crop-reason li,.crop-caution li{margin:4px 0}
+    .crop-photo-credit{font-size:14px!important;color:#6f573a;overflow-wrap:anywhere}
+    .crop-photo-credit a{overflow-wrap:anywhere}
+    .pixel-btn:disabled{opacity:.65;filter:grayscale(.25);cursor:progress;transform:none}
+
     .text-link{display:inline-block;margin-top:8px;color:#1d547d;text-decoration:underline;text-underline-offset:3px;font-weight:bold}
     .source-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .source-card{display:flex;gap:12px;padding:13px;background:rgba(255,246,215,.88);border:3px solid #9b774b;box-shadow:3px 4px 0 rgba(0,0,0,.12)}
@@ -176,6 +209,7 @@
       #province-select-wrap{min-width:140px;padding:3px}.bottom-hud{left:8px;bottom:8px;padding:7px 10px;gap:8px}.bottom-hud .controller{font-size:22px}.bottom-hud p{font-size:17px}
       .modal-shell{border-width:5px}.modal-header{padding:9px 11px;gap:8px}.modal-avatar{width:43px;height:43px;font-size:26px}.modal-close{padding:10px;font-size:10px}.tab-btn{font-size:17px;padding:8px 11px}.modal-content{padding:15px}
       .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-grid .field-card:last-child{grid-column:1/-1}
+      .crop-lab-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.crop-match-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .source-strip{align-items:flex-start;flex-direction:column}.source-strip .pixel-btn{align-self:flex-start}
     }
     @media(max-width:560px){
@@ -183,7 +217,7 @@
       .bottom-hud{max-width:calc(100vw - 16px);bottom:7px}.bottom-hud p{font-size:16px}.map-status{top:96px}
       .modal-shell{border-width:3px}.modal-header{padding:8px}.modal-heading{gap:8px}.modal-avatar{display:none}.modal-titles h1{font-size:25px}.modal-titles p{font-size:15px}.modal-stamp{font-size:9px}.modal-close{font-size:9px;padding:8px}
       .tab-bar{padding:5px 4px 0}.tab-btn{font-size:15px;padding:8px 10px}.modal-content{padding:12px}.modal-footer{padding:6px 9px;font-size:13px;gap:4px}.footer-controls{font-size:12px}
-      .tile-grid,.overview-grid,.crop-list,.guide-grid,.source-list{grid-template-columns:1fr}.overview-grid .field-card:last-child{grid-column:auto}.tab-intro h2{font-size:31px}.tab-intro p{font-size:20px}.field-card{padding:12px}.field-card h3{font-size:24px}.field-card p{font-size:19px}
+      .tile-grid,.overview-grid,.crop-list,.guide-grid,.source-list,.crop-match-grid{grid-template-columns:1fr}.crop-lab-controls{grid-template-columns:1fr}.overview-grid .field-card:last-child{grid-column:auto}.tab-intro h2{font-size:31px}.tab-intro p{font-size:20px}.field-card{padding:12px}.field-card h3{font-size:24px}.field-card p{font-size:19px}
       .quest-panel{padding:11px;gap:9px}.quest-icon{font-size:28px}.quest-panel h3,.source-strip h3{font-size:24px}.quest-panel p,.source-strip p,.soil-profile p{font-size:19px}
       .soil-profile{padding:12px;gap:10px}.soil-profile-icon{font-size:32px}.soil-profile h3{font-size:24px}.source-strip{padding:12px}
       .checklist-card{grid-template-columns:39px minmax(0,1fr);column-gap:8px}.check-number{width:35px;height:35px;font-size:9px}.crop-glyph{width:45px;height:45px;font-size:25px}
@@ -248,7 +282,7 @@
     </div>
   </div>
 
-  <script src="./api.js"></script>
-  <script src="./app.js"></script>
+  <script src="./api.js?v=20261020-crop-lab"></script>
+  <script src="./app.js?v=20261020-crop-lab"></script>
 </body>
 </html>
