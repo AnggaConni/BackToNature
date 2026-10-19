@@ -38,6 +38,7 @@
   var climatePromisesBySelection = {};
   var climatePhotoRequestId = 0;
   var climatePhotosLoadedBySelection = {};
+  var summarySelection = null;
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -292,6 +293,7 @@
   }
 
   function updateClimatePreview() {
+    updateRegionSummary();
     var statusNode = el('climate-preview-status');
     if (!statusNode || !currentProvince) return;
     var key = climateSelectionKey(currentProvince);
@@ -368,9 +370,9 @@
         return null;
       } finally {
         delete climatePromisesBySelection[key];
-        if (currentProvince === selection) {
+        if (currentProvince && climateSelectionKey(currentProvince) === key) {
           updateClimatePreview();
-          if (currentTab === 'climate') {
+          if (el('province-modal').classList.contains('open') && currentTab === 'climate') {
             renderTab('climate');
           }
         }
@@ -1025,6 +1027,117 @@
     content.scrollTop = 0;
   }
 
+  function regionSummaryContext(selection) {
+    var profile = profileFor(selection && selection.name || 'Selected region');
+    var techList = techByKind[profile.kind] || techByKind['mixed-lowland'] || [];
+    var countryName = selection && selection.countryName ||
+      (selection && selection.countryIso3 && countryByISO3[selection.countryIso3] && countryByISO3[selection.countryIso3].name) ||
+      (selectedCountry && selectedCountry.name) || 'Selected country';
+    var level = selection && Number(selection.adminLevel) === 2 ? 'District / ADM2' : 'Province, state or region / ADM1';
+    return { profile:profile, techList:techList, countryName:countryName, level:level };
+  }
+
+  function renderRegionSummary() {
+    if (!summarySelection) return '';
+    var selection = summarySelection;
+    var context = regionSummaryContext(selection);
+    var profile = context.profile;
+    var key = climateSelectionKey(selection);
+    var climateResult = climateResultsBySelection[key];
+    var climateStatus = climateStatusBySelection[key];
+    var cropCards = (profile.crops || []).slice(0,4).map(function (crop, index) {
+      var icon = /rice|padi/i.test(crop) ? '🌾' :
+        /coffee|kakao|cacao|cocoa|coconut|kelapa|mango|mangga|banana|pisang|tree|kayu/i.test(crop) ? '🌳' :
+        /vegetable|sayur|cabai|chili|potato|kentang|onion|bawang/i.test(crop) ? '🥬' :
+        /legume|bean|kacang/i.test(crop) ? '🫘' : '🌱';
+      return '<article class="region-summary-crop"><span class="region-summary-crop-icon">' + icon + '</span><div><span class="mini-code">STARTER IDEA ' + String(index+1).padStart(2,'0') + '</span><h4>' + esc(crop) + '</h4><p>Investigate local variety, soil, rainfall, water and planting season before deciding.</p></div></article>';
+    }).join('');
+    var technologyCards = context.techList.slice(0,3).map(function (technology, index) {
+      return '<article class="region-summary-tech"><div class="region-summary-tech-title"><span>' + esc(technology.icon || '🛠️') + '</span><h4>' + esc(technology.title) + '</h4></div><p><b>Can help with:</b> ' + esc(technology.problem) + '</p><p>' + esc(technology.action) + '</p></article>';
+    }).join('');
+    var climateMarkup = '';
+    if (climateResult) {
+      var climate = climateResult.climate;
+      var best = climateResult.recommendations || [];
+      climateMarkup = '<div class="region-summary-climate-metrics">' +
+        '<span><b>' + esc(numberOrDash(averageClimateValue(climate.monthly.map(function (month) { return month.temperatureMean; })),' °C')) + '</b><small>mean temperature</small></span>' +
+        '<span><b>' + esc(numberOrDash(climate.monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); },0),' mm')) + '</b><small>estimated annual rainfall</small></span>' +
+        '<span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>historical weather</small></span></div>' +
+        '<div class="region-summary-climate-crops">' + best.slice(0,3).map(function (crop) {
+          var window = crop.bestWindow || {};
+          return '<article><span class="mini-code">CLIMATE SCREEN</span><h4>' + esc(crop.name) + '</h4><p><b>Try planting window:</b> ' + esc(window.month || '—') + '</p><span class="crop-score">' + esc(window.score == null ? '—' : window.score) + '/100</span></article>';
+        }).join('') + '</div>';
+    } else if (climateStatus && climateStatus.state === 'error') {
+      climateMarkup = '<p class="region-summary-climate-status is-error">' + esc(climateStatus.message) + ' Open the detailed climate tab to retry or review the source information.</p>';
+    } else {
+      climateMarkup = '<div class="region-summary-climate-loading"><span class="region-summary-spinner">🌦️</span><span><b>Checking the local climate pattern…</b><small>Historical temperature, rain and wind data are being summarized for a representative point in this region.</small></span></div>';
+    }
+
+    return '<div class="region-summary-hero">' +
+      '<div class="mini-code">YOUR LAND / QUICK RECOMMENDATION</div>' +
+      '<h2>What could grow here? 🌱</h2>' +
+      '<p>' + esc(profile.intro) + '</p>' +
+      '<div class="region-summary-tags"><span>' + esc(context.countryName) + '</span><span>' + esc(context.level) + '</span><span>' + esc(profile.zone) + '</span></div>' +
+      '</div>' +
+      '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌾</span><div><div class="mini-code">START HERE</div><h3>Plants worth investigating</h3></div></div>' +
+      '<p>These are first-pass ideas from the regional field guide—not yet a verdict for a particular farm. Elevation, soil tests, drainage, water and local varieties may change the answer.</p>' +
+      '<div class="region-summary-crops">' + cropCards + '</div></section>' +
+      '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🛠️</span><div><div class="mini-code">LOW-REGRET PRACTICES</div><h3>Technologies to consider</h3></div></div>' +
+      '<div class="region-summary-tech-grid">' + technologyCards + '</div></section>' +
+      '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌦️</span><div><div class="mini-code">SEASONS / RAIN / WIND</div><h3>Climate-based planting hints</h3></div></div>' +
+      '<p>Seasonal candidates use historical climate at a representative map point. Treat this as a screening clue, not a forecast or guaranteed planting instruction.</p>' +
+      climateMarkup + '</section>' +
+      '<section class="region-summary-note"><span>📌</span><p><b>Before investing:</b> confirm actual soil conditions and water access, then check local planting calendars, seed availability, weather warnings, market access and advice from local agricultural extension services.</p></section>';
+  }
+
+  function updateRegionSummary() {
+    var backdrop = el('region-summary-modal');
+    var content = el('region-summary-content');
+    if (!backdrop || !content || !backdrop.classList.contains('open') || !summarySelection) return;
+    content.innerHTML = renderRegionSummary();
+  }
+
+  function closeRegionSummary(clearSelection) {
+    var backdrop = el('region-summary-modal');
+    if (backdrop) {
+      backdrop.classList.remove('open');
+      backdrop.setAttribute('aria-hidden','true');
+    }
+    if (clearSelection) {
+      if (!el('province-modal').classList.contains('open') && currentProvince === summarySelection) {
+        currentProvince = null;
+      }
+      summarySelection = null;
+      if (!el('province-modal').classList.contains('open')) document.body.classList.remove('modal-open');
+    }
+  }
+
+  function showRegionSummary(name, feature, context) {
+    var summary = Object.assign({ name:name, feature:feature || null, adminLevel:activeAdminLevel }, context || {});
+    summary.feature = feature || summary.feature || null;
+    summary.name = name;
+    summarySelection = summary;
+    currentProvince = summary;
+    currentTab = 'overview';
+    setText('region-summary-title',name);
+    var backdrop = el('region-summary-modal');
+    backdrop.classList.add('open');
+    backdrop.setAttribute('aria-hidden','false');
+    document.body.classList.add('modal-open');
+    updateRegionSummary();
+    loadClimateForSelection(summary);
+    var button = el('region-summary-details');
+    if (button) button.focus();
+  }
+
+  function openDetailedFieldbook() {
+    var selection = summarySelection;
+    if (!selection) return;
+    closeRegionSummary(false);
+    summarySelection = null;
+    openModal(selection.name,selection.feature,selection);
+  }
+
   function openModal(name, feature, context) {
     var profile = profileFor(name);
     currentProvince = Object.assign({ name:name, feature:feature || null, adminLevel:activeAdminLevel }, context || {});
@@ -1074,11 +1187,48 @@
     if (button) renderTab(button.getAttribute('data-tab'));
   });
   el('modal-close').addEventListener('click', closeModal);
+  el('region-summary-close').addEventListener('click', function () { closeRegionSummary(true); });
+  el('region-summary-details').addEventListener('click', openDetailedFieldbook);
+  el('region-summary-modal').addEventListener('click', function (event) {
+    if (event.target === el('region-summary-modal')) closeRegionSummary(true);
+  });
+
+  var translateButton = el('btn-translate');
+  var translateMenu = el('translate-menu');
+  if (translateButton && translateMenu) {
+    translateButton.addEventListener('click',function (event) {
+      event.stopPropagation();
+      var willOpen = translateMenu.hidden;
+      translateMenu.hidden = !willOpen;
+      translateButton.setAttribute('aria-expanded',willOpen ? 'true' : 'false');
+    });
+    translateMenu.addEventListener('click',function (event) {
+      var languageButton = event.target.closest('[data-translate-lang]');
+      if (!languageButton) return;
+      var targetLanguage = languageButton.getAttribute('data-translate-lang');
+      var translateUrl = new URL('https://translate.google.com/translate');
+      translateUrl.searchParams.set('sl','auto');
+      translateUrl.searchParams.set('tl',targetLanguage);
+      translateUrl.searchParams.set('u',window.location.href);
+      translateMenu.hidden = true;
+      translateButton.setAttribute('aria-expanded','false');
+      window.open(translateUrl.href,'_blank','noopener,noreferrer');
+    });
+    document.addEventListener('click',function (event) {
+      if (!event.target.closest('.translate-picker')) {
+        translateMenu.hidden = true;
+        translateButton.setAttribute('aria-expanded','false');
+      }
+    });
+  }
   el('province-modal').addEventListener('click', function (event) {
     if (event.target === el('province-modal')) closeModal();
   });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') closeModal();
+    if (event.key === 'Escape') {
+      if (el('region-summary-modal').classList.contains('open')) closeRegionSummary(true);
+      else closeModal();
+    }
     if (el('province-modal').classList.contains('open') && event.key === 'ArrowRight') {
       var index = tabs.findIndex(function (t) { return t.id === currentTab; });
       renderTab(tabs[(index + 1) % tabs.length].id);
@@ -1246,7 +1396,7 @@
             adminLevel: level,
             feature: feature
           };
-          openModal(name, feature, context);
+          showRegionSummary(name, feature, context);
         });
       }
     });
@@ -1352,7 +1502,7 @@
         });
     if (!feature) return;
     var featureName = provinceFeatureName(feature);
-    openModal(featureName, feature, {
+    showRegionSummary(featureName, feature, {
       countryIso3: selectedCountry ? selectedCountry.iso3 : '',
       countryName: selectedCountry ? selectedCountry.name : '',
       adminLevel: activeAdminLevel,
