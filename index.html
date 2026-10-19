@@ -170,46 +170,6 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Simulated Database/API for Global Agricultural Recommendations
-        const mockAgriAPI = {
-            "Brazil": {
-                masalah: "High deforestation rates, acidic soils in the Cerrado, and biodiversity loss.",
-                rekomendasi: "Agroforestry Systems, Cacao, Acai, and Shade-grown Coffee.",
-                cara: "1. Implement shade-grown planting to restore canopy.\n2. Add agricultural lime to balance soil pH.\n3. Integrate crops with native forest species."
-            },
-            "Australia": {
-                masalah: "Severe arid conditions, frequent droughts, and high soil salinity.",
-                rekomendasi: "Drought-resistant Sorghum, Saltbush, and Merino Sheep farming.",
-                cara: "1. Practice no-till farming to retain soil moisture.\n2. Plant salt-tolerant shrubs for livestock grazing.\n3. Implement advanced drip irrigation and water recycling."
-            },
-            "India": {
-                masalah: "Heavy dependence on monsoons, groundwater depletion, and nutrient-exhausted soil.",
-                rekomendasi: "Pearl Millet (Bajra), Legumes (Chickpeas), and integrated Dairy Farming.",
-                cara: "1. Rotate cereals with legumes to naturally fix soil nitrogen.\n2. Build rainwater harvesting ponds (Johads).\n3. Use solar-powered micro-irrigation systems."
-            },
-            "Egypt": {
-                masalah: "Hyper-arid desert environment, extreme water scarcity, and Nile delta salinity.",
-                rekomendasi: "Date Palms, Desert-adapted Cotton, and Camel Husbandry.",
-                cara: "1. Utilize precision drip irrigation under plastic mulch.\n2. Cultivate in controlled environment agriculture (greenhouses).\n3. Plant windbreaks using hardy desert trees."
-            },
-            "United States of America": {
-                masalah: "Topsoil erosion, monoculture vulnerabilities, and changing weather patterns.",
-                rekomendasi: "Cover Crops (Clover/Rye), Corn-Soybean Rotation, and Pasture-raised Cattle.",
-                cara: "1. Plant cover crops during off-seasons to prevent erosion.\n2. Implement precision agriculture using drone data.\n3. Transition to rotational grazing management."
-            },
-            "Indonesia": {
-                masalah: "High rate of land conversion, peatland degradation, and heavy rainfall erosion.",
-                rekomendasi: "Agroforestry, System of Rice Intensification (SRI), and Poultry Farming.",
-                cara: "1. Block canals in peatlands to maintain moisture and prevent fires.\n2. Apply terracing on steep slopes.\n3. Use organic pesticides to protect against common tropical pests."
-            }
-        };
-
-        const defaultAPI = {
-            masalah: "Declining soil quality and unpredictable weather due to global climate change.",
-            rekomendasi: "Crop Rotation, Drought-tolerant Seeds, and Local Livestock breeds.",
-            cara: "1. Reduce chemical fertilizers; increase use of organic compost.\n2. Apply mulch to preserve soil moisture.\n3. Implement biosecurity measures for livestock."
-        };
-
         let typingInterval;
         const dialogueBox = document.getElementById('dialogue-box');
         const dialogueText = document.getElementById('dialogue-text');
@@ -242,37 +202,6 @@
                     element.classList.remove('typing-cursor');
                 }
             }, speed);
-        }
-
-        async function fetchAgriData(countryName) {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    const data = mockAgriAPI[countryName] || defaultAPI;
-                    resolve(data);
-                }, 500); 
-            });
-        }
-
-        async function onRegionClick(e, feature) {
-            // Check different possible property keys for country names in the GeoJSON
-            const countryName = feature.properties.ADMIN || feature.properties.name || feature.properties.sovereignt || "Unknown Region";
-            
-            // Zoom to clicked country
-            map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
-
-            dialogueBox.style.display = 'flex';
-            regionTitle.innerText = `[ Fetching FAO/WOCAT System Data... ]`;
-            dialogueText.innerHTML = 'Analyzing soil and climate conditions...';
-            avatarIcon.innerText = '📡';
-
-            const agriData = await fetchAgriData(countryName);
-
-            // Format Text
-            const narasi = `[Land Issue]\n${agriData.masalah}\n\n[Expert Recommendation]\n${agriData.rekomendasi}\n\n[Execution Guide]\n${agriData.cara}`;
-
-            regionTitle.innerText = `Mayor of ${countryName}:`;
-            avatarIcon.innerText = '👨‍🌾'; 
-            typeWriter(narasi, dialogueText);
         }
 
         // Standard Global Countries GeoJSON (Publicly accessible)
