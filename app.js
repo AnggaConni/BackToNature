@@ -887,9 +887,12 @@
       bounds
     );
   });
-  el('open-current-province').addEventListener('click', function () {
-    if (currentProvince) renderTab('overview');
-  });
+  var openCurrentProvinceButton = el('open-current-province');
+  if (openCurrentProvinceButton) {
+    openCurrentProvinceButton.addEventListener('click', function () {
+      if (currentProvince) renderTab('overview');
+    });
+  }
 
   loadWorldLayer();
 })();
