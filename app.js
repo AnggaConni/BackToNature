@@ -217,10 +217,143 @@
       {t:'Provincial boundary GeoJSON',d:'38 Indonesian province boundaries. Repository README cites Kepmendagri No. 300.2.2-2138/2025 and MIT licensing; review the original metadata when reusing.',u:'https://github.com/AlfianAliM/Indonesia-GeoJSON',tag:'MAP BOUNDARIES'}
     ];
     return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open source records to check update date, methodology, geographic coverage, license and units. This app separates a curated regional starter profile from measured statistics.</p></div>' +
+      '<section class="live-connectors"><div class="section-title"><span class="mini-code">LIVE DATA TERMINAL</span><h3>Query the source systems</h3></div>' +
+      '<p class="live-explainer">These connectors request real records when you press a button. National FAOSTAT observations provide country context only; they are not provincial soil or yield measurements.</p>' +
+      '<div class="tile-grid">' +
+      '<article class="field-card"><div class="card-topline"><span class="card-emoji">📊</span><span class="mini-code">FAOSTAT / LIVE</span></div><h3>Land use · Indonesia</h3><p>Request Indonesia-level land-use observations from the public FAOSTAT API.</p><button id="live-faostat-btn" class="pixel-btn" type="button">FETCH NATIONAL DATA</button><div id="live-faostat-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-faostat-results" class="live-results">No values are shown until the live API responds.</div></article>' +
+      '<article class="field-card"><div class="card-topline"><span class="card-emoji">🗺️</span><span class="mini-code">FAO CATALOGUE / LIVE</span></div><h3>Spatial metadata · ' + esc(profile.name) + '</h3><p>Search FAO catalogue metadata for records mentioning this province and soil, land, water, climate or agriculture.</p><button id="live-fao-catalog-btn" class="pixel-btn" type="button">SEARCH FAO CATALOGUE</button><div id="live-fao-catalog-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-fao-catalog-results" class="live-results">No catalogue results loaded.</div></article>' +
+      '</div><details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary><p>WOCAT results are searched at the Indonesia/country level because a province-specific technology filter is not guaranteed. The token is used for this request only and is not written to localStorage or the repository. Only enter a token you are authorized to use.</p><label for="live-wocat-token">WOCAT QCAT token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste token for one request"><button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">Live access requires a valid WOCAT token; no sample records are fabricated.</div></details></section>' +
       '<div class="source-list">' + sources.map(function (s, i) {
         return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(s.tag) + '</span><h3>' + esc(s.t) + '</h3><p>' + esc(s.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(s.u) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' +
       '<section class="data-integrity"><span class="data-tag green">DATA INTEGRITY</span><h3>What this panel does—and does not—claim</h3><p><b>It does:</b> organize regional planning cues, crop candidates, field-check lists and trusted data portals.</p><p><b>It does not:</b> claim laboratory soil values, precise yield, farm-level suitability or confirmed API measurements where those data were not retrieved and validated.</p><p>Selected province: <b>' + esc(profile.name) + '</b>. Profile type: <b>curated regional starter</b>.</p></section>';
+  }
+
+  function setLiveStatus(id, text, type) {
+    var node = el(id);
+    if (!node) return;
+    node.className = 'live-status ' + (type || 'neutral');
+    node.textContent = text;
+  }
+
+  function safeHttps(value) {
+    try {
+      var parsed = new URL(String(value || ''), window.location.href);
+      return parsed.protocol === 'https:' ? parsed.href : '#';
+    } catch (_) { return '#'; }
+  }
+
+  function wireSourceControls(profile) {
+    var api = window.BackToNatureAPI;
+    var faoBtn = el('live-faostat-btn');
+    if (faoBtn) faoBtn.addEventListener('click', async function () {
+      if (!api || !api.fetchIndonesiaLandUse) {
+        setLiveStatus('live-faostat-status', 'API module unavailable. Reload this page.', 'error');
+        return;
+      }
+      faoBtn.disabled = true;
+      setLiveStatus('live-faostat-status', 'Requesting live FAOSTAT records…', 'pending');
+      el('live-faostat-results').textContent = 'Waiting for the official source. No placeholder values are shown.';
+      try {
+        var response = await api.fetchIndonesiaLandUse();
+        var rows = response.rows || [];
+        if (!rows.length) {
+          setLiveStatus('live-faostat-status', 'Source responded; no populated observations found', 'pending');
+          el('live-faostat-results').textContent = 'The request succeeded but the selected period returned no populated land-use values.';
+          return;
+        }
+        rows.sort(function (a,b) {
+          return Number(api.valueOf ? api.valueOf(b,['Year','Year Code']) : (b.Year || b['Year Code'] || 0)) -
+            Number(api.valueOf ? api.valueOf(a,['Year','Year Code']) : (a.Year || a['Year Code'] || 0));
+        });
+        var pick = [], seen = {};
+        rows.forEach(function (row) {
+          var item = row.Item || row['Item Name'] || row.ItemName || 'Land-use item';
+          var element = row.Element || row['Element Name'] || 'Observation';
+          var key = String(item).toLowerCase() + '|' + String(element).toLowerCase();
+          if (!seen[key] && pick.length < 8) { seen[key] = true; pick.push(row); }
+        });
+        var table = '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Item / indicator</th><th>Year</th><th>Value</th></tr></thead><tbody>';
+        pick.forEach(function (row) {
+          var item = row.Item || row['Item Name'] || row.ItemName || 'Land-use item';
+          var elName = row.Element || row['Element Name'] || 'Observation';
+          var year = row.Year || row['Year Code'] || '—';
+          var value = row.Value != null ? row.Value : (row.value != null ? row.value : '—');
+          var unit = row.Unit || row['Unit Name'] || '';
+          table += '<tr><td>' + esc(item) + '<br><small>' + esc(elName) + '</small></td><td>' + esc(year) + '</td><td>' + esc(Number.isFinite(Number(value)) ? Number(value).toLocaleString('en-US',{maximumFractionDigits:2}) : value) + '<br><small>' + esc(unit) + '</small></td></tr>';
+        });
+        table += '</tbody></table></div><p class="live-note">Indonesia · domain Land Use (RL) · request window ' + esc(response.startYear) + '–' + esc(response.endYear) + '. Values, units and years follow the source response. These are national context, not province-level results.</p>';
+        el('live-faostat-results').innerHTML = table;
+        setLiveStatus('live-faostat-status', 'LIVE SOURCE · ' + rows.length + ' populated records', 'success');
+      } catch (error) {
+        setLiveStatus('live-faostat-status', 'Live request failed', 'error');
+        el('live-faostat-results').textContent = (error && error.message ? error.message : 'Unknown API error') + ' No sample data were substituted.';
+      } finally { faoBtn.disabled = false; }
+    });
+
+    var catBtn = el('live-fao-catalog-btn');
+    if (catBtn) catBtn.addEventListener('click', async function () {
+      if (!api || !api.searchFaoCatalog) {
+        setLiveStatus('live-fao-catalog-status', 'API module unavailable. Reload this page.', 'error');
+        return;
+      }
+      catBtn.disabled = true;
+      setLiveStatus('live-fao-catalog-status', 'Searching FAO metadata catalogue…', 'pending');
+      el('live-fao-catalog-results').textContent = 'Querying the catalogue for ' + profile.name + '.';
+      try {
+        var records = await api.searchFaoCatalog(profile.name);
+        if (!records.length) {
+          setLiveStatus('live-fao-catalog-status', 'No matching catalogue records returned', 'pending');
+          el('live-fao-catalog-results').textContent = 'No matches were returned for this query. Try the official catalogue and broaden the search terms.';
+          return;
+        }
+        el('live-fao-catalog-results').innerHTML = '<ul class="live-record-list">' + records.map(function (record) {
+          return '<li><b>' + esc(record.title) + '</b>' +
+            (record.summary ? '<p>' + esc(record.summary.slice(0,240)) + (record.summary.length > 240 ? '…' : '') + '</p>' : '') +
+            '<a target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.url)) + '">Open metadata ↗</a></li>';
+        }).join('') + '</ul>';
+        setLiveStatus('live-fao-catalog-status', 'LIVE CATALOGUE · ' + records.length + ' records', 'success');
+      } catch (error) {
+        setLiveStatus('live-fao-catalog-status', 'Catalogue request failed', 'error');
+        el('live-fao-catalog-results').textContent = (error && error.message ? error.message : 'Unknown API error') + ' The request may be blocked by CORS or network policy. No fake records were substituted.';
+      } finally { catBtn.disabled = false; }
+    });
+
+    var wocatBtn = el('live-wocat-btn');
+    if (wocatBtn) wocatBtn.addEventListener('click', async function () {
+      if (!api || !api.fetchWocatTechnologies) {
+        setLiveStatus('live-wocat-status', 'API module unavailable. Reload this page.', 'error');
+        return;
+      }
+      var input = el('live-wocat-token');
+      var token = input ? input.value.trim() : '';
+      if (input) input.value = '';
+      if (!token) {
+        setLiveStatus('live-wocat-status', 'Token required for authenticated QCAT access', 'error');
+        return;
+      }
+      wocatBtn.disabled = true;
+      setLiveStatus('live-wocat-status', 'Requesting authorized WOCAT records…', 'pending');
+      el('live-wocat-results').textContent = 'The token was removed from the input and will only be passed to this request.';
+      try {
+        var records = await api.fetchWocatTechnologies(token, 'IDN');
+        if (!records.length) {
+          setLiveStatus('live-wocat-status', 'Request succeeded; no records returned', 'pending');
+          el('live-wocat-results').textContent = 'The API returned no technology records for the country-level query.';
+          return;
+        }
+        el('live-wocat-results').innerHTML = '<ul class="live-record-list">' + records.map(function (record) {
+          return '<li><b>' + esc(record.title) + '</b>' +
+            (record.code ? '<small class="record-code">' + esc(record.code) + '</small>' : '') +
+            (record.summary ? '<p>' + esc(record.summary.slice(0,260)) + (record.summary.length > 260 ? '…' : '') + '</p>' : '') +
+            '<a target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.url)) + '">Open WOCAT record ↗</a></li>';
+        }).join('') + '</ul><p class="live-note">Country-level WOCAT results: records are not guaranteed to match this province specifically.</p>';
+        setLiveStatus('live-wocat-status', 'LIVE SOURCE · ' + records.length + ' records', 'success');
+      } catch (error) {
+        setLiveStatus('live-wocat-status', 'WOCAT request failed', 'error');
+        el('live-wocat-results').textContent = (error && error.message ? error.message : 'Unknown API error') + ' Check token authorization and QCAT browser access. No sample records were substituted.';
+      } finally { wocatBtn.disabled = false; }
+    });
   }
 
   function renderTab(tab) {
@@ -233,6 +366,7 @@
       tab === 'soil' ? renderSoil(profile) :
       tab === 'crops' ? renderCrops(profile) :
       tab === 'technology' ? renderTechnology(profile) : renderSources(profile);
+    if (tab === 'sources') wireSourceControls(profile);
     Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (button) {
       var active = button.getAttribute('data-tab') === tab;
       button.classList.toggle('active', active);
@@ -278,8 +412,8 @@
     if (button) renderTab(button.getAttribute('data-tab'));
   });
   el('modal-close').addEventListener('click', closeModal);
-  el('modal-backdrop').addEventListener('click', function (event) {
-    if (event.target === el('modal-backdrop')) closeModal();
+  el('province-modal').addEventListener('click', function (event) {
+    if (event.target === el('province-modal')) closeModal();
   });
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') closeModal();
@@ -344,7 +478,7 @@
           layer.on('mouseover', function () { layer.setStyle(provinceHoverStyle()); if (layer.bringToFront) layer.bringToFront(); });
           layer.on('mouseout', function () { provinceLayer.resetStyle(layer); });
           layer.on('click', function (event) {
-            L.DomEvent.stopPropagation(event);
+            if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
             openModal(name, feature);
           });
         }
