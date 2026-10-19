@@ -9,9 +9,10 @@ Each province opens a full-screen, tabbed field guide:
 1. **Overview** — regional landscape context, priority questions and candidate crops.
 2. **Soil & Land** — a transparent regional soil/landscape cue, a field sampling checklist and links to mapped soil resources.
 3. **Crops** — a new Crop & Soil Lab lets users screen a curated crop library against soil group, optional measured pH, drainage, water availability, climate and intended use. Results show a transparent screening score, reasons, caveats and reference photos where available.
-4. **Farming Guide** — a five-step starter workflow adapted to the broad landscape type (upland, peat/wetland, dryland, irrigated lowland, island, highland or urban).
-5. **Technology** — potential soil conservation, irrigation, agroforestry, wetland/peat or urban-growing practices selected according to the broad landscape type.
-6. **Sources** — official data portals plus optional live queries to FAOSTAT, the FAO geospatial metadata catalogue and WOCAT QCAT.
+4. **Climate & Planting** — automatically loads five complete years of historical weather for a representative point inside the selected province/district and summarizes monthly temperature, rainfall, rainy days, mean wind, gusts and dominant wind direction. It ranks provisional crop planting windows using the seasonal temperature/rainfall pattern.
+5. **Farming Guide** — a five-step starter workflow adapted to the broad landscape type (upland, peat/wetland, dryland, irrigated lowland, island, highland or urban).
+6. **Technology** — potential soil conservation, irrigation, agroforestry, wetland/peat or urban-growing practices selected according to the broad landscape type.
+7. **Sources** — official data portals plus optional live queries to FAOSTAT, the FAO geospatial metadata catalogue and WOCAT QCAT.
 
 The interface uses pixel fonts, wood-sign borders, parchment panels, controller-style prompts and a full-screen tab layout, while remaining usable on phones.
 
@@ -41,6 +42,13 @@ The Sources tab links to CGIAR GARDIAN as a research-publication and dataset dis
 
 OpenFarm is deliberately **not** called as a live API: the OpenFarm maintainers announced that the service servers were shut down in April 2025 and the project was archived. The original repository remains linked as a reference, not as a working endpoint. Crop candidates in this site are curated starter ideas and are not presented as OpenFarm data.
 
+### Historical climate & planting-window API
+When a user opens a province/region or district fieldbook, the app calculates an area-weighted representative coordinate from the selected boundary geometry and requests five complete calendar years of daily historical weather from the Open-Meteo Historical Weather API. The API module aggregates observations into monthly temperature averages, average monthly rainfall, rainy-day counts, mean/max wind speed, gust statistics and dominant wind direction. The Climate & Planting tab uses these month-by-month patterns to rank provisional establishment windows for the crop screening library.
+
+The weather point is a regional proxy; it is not a parcel forecast and does not represent every elevation, coastline or microclimate in a large boundary. The crop temperature/rainfall bands are provisional rules added to help users investigate planting seasons—not an agronomically validated global model. The UI intentionally labels scores as screening indicators, exposes reasons and cautions, and reminds users to check soil, irrigation, crop variety, the current national forecast and local extension advice. Wind warnings are generic exposure flags rather than crop-specific thresholds.
+
+Source documentation: https://open-meteo.com/en/docs/historical-weather-api
+
 ### Crop & Soil Lab — local screening library
 The Crops tab includes a curated screening library for common staple crops, vegetables, perennials and soil-cover options. It compares the user's stated soil group, optional pH test, drainage, water pattern, climate group and crop purpose. Each result lists why it scored well and what still needs checking. The score is a rule-based screening indicator, not a statistical probability, yield prediction, or scientifically validated global crop-suitability model. Crop profiles and ranges are broad starting points and should be improved with locally validated sources and extension recommendations.
 
@@ -67,7 +75,8 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 
 - `index.html` — page shell and retro game-inspired styles.
 - `app.js` — map interaction, country-to-region-to-district navigation, 38 Indonesian provincial field profiles, full-screen tabbed modal and source UI.
-- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions used by the Sources tab.
+- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, Wikimedia Commons plant photo search, and historical climate/planting-window functions.
+- `tests/crop-api.test.js` — offline smoke tests for crop screening, Commons image metadata mapping, historical weather aggregation and seasonal windows.
 
 ## Try it
 
