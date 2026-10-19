@@ -283,6 +283,13 @@
       '</section>';
   }
 
+  function averageClimateValue(values) {
+    var valid = (values || []).filter(function (value) {
+      return value != null && Number.isFinite(Number(value));
+    }).map(Number);
+    return valid.length ? valid.reduce(function (sum, value) { return sum + value; }, 0) / valid.length : null;
+  }
+
   function updateClimatePreview() {
     var statusNode = el('climate-preview-status');
     if (!statusNode || !currentProvince) return;
@@ -294,7 +301,7 @@
       var meanTemp = climate.monthly.map(function (month) { return month.temperatureMean; })
         .filter(function (value) { return value != null; });
       var annualRain = climate.monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
-      var tempValue = meanTemp.length ? (mean(meanTemp).toFixed(1) + ' °C') : 'n/a';
+      var tempValue = meanTemp.length ? (averageClimateValue(meanTemp).toFixed(1) + ' °C') : 'n/a';
       statusNode.textContent = climate.startYear + '–' + climate.endYear + ' climate ready · average temperature ' + tempValue +
         ' · estimated annual rainfall ' + Math.round(annualRain) + ' mm. Open the climate tab for monthly patterns and crop windows.';
     } else if (status && status.state === 'error') {
@@ -392,7 +399,7 @@
     var monthly = climate.monthly || [];
     var recommendations = result.recommendations || [];
     var annualRain = monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); }, 0);
-    var meanTemp = mean(monthly.map(function (month) { return month.temperatureMean; }));
+    var meanTemp = averageClimateValue(monthly.map(function (month) { return month.temperatureMean; }));
     var maxRain = Math.max(1, ...monthly.map(function (month) { return Number(month.precipitationMm) || 0; }));
     var avgWind = mean(monthly.map(function (month) { return month.windMeanKmh; }));
     var peakGust = Math.max.apply(null, monthly.map(function (month) { return Number(month.windGustMaxMeanKmh) || 0; }));
