@@ -1,6 +1,12 @@
 name: Update administrative boundaries
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-boundaries.yml"
+      - "scripts/update_boundaries.py"
+      - "requirements.txt"
   schedule:
     - cron: "23 2 1 * *"
   workflow_dispatch:
@@ -10,7 +16,7 @@ permissions:
 
 concurrency:
   group: boundary-data-refresh
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   update:
