@@ -6,6 +6,7 @@ on:
     paths:
       - "app.js"
       - "api.js"
+      - "tests/crop-api.test.js"
       - ".github/workflows/validate-app.yml"
   pull_request:
     paths:
@@ -28,4 +29,8 @@ jobs:
         run: |
           node --check app.js
           node --check api.js
+          node --check tests/crop-api.test.js
           echo "JavaScript syntax is valid."
+
+      - name: Smoke test crop screener and photo API mapping
+        run: node tests/crop-api.test.js
