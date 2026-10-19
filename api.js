@@ -195,6 +195,8 @@
       var score = 0;
       var reasons = [];
       var cautions = [crop.caution];
+      var soilMismatch = false;
+      var pHOutsideRange = false;
 
       if (soil === 'unknown') {
         score += 15;
@@ -202,7 +204,7 @@
         score += 30;
         reasons.push('The selected soil group is included in this crop’s broad screening profile.');
       } else {
-        score += 3;
+        soilMismatch = true;
         cautions.push('The selected soil group is not a strong match in this broad screen; verify texture, depth, drainage and local evidence before planting.');
       }
 
@@ -215,7 +217,7 @@
         score += 9;
         cautions.push('The entered pH is near, but outside, the screening range; check the crop’s local tolerance and soil-test advice.');
       } else {
-        score += 0;
+        pHOutsideRange = true;
         cautions.push('The entered pH is outside the broad screening range; do not correct it without a suitable soil test and local advice.');
       }
 
@@ -251,7 +253,8 @@
       else score += 0;
 
       return Object.assign({}, crop, {
-        score: Math.min(100, score),
+        // Avoid a reassuring score when an explicit soil/pH input is a major mismatch.
+        score: Math.min(score, soilMismatch ? 49 : (pHOutsideRange ? 59 : 100)),
         reasons: reasons,
         cautions: cautions,
         pHText: crop.phMin.toFixed(1) + '–' + crop.phMax.toFixed(1)
