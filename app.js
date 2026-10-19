@@ -38,6 +38,15 @@
     node.textContent = value;
   }
 
+  function provinceFeatureName(feature) {
+    var p = feature && feature.properties ? feature.properties : {};
+    return p.name || p.PROVINSI || p.provinsi || p.NAME_1 || p.NAME || p._prov || 'Unknown province';
+  }
+  function provinceFeatureCode(feature) {
+    var p = feature && feature.properties ? feature.properties : {};
+    return p.code || p.KODE_PROV || p.PROV_CODE || p.PROVNO || p.prov_code || '';
+  }
+
   var profiles = [
     {name:'Aceh', kind:'humid-upland', zone:'Coastal plains, wet lowlands and uplands', intro:'A mixed landscape where irrigated rice, tree crops and upland farming can coexist. Recommendations should distinguish the coast, peat/wetlands where present, and cooler highland farms.', focus:'Protect slopes and diversify tree-crop systems', crops:['Padi sawah','Kopi Arabika (dataran tinggi)','Kakao','Kelapa','Pinang'], soilCue:'The province spans several landforms. Slope, drainage, acidity and soil depth can change substantially between coastal plains and uplands.'},
     {name:'Sumatera Utara', kind:'humid-upland', zone:'Wet lowlands, volcanic uplands and highland valleys', intro:'A diverse farming region with rice, plantation crops and highland horticulture. Match each crop to elevation, rainfall, slope and road access instead of treating the province as one soil zone.', focus:'Agroforestry and erosion control on sloping farms', crops:['Padi sawah','Kopi Arabika','Kopi Robusta','Sayuran dataran tinggi','Kakao','Karet'], soilCue:'Volcanic uplands, valleys, coastal plains and wet lowlands create different soil and drainage conditions.'},
@@ -381,7 +390,7 @@
     currentTab = 'overview';
     setText('modal-title', name);
     setText('modal-subtitle', 'PROVINCE FIELD GUIDE · ' + profile.zone.toUpperCase());
-    setText('modal-stamp', 'FIELD NOTE / ' + (feature && feature.properties && feature.properties.code ? feature.properties.code : 'REGIONAL PROFILE'));
+    setText('modal-stamp', 'FIELD NOTE / ' + (feature ? (provinceFeatureCode(feature) || 'REGIONAL PROFILE') : 'REGIONAL PROFILE'));
     el('province-modal').classList.add('open');
     el('province-modal').setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
@@ -437,11 +446,11 @@
     var select = el('province-select');
     if (!select || !provincesGeoJSON) return;
     var list = provincesGeoJSON.features.slice().sort(function (a, b) {
-      return norm((a.properties || {}).name).localeCompare(norm((b.properties || {}).name));
+      return norm(provinceFeatureName(a)).localeCompare(norm(provinceFeatureName(b)));
     });
     select.innerHTML = '<option value="">JUMP TO PROVINCE…</option>' + list.map(function (feature) {
-      var p = feature.properties || {};
-      return '<option value="' + esc(p.name || '') + '">' + esc(p.name || 'Unknown province') + '</option>';
+      var provinceName = provinceFeatureName(feature);
+      return '<option value="' + esc(provinceName) + '">' + esc(provinceName) + '</option>';
     }).join('');
   }
 
@@ -473,7 +482,7 @@
       provinceLayer = L.geoJSON(provincesGeoJSON, {
         style:provinceStyle,
         onEachFeature:function (feature, layer) {
-          var name = (feature.properties || {}).name || 'Unknown province';
+          var name = provinceFeatureName(feature);
           layer.bindTooltip(name, { sticky:true, direction:'auto', className:'retro-tooltip' });
           layer.on('mouseover', function () { layer.setStyle(provinceHoverStyle()); if (layer.bringToFront) layer.bringToFront(); });
           layer.on('mouseout', function () { provinceLayer.resetStyle(layer); });
@@ -510,15 +519,15 @@
   async function jumpToProvince(name) {
     if (!name) return;
     var feature = provincesGeoJSON && provincesGeoJSON.features.find(function (f) {
-      return norm((f.properties || {}).name) === norm(name);
+      return norm(provinceFeatureName(f)) === norm(name);
     });
     if (!feature) return;
     if (mode !== 'provinces') await enterProvinceMode();
-    openModal((feature.properties || {}).name || name, feature);
+    openModal(provinceFeatureName(feature) || name, feature);
     if (provinceLayer) {
       var targetLayer = null;
       provinceLayer.eachLayer(function (layer) {
-        if (norm((layer.feature.properties || {}).name) === norm(name)) targetLayer = layer;
+        if (norm(provinceFeatureName(layer.feature)) === norm(name)) targetLayer = layer;
       });
       if (targetLayer) map.fitBounds(targetLayer.getBounds(), { padding:[45,45], maxZoom:7 });
     }
