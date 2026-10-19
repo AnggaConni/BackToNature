@@ -59,7 +59,15 @@
     .logo-copy{min-width:0}
     .pixel-label{font-family:'Press Start 2P',monospace;font-size:clamp(8px,1vw,12px);line-height:1.65;letter-spacing:-.4px}
     .logo-subtitle{font-size:18px;color:#ffdda2;line-height:1.05}
-    .hud-actions{pointer-events:auto;display:flex;gap:8px;align-items:stretch}
+    .hud-actions{pointer-events:auto;display:flex;gap:8px;align-items:stretch;position:relative}
+    .translate-picker{position:relative;display:flex;align-items:stretch}
+    .translate-trigger{white-space:nowrap;padding-left:9px;padding-right:9px}
+    .translate-menu{position:absolute;z-index:1800;top:calc(100% + 9px);right:0;width:212px;padding:9px;background:#f4e4b8;border:4px solid #583b26;box-shadow:4px 5px 0 rgba(0,0,0,.35);color:#3b2b1e}
+    .translate-menu[hidden]{display:none}
+    .translate-menu-title{padding:4px 5px 7px;color:#654326;font-family:'Press Start 2P',monospace;font-size:8px;line-height:1.5;border-bottom:2px solid #b38c55}
+    .translate-menu p{margin:6px 5px 8px;font-size:16px;line-height:1.05;color:#6d573a}
+    .translate-menu button{display:block;width:100%;padding:7px 8px;margin:3px 0;text-align:left;border:2px solid #c2a16b;background:#fff4d4;color:#3c2a1a;font-size:19px;line-height:1.05}
+    .translate-menu button:hover,.translate-menu button:focus-visible{background:#dce8c9;border-color:#5f7d43}
     .pixel-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 13px;background:linear-gradient(#315b91,#1a3965);border:3px solid #102747;box-shadow:inset 0 0 0 2px #7196ba,4px 5px 0 var(--shadow);color:#fff2c9;text-decoration:none;text-align:center;font-size:20px;line-height:1.1;text-shadow:1px 2px #12243a}
     .pixel-btn:hover{filter:brightness(1.13);transform:translate(-1px,-1px)}
     .pixel-btn:active{transform:translate(2px,2px);box-shadow:inset 0 0 0 2px #7196ba,1px 2px 0 var(--shadow)}
@@ -78,6 +86,54 @@
     .map-status p{font-size:19px;margin:0;line-height:1.15}
     .modal-backdrop{display:none;position:fixed;inset:0;z-index:3000;background:rgba(12,18,10,.86);backdrop-filter:blur(4px);padding:0}
     .modal-backdrop.open{display:flex}
+    .region-summary-backdrop{display:none;position:fixed;inset:0;z-index:2600;align-items:center;justify-content:center;padding:clamp(10px,3vw,30px);background:rgba(12,18,10,.76);backdrop-filter:blur(3px)}
+    .region-summary-backdrop.open{display:flex}
+    .region-summary-shell{display:flex;flex-direction:column;width:min(980px,calc(100vw - 20px));max-height:min(90dvh,980px);background:#ead7a5;border:7px solid #51321f;box-shadow:inset 0 0 0 4px #bb915c,8px 9px 0 rgba(0,0,0,.38);overflow:hidden}
+    .region-summary-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:15px 18px;background:linear-gradient(#a66b3a,#704229);border-bottom:5px solid #4a2d1c;color:#fff1c9}
+    .region-summary-header h2{margin:5px 0;color:#ffda71;font-size:clamp(27px,4vw,39px);line-height:1.05}
+    .region-summary-header p{margin:5px 0 0;font-size:20px;line-height:1.1;color:#fff0cd}
+    .region-summary-header .modal-stamp{color:#ffe5a0}
+    .region-summary-content{padding:clamp(13px,2vw,22px);overflow:auto;overscroll-behavior:contain}
+    .region-summary-hero{padding:16px;background:#dce8c9;border:4px solid #658049;box-shadow:4px 4px 0 rgba(0,0,0,.12)}
+    .region-summary-hero h2{margin:5px 0;color:#35512b;font-size:clamp(25px,3.5vw,36px);line-height:1}
+    .region-summary-hero p{margin:8px 0;font-size:21px;line-height:1.15}
+    .region-summary-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .region-summary-tags span{padding:5px 8px;background:#fff0c8;border:2px solid #aa8b58;font-size:17px;line-height:1.05}
+    .region-summary-section{margin:17px 0}
+    .region-summary-section-heading{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+    .region-summary-section-heading>span{display:grid;place-items:center;flex:none;width:43px;height:43px;background:#fef0c7;border:3px solid #947245;font-size:27px}
+    .region-summary-section-heading h3{margin:3px 0;color:#543820;font-size:27px;line-height:1}
+    .region-summary-section>p{margin:7px 0 10px;font-size:19px;line-height:1.12}
+    .region-summary-crops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .region-summary-crop{display:flex;gap:10px;min-width:0;padding:11px;background:#fff2cf;border:3px solid #aa8753;box-shadow:3px 3px 0 rgba(0,0,0,.1)}
+    .region-summary-crop-icon{display:grid;place-items:center;flex:none;width:43px;height:43px;background:#dbe7c7;border:2px solid #76925a;font-size:28px}
+    .region-summary-crop h4{margin:4px 0;color:#3f5a2e;font-size:22px;line-height:1.05}
+    .region-summary-crop p{margin:4px 0 0;font-size:17px;line-height:1.1}
+    .region-summary-tech-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .region-summary-tech{padding:11px;background:#dce7ec;border:3px solid #637e90;box-shadow:3px 3px 0 rgba(0,0,0,.1)}
+    .region-summary-tech-title{display:flex;align-items:center;gap:8px}
+    .region-summary-tech-title>span{font-size:26px}
+    .region-summary-tech h4{margin:4px 0;color:#274962;font-size:21px;line-height:1.05}
+    .region-summary-tech p{margin:7px 0;font-size:17px;line-height:1.12}
+    .region-summary-climate-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+    .region-summary-climate-metrics span{display:flex;flex-direction:column;gap:4px;padding:10px;background:#fef0c8;border:2px solid #a68a5c;min-width:0}
+    .region-summary-climate-metrics b{font-size:23px;color:#244d71}
+    .region-summary-climate-metrics small{font-size:15px;line-height:1}
+    .region-summary-climate-crops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .region-summary-climate-crops article{padding:10px;background:#dce8c9;border:3px solid #779457;min-width:0}
+    .region-summary-climate-crops h4{margin:5px 0;font-size:22px;line-height:1.05;color:#38532e}
+    .region-summary-climate-crops p{margin:6px 0;font-size:18px;line-height:1.05}
+    .region-summary-climate-loading{display:flex;gap:10px;align-items:center;padding:12px;background:#e0e9d3;border:3px solid #74915a}
+    .region-summary-spinner{font-size:31px}
+    .region-summary-climate-loading b{display:block;font-size:21px;color:#36512d}
+    .region-summary-climate-loading small{display:block;margin-top:4px;font-size:17px;line-height:1.05}
+    .region-summary-climate-status{padding:12px;background:#f5dfc5;border:3px solid #b47b43;font-size:18px;line-height:1.12}
+    .region-summary-climate-status.is-error{color:#7e3b27}
+    .region-summary-note{display:flex;gap:10px;padding:12px;background:#f4dfbc;border:3px solid #ad8a57}
+    .region-summary-note>span{font-size:26px}
+    .region-summary-note p{margin:0;font-size:18px;line-height:1.12}
+    .region-summary-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#cfb07b;border-top:4px solid #765230;font-size:17px;line-height:1.05}
+    .region-summary-footer .pixel-btn{flex:none}
     .modal-shell{width:100vw;height:100dvh;max-height:100dvh;display:flex;flex-direction:column;background:var(--paper);border:8px solid #51321f;box-shadow:inset 0 0 0 4px #bb915c;color:var(--ink);overflow:hidden}
     .modal-header{flex:none;display:flex;gap:14px;justify-content:space-between;align-items:center;padding:13px 18px;background:linear-gradient(#315b91,#193a66);border-bottom:5px solid #102747;color:#fff1c9;box-shadow:inset 0 -2px #6587b1}
     .modal-heading{display:flex;gap:13px;align-items:center;min-width:0}
@@ -256,6 +312,8 @@
       .hud-actions{gap:5px}.pixel-btn{padding:7px 8px;font-size:17px;box-shadow:inset 0 0 0 2px #7196ba,2px 3px 0 var(--shadow)}
       #province-select-wrap{min-width:140px;padding:3px}.bottom-hud{left:8px;bottom:8px;padding:7px 10px;gap:8px}.bottom-hud .controller{font-size:22px}.bottom-hud p{font-size:17px}
       .modal-shell{border-width:5px}.modal-header{padding:9px 11px;gap:8px}.modal-avatar{width:43px;height:43px;font-size:26px}.modal-close{padding:10px;font-size:10px}.tab-btn{font-size:17px;padding:8px 11px}.modal-content{padding:15px}
+      .region-summary-shell{border-width:5px;max-height:94dvh}.region-summary-header{padding:10px;gap:8px}.region-summary-content{padding:11px}.region-summary-tech-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.region-summary-footer{align-items:flex-start;flex-direction:column}.region-summary-footer .pixel-btn{width:100%}
+      .translate-trigger{padding:7px 6px;font-size:14px}
       .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-grid .field-card:last-child{grid-column:1/-1}
       .crop-lab-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.crop-match-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .climate-preview-panel{align-items:flex-start;flex-wrap:wrap}.climate-preview-panel .pixel-btn{margin-left:77px}
@@ -266,6 +324,8 @@
       body{font-size:19px}.screen-hud{align-items:flex-start}.logo-board{padding:6px;min-height:48px}.logo-sprite{width:23px;height:23px}.logo-subtitle{display:none}.logo-copy .pixel-label{font-size:8px}.hud-actions{flex-direction:column;max-width:44%}.hud-actions .pixel-btn{font-size:15px;padding:6px 8px}.hud-actions #province-select-wrap{min-width:0}
       .bottom-hud{max-width:calc(100vw - 16px);bottom:7px}.bottom-hud p{font-size:16px}.map-status{top:96px}
       .modal-shell{border-width:3px}.modal-header{padding:8px}.modal-heading{gap:8px}.modal-avatar{display:none}.modal-titles h1{font-size:25px}.modal-titles p{font-size:15px}.modal-stamp{font-size:9px}.modal-close{font-size:9px;padding:8px}
+      .translate-trigger{font-size:12px;padding:6px 4px}.translate-menu{width:178px;right:-45px}
+      .region-summary-backdrop{padding:6px}.region-summary-shell{width:calc(100vw - 12px);max-height:96dvh;border-width:3px}.region-summary-header{padding:8px;gap:7px}.region-summary-header h2{font-size:24px}.region-summary-header p{font-size:17px}.region-summary-content{padding:9px}.region-summary-hero{padding:10px}.region-summary-hero h2{font-size:25px}.region-summary-hero p,.region-summary-section>p{font-size:18px}.region-summary-crops,.region-summary-tech-grid{grid-template-columns:1fr}.region-summary-crop{padding:8px}.region-summary-climate-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.region-summary-climate-metrics span{padding:6px}.region-summary-climate-metrics b{font-size:18px}.region-summary-climate-metrics small{font-size:13px}.region-summary-climate-crops{grid-template-columns:1fr}.region-summary-footer{gap:8px;padding:8px}.region-summary-footer .pixel-btn{width:100%}
       .tab-bar{padding:5px 4px 0}.tab-btn{font-size:15px;padding:8px 10px}.modal-content{padding:12px}.modal-footer{padding:6px 9px;font-size:13px;gap:4px}.footer-controls{font-size:12px}
       .tile-grid,.overview-grid,.crop-list,.guide-grid,.source-list,.crop-match-grid,.climate-month-grid,.climate-crop-grid{grid-template-columns:1fr}.crop-lab-controls{grid-template-columns:1fr}.climate-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.climate-preview-panel{padding:10px;gap:9px}.climate-preview-icon{width:42px;height:42px;font-size:25px}.climate-preview-panel .pixel-btn{margin-left:0;width:100%}.climate-preview-copy h3{font-size:25px}.overview-grid .field-card:last-child{grid-column:auto}.tab-intro h2{font-size:31px}.tab-intro p{font-size:20px}.field-card{padding:12px}.field-card h3{font-size:24px}.field-card p{font-size:19px}
       .quest-panel{padding:11px;gap:9px}.quest-icon{font-size:28px}.quest-panel h3,.source-strip h3{font-size:24px}.quest-panel p,.source-strip p,.soil-profile p{font-size:19px}
@@ -286,6 +346,20 @@
       </div>
     </div>
     <div class="hud-actions">
+      <div class="translate-picker">
+        <button id="btn-translate" class="pixel-btn translate-trigger" type="button" aria-expanded="false" aria-controls="translate-menu" title="Open Google Translate for this page">🌐 LANG</button>
+        <div id="translate-menu" class="translate-menu" hidden>
+          <div class="translate-menu-title">TRANSLATE WITH GOOGLE</div>
+          <p>Opens a translated view in a new tab.</p>
+          <button type="button" data-translate-lang="id">🇮🇩 Indonesian</button>
+          <button type="button" data-translate-lang="en">🇬🇧 English</button>
+          <button type="button" data-translate-lang="es">🇪🇸 Spanish</button>
+          <button type="button" data-translate-lang="fr">🇫🇷 French</button>
+          <button type="button" data-translate-lang="ja">🇯🇵 Japanese</button>
+          <button type="button" data-translate-lang="zh-CN">🇨🇳 Chinese (Simplified)</button>
+          <button type="button" data-translate-lang="ar">🇸🇦 Arabic</button>
+        </div>
+      </div>
       <button id="btn-provinces" class="pixel-btn green" type="button">🌍 Region Explorer</button>
       <button id="btn-world" class="pixel-btn wood" type="button" hidden>🌍 World Map</button>
       <div id="province-select-wrap" hidden>
@@ -308,6 +382,24 @@
       <span id="map-help">Click any country to explore regions, then drill into districts from a region fieldbook.</span>
     </p>
   </aside>
+
+  <div id="region-summary-modal" class="region-summary-backdrop" aria-hidden="true">
+    <section class="region-summary-shell" role="dialog" aria-modal="true" aria-labelledby="region-summary-title">
+      <header class="region-summary-header">
+        <div>
+          <div class="modal-stamp">BACK TO NATURE / QUICK FIELD BRIEF</div>
+          <h2 id="region-summary-title">Selected region</h2>
+          <p>Start with the recommendations, then open the full fieldbook when you want more detail.</p>
+        </div>
+        <button id="region-summary-close" class="modal-close" type="button" aria-label="Close regional recommendations">✕ CLOSE</button>
+      </header>
+      <main id="region-summary-content" class="region-summary-content"></main>
+      <footer class="region-summary-footer">
+        <span>🌱 First-pass guidance · verify conditions on the actual plot</span>
+        <button id="region-summary-details" class="pixel-btn green" type="button">📖 DETAILED FIELDBOOK →</button>
+      </footer>
+    </section>
+  </div>
 
   <div id="province-modal" class="modal-backdrop" aria-hidden="true">
     <div id="modal-shell" class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -332,7 +424,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-global-region-v4"></script>
-  <script src="./app.js?v=20261020-global-region-v4"></script>
+  <script src="./api.js?v=20261020-summary-translate-v1"></script>
+  <script src="./app.js?v=20261020-summary-translate-v1"></script>
 </body>
 </html>
