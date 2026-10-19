@@ -8,9 +8,10 @@ Each province opens a full-screen, tabbed field guide:
 
 1. **Overview** — regional landscape context, priority questions and candidate crops.
 2. **Soil & Land** — a transparent regional soil/landscape cue, a field sampling checklist and links to mapped soil resources.
-3. **Crops & Farming** — locally relevant crop candidates to investigate and guidance for planning around seasonal water availability.
-4. **Technology** — potential soil conservation, irrigation, agroforestry, wetland/peat or urban-growing practices selected according to the broad landscape type.
-5. **Sources** — official data portals plus optional live queries to FAOSTAT, the FAO geospatial metadata catalogue and WOCAT QCAT.
+3. **Crops** — crop candidates plus a checklist to screen water, soil, seed/season, market and labour fit.
+4. **Farming Guide** — a five-step starter workflow adapted to the broad landscape type (upland, peat/wetland, dryland, irrigated lowland, island, highland or urban).
+5. **Technology** — potential soil conservation, irrigation, agroforestry, wetland/peat or urban-growing practices selected according to the broad landscape type.
+6. **Sources** — official data portals plus optional live queries to FAOSTAT, the FAO geospatial metadata catalogue and WOCAT QCAT.
 
 The interface uses pixel fonts, wood-sign borders, parchment panels, controller-style prompts and a full-screen tab layout, while remaining usable on phones.
 
