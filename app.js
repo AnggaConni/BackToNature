@@ -209,15 +209,87 @@
 
   function renderCrops(profile) {
     var chips = profile.crops.map(function (crop, i) {
-      return '<div class="crop-card"><div class="crop-glyph">' + ['🌾','🌱','🌴','🥬','🍠'][i % 5] + '</div><div><span class="mini-code">CANDIDATE ' + String(i + 1).padStart(2, '0') + '</span><h3>' + esc(crop) + '</h3><p>Investigate local suitability, water needs, variety, pest pressure, harvest window, costs and market access before choosing.</p></div></div>';
+      return '<article class="crop-card"><div class="crop-glyph">' + ['🌾','🌱','🌴','🥬','🍠'][i % 5] + '</div><div><span class="mini-code">CANDIDATE ' + String(i + 1).padStart(2, '0') + '</span><h3>' + esc(crop) + '</h3><p>Investigate local suitability, water needs, varieties, pest pressure, harvest window, costs and market access before choosing.</p></div></article>';
     }).join('');
-    return '<div class="tab-intro"><div class="eyebrow">CROPS & FARMING / PLANT WITH A PLAN</div><h2>What could we grow?</h2><p>These are candidate crops to investigate based on broad regional farming contexts—not an automated guarantee of suitability. The right crop depends on the individual site, variety, water and the farmer\'s objectives.</p></div>' +
+    return '<div class="tab-intro"><div class="eyebrow">CROPS / WHAT SHOULD WE PLANT?</div><h2>Choose a crop for the plot 🌾</h2><p>These are regionally relevant candidates to investigate—not an automated guarantee of suitability. The actual choice depends on the farm&apos;s soil, elevation, water, variety, local knowledge and buyer access.</p></div>' +
       '<div class="crop-list">' + chips + '</div>' +
-      '<div class="section-title"><span class="mini-code">SEASONAL PLANNING</span><h3>Plan around water, not a generic calendar</h3></div><div class="tile-grid">' +
-      '<article class="field-card"><div class="card-emoji">🌧️</div><h3>Rainy season</h3><p>Confirm onset and likely duration of rain, drainage, flood exposure and seedbed conditions. Keep soil covered and avoid sowing into saturated soil where the crop is sensitive.</p></article>' +
-      '<article class="field-card"><div class="card-emoji">☀️</div><h3>Dry season</h3><p>Check dependable irrigation first. Prioritize water-efficient or locally drought-adapted options where suitable; do not increase planted area beyond reliable water supply.</p></article>' +
-      '<article class="field-card"><div class="card-emoji">📅</div><h3>Local crop calendar</h3><p>Planting months vary by district, elevation and irrigation schedule. Confirm with the local agricultural extension office and current BMKG rainfall outlook.</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.bmkg.go.id/">Check BMKG ↗</a></article>' +
-      '</div><section class="quest-panel"><div class="quest-icon">🧺</div><div><div class="mini-code">FARMER CHECK</div><h3>Market before monoculture</h3><p>Compare input costs, labour, storage, buyers, transport and food-security needs before converting land to a single cash crop.</p></div></section>';
+      '<div class="section-title"><span class="mini-code">CROP SELECTION CHECKLIST</span><h3>Before buying seed or seedlings</h3></div>' +
+      '<div class="tile-grid">' +
+      '<article class="field-card"><div class="card-emoji">💧</div><h3>1. Water fit</h3><p>Is rain timing or irrigation reliable through the crop growth stages? Do not expand planted area beyond dependable water supply.</p></article>' +
+      '<article class="field-card"><div class="card-emoji">🧪</div><h3>2. Soil fit</h3><p>Check soil depth, drainage, pH and nutrient status. Get a local soil test before deciding lime or fertilizer rates.</p></article>' +
+      '<article class="field-card"><div class="card-emoji">🌱</div><h3>3. Seed and season</h3><p>Use locally recommended varieties and certified/traceable planting material where available. Confirm local planting windows with extension services.</p></article>' +
+      '<article class="field-card"><div class="card-emoji">🧺</div><h3>4. Market and labour</h3><p>Compare input costs, labour, storage, harvest losses, transport, buyers and household food needs before converting land to a cash crop.</p></article>' +
+      '</div>' +
+      '<section class="source-strip"><div><span class="mini-code">NEXT QUEST</span><h3>Need province-level production statistics?</h3><p>Use the official BPS table for rice harvested area, productivity and output. It is a statistical source, not a field-level crop suitability assessment.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS DATA ↗</a></section>';
+  }
+
+  function renderFarming(profile) {
+    var plans = {
+      'humid-upland': [
+        ['Map the plot first','Mark slope direction, water paths, shade and existing trees. Avoid clearing steep or unstable ground before getting local technical advice.'],
+        ['Keep soil covered','Retain safe residues, use mulch and keep living cover between rows. On slopes, plan planting lines along the contour.'],
+        ['Establish the crop mix','Choose locally recommended varieties; introduce compatible shade or companion trees only where crop light needs and local extension advice support them.'],
+        ['Manage soil and pests','Base fertilizer and lime decisions on soil tests. Scout pests regularly and prioritize integrated pest management before pesticide use.'],
+        ['Record the result','Track rainfall, labour, inputs, yield, erosion signs and farm-gate price to learn what works for this specific site.']
+      ],
+      'peat-wet': [
+        ['Identify peat, mineral and wetland areas','Check soil type, peat depth where relevant, flood duration and water-table variation before proposing a crop or earthwork.'],
+        ['Plan water before planting','Where peat is present, do not create new drainage simply to fit a crop. Prioritize hydrology, rewetting and fire-prevention guidance.'],
+        ['Choose a water-compatible system','Use crops only where soil, acidity, salinity, flooding and local land-use safeguards indicate they are suitable.'],
+        ['Prevent fire and soil loss','Avoid burning. Coordinate water-level monitoring and fire preparedness with community and local authorities.'],
+        ['Monitor the landscape','Record water level, flooding, subsidence signs, crop performance and downstream effects; adjust only with local technical advice.']
+      ],
+      'dryland': [
+        ['Check the local rainfall window','Review recent rainfall and seasonal outlook. Plan around moisture available at establishment and flowering—not the calendar alone.'],
+        ['Secure water and infiltration','Maintain safe water storage and infiltration measures appropriate to slope. Never build bunds or ponds without checking overflow and downstream effects.'],
+        ['Select locally adapted seed','Compare drought-adapted or short-duration varieties recommended by local extension, and try them on a small area before scaling.'],
+        ['Protect soil moisture','Retain suitable residues, mulch and control weeds early. Rotate with locally appropriate legumes where water and disease risk permit.'],
+        ['Harvest and store safely','Prepare drying and storage before harvest, check moisture requirements for the crop and record losses as well as yield.']
+      ],
+      'irrigated-lowland': [
+        ['Confirm the water schedule','Coordinate with the irrigation group and confirm when water is actually available. Check field level, inlet/outlet and drainage.'],
+        ['Prepare the field carefully','Repair bunds and drains. Avoid overworking wet soil or shifting flood risk to neighbouring fields.'],
+        ['Plant recommended varieties','Use locally appropriate seed and planting density guidance; crop calendars differ by district and irrigation schedule.'],
+        ['Manage nutrients and pests','Use soil-test-based nutrient planning, safe organic amendments and pest scouting. Apply registered crop-protection products only when needed and as directed.'],
+        ['Compare performance','Keep notes on water use, labour, input cost, harvested area and output to compare practices across seasons.']
+      ],
+      'mixed-lowland': [
+        ['Classify the field','Separate irrigated, rainfed, sloping and flood-prone parts. One farm may need more than one crop plan.'],
+        ['Plan crop sequence','Match planting windows, water and market demand. Consider locally suitable rotations or intercropping instead of repeating one crop everywhere.'],
+        ['Prepare with soil protection','Keep residues or mulch where appropriate, use contour lines on slopes and maintain safe drainage outlets.'],
+        ['Monitor the crop','Scout pests, water stress and nutrient symptoms. Verify suspected deficiencies with extension advice or soil testing before applying inputs.'],
+        ['Review costs and returns','Record seed, fertilizer, water, labour, harvest losses, price and soil-cover condition at the end of each cycle.']
+      ],
+      'islands': [
+        ['Check fresh water and land limits','Assess water storage, dry-season supply, soil depth, salinity and exposure to wind or coastal hazards.'],
+        ['Start with mixed gardens','Combine locally valued food crops and suitable perennial crops on the land available; avoid introducing invasive species.'],
+        ['Protect the coast and watershed','Keep appropriate native coastal buffers and protect watercourses. Mangroves belong in suitable natural habitats—not every shoreline.'],
+        ['Improve soil safely','Use mature compost and well-drained beds/containers where appropriate. Verify the safety of soil and water used for edible crops.'],
+        ['Plan for supply and markets','Check transport, storage, local demand and the cost of water before scaling a high-input crop.']
+      ],
+      'highland': [
+        ['Mark slope and drainage','Map garden edges, footpaths and runoff. Avoid deep cuts or unstable terraces without technical guidance.'],
+        ['Use locally adapted planting material','Select varieties proven for the local elevation and temperature; do not transfer lowland advice without validation.'],
+        ['Recycle organic matter','Use safe compost and crop residues to support soil structure. Test soil before deciding fertilizer or lime applications.'],
+        ['Manage pests and planting windows','Monitor crop health and use a planting schedule that reflects local elevation, rainfall and available seed.'],
+        ['Track soil stability and harvest','Observe rills, slips and drainage changes after heavy rainfall. Record yields and save planting material where suitable and safe.']
+      ],
+      'urban': [
+        ['Choose a safe growing site','Check sunlight, access, water quality and possible soil contamination. If unsure, use clean containers and traceable growing media.'],
+        ['Prepare growing media','Use a well-drained, crop-appropriate mix. Compost only clean organic material and avoid contaminated inputs.'],
+        ['Plant short-cycle crops','Start with locally suitable leafy vegetables, herbs or container crops that match light, heat and watering capacity.'],
+        ['Water and observe daily','Use low-flow watering, monitor drainage and pests, and keep containers clean. Use crop protection only according to label and food-safety guidance.'],
+        ['Harvest and close the loop','Harvest hygienically, compost clean plant residues and record water use and yield to decide what to grow next.']
+      ]
+    };
+    var plan = plans[profile.kind] || plans['mixed-lowland'];
+    var steps = plan.map(function (step, index) {
+      return '<article class="field-card guide-step"><div class="check-number">' + String(index + 1).padStart(2, '0') + '</div><div><span class="mini-code">FIELD DAY ' + String(index + 1).padStart(2, '0') + '</span><h3>' + esc(step[0]) + '</h3><p>' + esc(step[1]) + '</p></div></article>';
+    }).join('');
+    return '<div class="tab-intro"><div class="eyebrow">FARMING GUIDE / HOW TO CULTIVATE</div><h2>Your farm, one step at a time 🚜</h2><p>This starter workflow is adapted to the broad landscape type for ' + esc(profile.name) + '. It deliberately avoids invented seed rates, spacing or fertilizer dosages; use local crop-specific extension recommendations for those details.</p></div>' +
+      '<section class="soil-profile"><div class="soil-profile-icon">📍</div><div><span class="mini-code">PLANNING CONTEXT</span><h3>' + esc(profile.zone) + '</h3><p>Priority: ' + esc(profile.focus) + '. Start small, observe the response and scale only when the site, water and economics support it.</p><span class="data-tag green">CURATED STARTER WORKFLOW</span></div></section>' +
+      '<div class="guide-grid">' + steps + '</div>' +
+      '<section class="source-strip"><div><span class="mini-code">LOCAL CALENDAR & EXTENSION</span><h3>Check the latest field guidance</h3><p>Exact planting month, plant spacing, seed rate, fertilizer rate and pest controls depend on crop variety and local conditions. Confirm them with extension staff and seasonal rainfall outlook.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bmkg.go.id/">CHECK BMKG ↗</a></section>';
   }
 
   function renderTechnology(profile) {
@@ -388,6 +460,7 @@
     content.innerHTML = tab === 'overview' ? renderOverview(profile) :
       tab === 'soil' ? renderSoil(profile) :
       tab === 'crops' ? renderCrops(profile) :
+      tab === 'farming' ? renderFarming(profile) :
       tab === 'technology' ? renderTechnology(profile) : renderSources(profile);
     if (tab === 'sources') wireSourceControls(profile);
     Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (button) {
@@ -422,9 +495,10 @@
   var tabs = [
     {id:'overview',label:'01 OVERVIEW',icon:'🏡'},
     {id:'soil',label:'02 SOIL & LAND',icon:'🧪'},
-    {id:'crops',label:'03 CROPS & FARMING',icon:'🌾'},
-    {id:'technology',label:'04 TECHNOLOGY',icon:'🛠️'},
-    {id:'sources',label:'05 SOURCES',icon:'📚'}
+    {id:'crops',label:'03 CROPS',icon:'🌾'},
+    {id:'farming',label:'04 FARMING GUIDE',icon:'🚜'},
+    {id:'technology',label:'05 TECHNOLOGY',icon:'🛠️'},
+    {id:'sources',label:'06 SOURCES',icon:'📚'}
   ];
   el('modal-tabs').innerHTML = tabs.map(function (t) {
     return '<button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="' + t.id + '">' + t.icon + ' ' + t.label + '</button>';
