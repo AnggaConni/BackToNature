@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harvest Moon: Capacity Building</title>
+
+    <!-- Tailwind CSS untuk tata letak -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS untuk Peta -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Google Fonts: VT323 untuk efek pixel/retro -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <!-- CSS Kustom untuk Tema Harvest Moon -->
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            background-color: #2b3a27; /* Hijau tua */
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Mencegah scroll, aplikasi full screen */
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Kotak Dialog ala Harvest Moon BTN */
+        .hm-dialogue {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            background: linear-gradient(to bottom, #2b599a 0%, #17325c 100%);
+            border: 6px solid #e0d0a6;
+            border-radius: 16px;
+            padding: 20px;
+            color: #ffffff;
+            box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            display: none; /* Disembunyikan secara default */
+            flex-direction: row;
+            gap: 20px;
+            align-items: flex-start;
+            font-size: 1.5rem;
+            line-height: 1.4;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .hm-avatar {
+            width: 80px;
+            height: 80px;
+            background-color: #d1bfae;
+            border: 4px solid #6c4b31;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            flex-shrink: 0;
+            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.2);
+        }
+
+        .hm-text-container {
+            flex-grow: 1;
+        }
+
+        .hm-title {
+            color: #ffd700;
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            border-bottom: 2px dashed #8b9bb4;
+            padding-bottom: 4px;
+        }
+
+        .typing-cursor::after {
+            content: '▼';
+            animation: blink 1s step-start infinite;
+            color: #ffd700;
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        /* Tombol Close retro */
+        .btn-close {
+            background: #8b0000;
+            color: white;
+            border: 4px solid #ff4d4d;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1.5rem;
+            text-shadow: 1px 1px 0px #000;
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.5);
+        }
+        .btn-close:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0px rgba(0,0,0,0.5);
+        }
+
+        /* Modifikasi kontrol zoom peta agar lebih menyatu dengan tema */
+        .leaflet-control-zoom a {
+            background-color: #e0d0a6 !important;
+            color: #4a3728 !important;
+            border: 2px solid #4a3728 !important;
+            font-family: 'VT323', monospace !important;
+            font-size: 1.2rem !important;
+        }
+
+        /* Judul Papan Kayu */
+        .wood-sign {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #8b5a2b;
+            border: 4px solid #3e2723;
+            color: #ffecd2;
+            padding: 10px 30px;
+            z-index: 1000;
+            font-size: 2rem;
+            text-shadow: 2px 2px 0px #000;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            pointer-events: none; /* Agar tidak menghalangi interaksi peta */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Judul Aplikasi -->
+    <div class="wood-sign">
+        📍 Global Agriculture & Land Restoration Map
+    </div>
+
+    <!-- Kontainer Peta -->
+    <div id="map"></div>
+
+    <!-- UI Dialogue Kotak ala Harvest Moon -->
+    <div id="dialogue-box" class="hm-dialogue">
+        <button class="btn-close" onclick="closeDialogue()">X</button>
+        <div class="hm-avatar" id="avatar-icon">👨‍🌾</div>
+        <div class="hm-text-container">
+            <div class="hm-title" id="region-title">Loading...</div>
+            <div id="dialogue-text">Click a region on the map to view data...</div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Leaflet Map (Global View)
+        const map = L.map('map').setView([20.0, 0.0], 2);
+
+        // OpenStreetMap Basemap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Simulated Database/API for Global Agricultural Recommendations
+        const mockAgriAPI = {
+            "Brazil": {
+                masalah: "High deforestation rates, acidic soils in the Cerrado, and biodiversity loss.",
+                rekomendasi: "Agroforestry Systems, Cacao, Acai, and Shade-grown Coffee.",
+                cara: "1. Implement shade-grown planting to restore canopy.\n2. Add agricultural lime to balance soil pH.\n3. Integrate crops with native forest species."
+            },
+            "Australia": {
+                masalah: "Severe arid conditions, frequent droughts, and high soil salinity.",
+                rekomendasi: "Drought-resistant Sorghum, Saltbush, and Merino Sheep farming.",
+                cara: "1. Practice no-till farming to retain soil moisture.\n2. Plant salt-tolerant shrubs for livestock grazing.\n3. Implement advanced drip irrigation and water recycling."
+            },
+            "India": {
+                masalah: "Heavy dependence on monsoons, groundwater depletion, and nutrient-exhausted soil.",
+                rekomendasi: "Pearl Millet (Bajra), Legumes (Chickpeas), and integrated Dairy Farming.",
+                cara: "1. Rotate cereals with legumes to naturally fix soil nitrogen.\n2. Build rainwater harvesting ponds (Johads).\n3. Use solar-powered micro-irrigation systems."
+            },
+            "Egypt": {
+                masalah: "Hyper-arid desert environment, extreme water scarcity, and Nile delta salinity.",
+                rekomendasi: "Date Palms, Desert-adapted Cotton, and Camel Husbandry.",
+                cara: "1. Utilize precision drip irrigation under plastic mulch.\n2. Cultivate in controlled environment agriculture (greenhouses).\n3. Plant windbreaks using hardy desert trees."
+            },
+            "United States of America": {
+                masalah: "Topsoil erosion, monoculture vulnerabilities, and changing weather patterns.",
+                rekomendasi: "Cover Crops (Clover/Rye), Corn-Soybean Rotation, and Pasture-raised Cattle.",
+                cara: "1. Plant cover crops during off-seasons to prevent erosion.\n2. Implement precision agriculture using drone data.\n3. Transition to rotational grazing management."
+            },
+            "Indonesia": {
+                masalah: "High rate of land conversion, peatland degradation, and heavy rainfall erosion.",
+                rekomendasi: "Agroforestry, System of Rice Intensification (SRI), and Poultry Farming.",
+                cara: "1. Block canals in peatlands to maintain moisture and prevent fires.\n2. Apply terracing on steep slopes.\n3. Use organic pesticides to protect against common tropical pests."
+            }
+        };
+
+        const defaultAPI = {
+            masalah: "Declining soil quality and unpredictable weather due to global climate change.",
+            rekomendasi: "Crop Rotation, Drought-tolerant Seeds, and Local Livestock breeds.",
+            cara: "1. Reduce chemical fertilizers; increase use of organic compost.\n2. Apply mulch to preserve soil moisture.\n3. Implement biosecurity measures for livestock."
+        };
+
+        let typingInterval;
+        const dialogueBox = document.getElementById('dialogue-box');
+        const dialogueText = document.getElementById('dialogue-text');
+        const regionTitle = document.getElementById('region-title');
+        const avatarIcon = document.getElementById('avatar-icon');
+
+        function closeDialogue() {
+            dialogueBox.style.display = 'none';
+            clearInterval(typingInterval);
+        }
+
+        function typeWriter(text, element) {
+            clearInterval(typingInterval);
+            element.innerHTML = '';
+            element.classList.add('typing-cursor');
+            
+            let i = 0;
+            const speed = 25; 
+
+            typingInterval = setInterval(() => {
+                if (i < text.length) {
+                    if (text.charAt(i) === '\n') {
+                        element.innerHTML += '<br><br>';
+                    } else {
+                        element.innerHTML += text.charAt(i);
+                    }
+                    i++;
+                } else {
+                    clearInterval(typingInterval);
+                    element.classList.remove('typing-cursor');
+                }
+            }, speed);
+        }
+
+        async function fetchAgriData(countryName) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const data = mockAgriAPI[countryName] || defaultAPI;
+                    resolve(data);
+                }, 500); 
+            });
+        }
+
+        async function onRegionClick(e, feature) {
+            // Check different possible property keys for country names in the GeoJSON
+            const countryName = feature.properties.ADMIN || feature.properties.name || feature.properties.sovereignt || "Unknown Region";
+            
+            // Zoom to clicked country
+            map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
+
+            dialogueBox.style.display = 'flex';
+            regionTitle.innerText = `[ Fetching FAO/WOCAT System Data... ]`;
+            dialogueText.innerHTML = 'Analyzing soil and climate conditions...';
+            avatarIcon.innerText = '📡';
+
+            const agriData = await fetchAgriData(countryName);
+
+            // Format Text
+            const narasi = `[Land Issue]\n${agriData.masalah}\n\n[Expert Recommendation]\n${agriData.rekomendasi}\n\n[Execution Guide]\n${agriData.cara}`;
+
+            regionTitle.innerText = `Mayor of ${countryName}:`;
+            avatarIcon.innerText = '👨‍🌾'; 
+            typeWriter(narasi, dialogueText);
+        }
+
+        // Standard Global Countries GeoJSON (Publicly accessible)
+        const geojsonUrl = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+
+        const mapStyle = {
+            color: "#4a3728",
+            weight: 1, // Lighter borders for a global map
+            fillColor: "#8b9bb4",
+            fillOpacity: 0.4
+        };
+
+        const hoverStyle = {
+            color: "#ffd700",
+            weight: 2,
+            fillColor: "#e0d0a6",
+            fillOpacity: 0.7
+        };
+
+        fetch(geojsonUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                L.geoJSON(data, {
+                    style: mapStyle,
+                    onEachFeature: function (feature, layer) {
+                        layer.on('mouseover', function (e) {
+                            layer.setStyle(hoverStyle);
+                        });
+                        layer.on('mouseout', function (e) {
+                            layer.setStyle(mapStyle);
+                        });
+                        
+                        layer.on('click', function (e) {
+                            onRegionClick(e, feature);
+                        });
+                    }
+                }).addTo(map);
+            })
+            .catch(error => {
+                console.error('Failed to load GeoJSON:', error);
+                dialogueBox.style.display = 'flex';
+                regionTitle.innerText = "System Warning!";
+                typeWriter("It seems the satellite data connection failed. Please reload the page.", dialogueText);
+                avatarIcon.innerText = '⚠️';
+            });
+
+    </script>
+</body>
+</html>
