@@ -1592,5 +1592,123 @@
     });
   }
 
+  // Background music is intentionally user-initiated. No autoplay calls are made.
+  (function wireMusicPlayer() {
+    var audio = el('background-music');
+    var playButton = el('music-play-toggle');
+    var muteButton = el('music-mute-toggle');
+    var volumeSlider = el('music-volume');
+    var volumeOutput = el('music-volume-value');
+    var seekSlider = el('music-seek');
+    var currentTimeNode = el('music-current-time');
+    var durationNode = el('music-duration');
+    var statusNode = el('music-player-status');
+    if (!audio || !playButton || !muteButton || !volumeSlider || !seekSlider) return;
+
+    audio.volume = Number(volumeSlider.value || 0.35);
+    audio.preload = 'none';
+
+    function timeLabel(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+      var total = Math.floor(seconds);
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+
+    function setStatus(label, kind) {
+      if (!statusNode) return;
+      statusNode.textContent = label;
+      statusNode.classList.toggle('is-playing', kind === 'playing');
+      statusNode.classList.toggle('is-error', kind === 'error');
+    }
+
+    function updatePlayButton() {
+      var playing = !audio.paused && !audio.ended;
+      playButton.textContent = playing ? 'Ⅱ PAUSE' : '▶ PLAY';
+      playButton.setAttribute('aria-label', playing ? 'Pause background music' : 'Play background music');
+      playButton.title = playing ? 'Pause music' : 'Play music';
+      if (playing) setStatus('PLAYING', 'playing');
+      else if (audio.ended) setStatus('ENDED', '');
+      else if (audio.currentTime > 0) setStatus('PAUSED', '');
+      else if (statusNode && !statusNode.classList.contains('is-error')) setStatus('READY', '');
+    }
+
+    function updateMuteButton() {
+      var muted = audio.muted || audio.volume === 0;
+      muteButton.textContent = muted ? '🔇' : '🔊';
+      muteButton.setAttribute('aria-label', muted ? 'Unmute music' : 'Mute music');
+      muteButton.title = muted ? 'Unmute music' : 'Mute music';
+      if (volumeOutput) volumeOutput.value = Math.round(Number(volumeSlider.value) * 100) + '%';
+    }
+
+    playButton.addEventListener('click', async function () {
+      if (!audio.paused && !audio.ended) {
+        audio.pause();
+        return;
+      }
+      setStatus('LOADING', '');
+      playButton.disabled = true;
+      try {
+        // Calling play() directly in this click handler satisfies browser user-gesture policies.
+        var promise = audio.play();
+        if (promise && typeof promise.then === 'function') await promise;
+        setStatus('PLAYING', 'playing');
+      } catch (error) {
+        setStatus('AUDIO ERROR', 'error');
+        console.error('BackToNature music could not start:', error);
+      } finally {
+        playButton.disabled = false;
+        updatePlayButton();
+      }
+    });
+
+    muteButton.addEventListener('click', function () {
+      audio.muted = !audio.muted;
+      updateMuteButton();
+    });
+
+    volumeSlider.addEventListener('input', function () {
+      audio.volume = Number(volumeSlider.value);
+      if (audio.volume > 0) audio.muted = false;
+      updateMuteButton();
+    });
+
+    seekSlider.addEventListener('input', function () {
+      if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      if (currentTimeNode) {
+        currentTimeNode.textContent = timeLabel((Number(seekSlider.value) / 1000) * audio.duration);
+      }
+    });
+    seekSlider.addEventListener('change', function () {
+      if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      audio.currentTime = (Number(seekSlider.value) / 1000) * audio.duration;
+    });
+
+    audio.addEventListener('play', function () { updatePlayButton(); });
+    audio.addEventListener('pause', function () { updatePlayButton(); });
+    audio.addEventListener('ended', function () { updatePlayButton(); });
+    audio.addEventListener('volumechange', updateMuteButton);
+    audio.addEventListener('loadedmetadata', function () {
+      if (durationNode) durationNode.textContent = timeLabel(audio.duration);
+      seekSlider.disabled = !(Number.isFinite(audio.duration) && audio.duration > 0);
+    });
+    audio.addEventListener('durationchange', function () {
+      if (durationNode) durationNode.textContent = timeLabel(audio.duration);
+      seekSlider.disabled = !(Number.isFinite(audio.duration) && audio.duration > 0);
+    });
+    audio.addEventListener('timeupdate', function () {
+      if (currentTimeNode) currentTimeNode.textContent = timeLabel(audio.currentTime);
+      if (!seekSlider.matches(':active') && Number.isFinite(audio.duration) && audio.duration > 0) {
+        seekSlider.value = String(Math.round((audio.currentTime / audio.duration) * 1000));
+      }
+    });
+    audio.addEventListener('error', function () {
+      setStatus('AUDIO ERROR', 'error');
+      playButton.disabled = false;
+    });
+
+    updateMuteButton();
+    updatePlayButton();
+  })();
+
   loadWorldLayer();
 })();
