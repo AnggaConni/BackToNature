@@ -1,259 +1,202 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Harvest Moon: Capacity Building</title>
-
-    <!-- Tailwind CSS untuk tata letak -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS & JS untuk Peta -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Google Fonts: VT323 untuk efek pixel/retro -->
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-
-    <!-- CSS Kustom untuk Tema Harvest Moon -->
-    <style>
-        body {
-            font-family: 'VT323', monospace;
-            background-color: #2b3a27; /* Hijau tua */
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Mencegah scroll, aplikasi full screen */
-        }
-
-        #map {
-            width: 100vw;
-            height: 100vh;
-            z-index: 1;
-        }
-
-        /* Kotak Dialog ala Harvest Moon BTN */
-        .hm-dialogue {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 800px;
-            background: linear-gradient(to bottom, #2b599a 0%, #17325c 100%);
-            border: 6px solid #e0d0a6;
-            border-radius: 16px;
-            padding: 20px;
-            color: #ffffff;
-            box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.6);
-            z-index: 1000;
-            display: none; /* Disembunyikan secara default */
-            flex-direction: row;
-            gap: 20px;
-            align-items: flex-start;
-            font-size: 1.5rem;
-            line-height: 1.4;
-            text-shadow: 2px 2px 0px #000;
-        }
-
-        .hm-avatar {
-            width: 80px;
-            height: 80px;
-            background-color: #d1bfae;
-            border: 4px solid #6c4b31;
-            border-radius: 8px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 3rem;
-            flex-shrink: 0;
-            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.2);
-        }
-
-        .hm-text-container {
-            flex-grow: 1;
-        }
-
-        .hm-title {
-            color: #ffd700;
-            font-size: 1.8rem;
-            margin-bottom: 8px;
-            border-bottom: 2px dashed #8b9bb4;
-            padding-bottom: 4px;
-        }
-
-        .typing-cursor::after {
-            content: '▼';
-            animation: blink 1s step-start infinite;
-            color: #ffd700;
-            margin-left: 5px;
-        }
-
-        @keyframes blink {
-            50% { opacity: 0; }
-        }
-
-        /* Tombol Close retro */
-        .btn-close {
-            background: #8b0000;
-            color: white;
-            border: 4px solid #ff4d4d;
-            padding: 4px 12px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 1.5rem;
-            text-shadow: 1px 1px 0px #000;
-            position: absolute;
-            top: -15px;
-            right: -15px;
-            box-shadow: 3px 3px 0px rgba(0,0,0,0.5);
-        }
-        .btn-close:active {
-            transform: translate(2px, 2px);
-            box-shadow: 1px 1px 0px rgba(0,0,0,0.5);
-        }
-
-        /* Modifikasi kontrol zoom peta agar lebih menyatu dengan tema */
-        .leaflet-control-zoom a {
-            background-color: #e0d0a6 !important;
-            color: #4a3728 !important;
-            border: 2px solid #4a3728 !important;
-            font-family: 'VT323', monospace !important;
-            font-size: 1.2rem !important;
-        }
-
-        /* Judul Papan Kayu */
-        .wood-sign {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #8b5a2b;
-            border: 4px solid #3e2723;
-            color: #ffecd2;
-            padding: 10px 30px;
-            z-index: 1000;
-            font-size: 2rem;
-            text-shadow: 2px 2px 0px #000;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.6);
-            border-radius: 8px;
-            pointer-events: none; /* Agar tidak menghalangi interaksi peta */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2b3a27">
+  <meta name="description" content="A Harvest Moon: Back to Nature-inspired provincial field guide for soil, crops, farming techniques and land restoration in Indonesia.">
+  <title>BackToNature — Living Land Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --grass:#8caf5d;--grass-dark:#426039;--wood:#87532e;--wood-dark:#422b1e;
+      --cream:#f5e7bd;--paper:#e5d3a1;--paper-light:#fff2cd;--navy:#204477;--navy-dark:#132c4f;
+      --ink:#35271d;--gold:#ffd66f;--line:#a98a52;--white:#fffdf5;--shadow:rgba(0,0,0,.42);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{background:#253522;color:var(--ink);font-family:'VT323',monospace;font-size:21px;overflow:hidden}
+    button,select,a{font:inherit}
+    button{cursor:pointer}
+    a{color:#245d88}
+    a:focus-visible,button:focus-visible,select:focus-visible{outline:3px dashed #ffe28a;outline-offset:3px}
+    #map{position:fixed;inset:0;z-index:1;background:#b4c99b;filter:saturate(.8) contrast(1.03)}
+    .leaflet-tile{filter:saturate(.82) sepia(.12) contrast(1.02)}
+    .leaflet-control-zoom a{background:#f3e2b6!important;color:#513824!important;border:3px solid #513824!important;border-radius:0!important;box-shadow:3px 3px 0 var(--shadow);font-family:'VT323',monospace!important;font-size:25px!important;width:32px!important;height:32px!important;line-height:26px!important}
+    .leaflet-control-attribution{font:12px Arial,sans-serif!important;background:rgba(255,245,215,.85)!important}
+    .retro-tooltip{background:var(--paper-light);border:2px solid var(--wood-dark);border-radius:0;color:var(--ink);box-shadow:3px 3px 0 var(--shadow);font-family:'VT323',monospace;font-size:19px;padding:4px 8px}
+    .retro-tooltip:before{border-top-color:var(--wood-dark)}
+    .screen-hud{position:fixed;z-index:500;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:stretch;width:min(1200px,calc(100vw - 28px));pointer-events:none}
+    .logo-board{position:relative;pointer-events:auto;flex:1;min-width:0;display:flex;align-items:center;gap:13px;padding:10px 18px;background:linear-gradient(#a97545,#754326);border:4px solid #452a1a;box-shadow:inset 0 0 0 3px #c99961,5px 6px 0 var(--shadow);color:#fff0c8;min-height:64px}
+    .logo-sprite{font-size:34px;line-height:1;filter:drop-shadow(2px 2px 0 #422)}
+    .logo-copy{min-width:0}
+    .pixel-label{font-family:'Press Start 2P',monospace;font-size:clamp(8px,1vw,12px);line-height:1.65;letter-spacing:-.4px}
+    .logo-subtitle{font-size:18px;color:#ffdda2;line-height:1.05}
+    .hud-actions{pointer-events:auto;display:flex;gap:8px;align-items:stretch}
+    .pixel-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 13px;background:linear-gradient(#315b91,#1a3965);border:3px solid #102747;box-shadow:inset 0 0 0 2px #7196ba,4px 5px 0 var(--shadow);color:#fff2c9;text-decoration:none;text-align:center;font-size:20px;line-height:1.1;text-shadow:1px 2px #12243a}
+    .pixel-btn:hover{filter:brightness(1.13);transform:translate(-1px,-1px)}
+    .pixel-btn:active{transform:translate(2px,2px);box-shadow:inset 0 0 0 2px #7196ba,1px 2px 0 var(--shadow)}
+    .pixel-btn.wood{background:linear-gradient(#a16a3d,#6f4024);border-color:#432718;box-shadow:inset 0 0 0 2px #c99961,4px 5px 0 var(--shadow)}
+    .pixel-btn.green{background:linear-gradient(#698c48,#3c5d2d);border-color:#243d1d;box-shadow:inset 0 0 0 2px #a5c878,4px 5px 0 var(--shadow)}
+    [hidden]{display:none!important}
+    #province-select-wrap{pointer-events:auto;background:var(--paper);border:4px solid var(--wood-dark);box-shadow:4px 5px 0 var(--shadow);padding:5px;min-width:190px;display:flex;align-items:center}
+    #province-select{background:#fff3d0;color:#39281a;border:2px solid #936944;padding:5px;width:100%;font-family:'VT323',monospace;font-size:19px}
+    .bottom-hud{position:fixed;z-index:450;bottom:18px;left:18px;max-width:min(560px,calc(100vw - 36px));padding:10px 16px;background:linear-gradient(180deg,#f7e8bd,#d9c08a);border:4px solid #573825;box-shadow:5px 6px 0 var(--shadow);display:flex;gap:12px;align-items:center}
+    .bottom-hud .controller{font-size:27px;white-space:nowrap}
+    .bottom-hud p{margin:0;line-height:1.08;font-size:20px}
+    .bottom-hud strong{color:#614127}
+    .map-status{position:fixed;z-index:800;left:50%;top:100px;transform:translate(-50%,-10px);width:min(490px,calc(100vw - 30px));padding:14px 18px;background:linear-gradient(#204477,#142d50);color:#fff1c4;border:4px solid #ead5a0;box-shadow:5px 6px 0 var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+    .map-status.visible{opacity:1;transform:translate(-50%,0)}
+    .map-status h2{font-size:25px;margin:0 0 4px;color:#ffdc74}
+    .map-status p{font-size:19px;margin:0;line-height:1.15}
+    .modal-backdrop{display:none;position:fixed;inset:0;z-index:3000;background:rgba(12,18,10,.86);backdrop-filter:blur(4px);padding:0}
+    .modal-backdrop.open{display:flex}
+    .modal-shell{width:100vw;height:100dvh;max-height:100dvh;display:flex;flex-direction:column;background:var(--paper);border:8px solid #51321f;box-shadow:inset 0 0 0 4px #bb915c;color:var(--ink);overflow:hidden}
+    .modal-header{flex:none;display:flex;gap:14px;justify-content:space-between;align-items:center;padding:13px 18px;background:linear-gradient(#315b91,#193a66);border-bottom:5px solid #102747;color:#fff1c9;box-shadow:inset 0 -2px #6587b1}
+    .modal-heading{display:flex;gap:13px;align-items:center;min-width:0}
+    .modal-avatar{width:52px;height:52px;flex:none;display:grid;place-items:center;background:#e3c58a;border:4px solid #583b26;box-shadow:inset -4px -4px 0 rgba(80,42,18,.17);font-size:31px}
+    .modal-titles{min-width:0}
+    .modal-titles h1{margin:2px 0;font-size:clamp(26px,3vw,39px);line-height:1;color:#ffda71;overflow-wrap:anywhere}
+    .modal-titles p{margin:4px 0 0;color:#e7edf8;font-size:17px;line-height:1.05;max-height:36px;overflow:hidden}
+    .modal-stamp{font-size:14px;color:#c3d8f3;letter-spacing:1px}
+    .modal-close{align-self:flex-start;flex:none;font-family:'Press Start 2P',monospace;font-size:12px;padding:12px 14px;color:#fff;background:#8f2924;border:4px solid #481916;box-shadow:inset 0 0 0 2px #d98174,3px 4px 0 rgba(0,0,0,.3)}
+    .modal-close:hover{filter:brightness(1.2)}
+    .tab-bar{flex:none;display:flex;gap:0;padding:7px 9px 0;background:#c4a46d;border-bottom:4px solid #694429;overflow-x:auto}
+    .tab-btn{white-space:nowrap;flex:none;padding:10px 15px 9px;background:#e6d2a0;border:3px solid #805736;border-bottom:0;color:#51351f;box-shadow:inset 0 2px #fff0c9;font-size:19px}
+    .tab-btn.active{position:relative;background:#fff0c6;color:#1d3f67;border-color:#1c3c64;box-shadow:inset 0 3px #fffdf5,inset 0 -4px #fff0c6;font-weight:bold}
+    .tab-btn.active:after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:5px;background:#fff0c6}
+    .modal-content{padding:clamp(15px,2.5vw,30px);overflow:auto;flex:1;background-color:#eddfb9;background-image:radial-gradient(rgba(115,76,40,.08) .8px,transparent .8px);background-size:7px 7px;scrollbar-color:#9b744a #e2cca0}
+    .modal-footer{flex:none;display:flex;gap:12px;justify-content:space-between;align-items:center;padding:7px 14px;background:#d0b17b;border-top:3px solid #845c37;font-size:16px;line-height:1.05}
+    .footer-controls{white-space:nowrap;color:#49311f}
+    .tab-intro{padding:4px 2px 18px;max-width:1050px}
+    .eyebrow,.mini-code{font-family:'Press Start 2P',monospace;font-size:10px;line-height:1.8;letter-spacing:.1px;color:#775130}
+    .tab-intro h2{font-size:clamp(31px,4vw,44px);line-height:1;margin:7px 0 9px;color:#234a73;text-shadow:1px 2px #fff1c4}
+    .tab-intro p{font-size:22px;line-height:1.18;margin:0;max-width:1000px}
+    .profile-stamp{display:inline-flex;align-items:center;gap:10px;margin-top:15px;padding:7px 12px;background:#d5e0bb;border:3px solid #536b3c;box-shadow:3px 3px 0 rgba(0,0,0,.18)}
+    .profile-stamp>span{font-size:28px}.profile-stamp b,.profile-stamp small{display:block;line-height:1.05}.profile-stamp small{font-size:16px}
+    .tile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:9px 0 20px}
+    .overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .field-card{position:relative;padding:15px 16px 17px;background:rgba(255,246,215,.82);border:3px solid #8d6842;box-shadow:inset 0 0 0 2px #fff1cb,4px 5px 0 rgba(56,39,22,.17);min-width:0}
+    .card-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;margin-bottom:8px;border-bottom:2px dashed #c2a471}
+    .card-emoji{font-size:29px;line-height:1}
+    .field-card h3{font-size:26px;line-height:1.02;color:#654226;margin:7px 0 8px}
+    .field-card p{font-size:20px;line-height:1.12;margin:8px 0 0}
+    .card-problem{color:#854321}
+    .quest-panel{display:flex;gap:15px;align-items:flex-start;padding:16px;margin:20px 0;background:linear-gradient(90deg,#d5e2bf,#e8ebcc);border:4px solid #4a6339;box-shadow:4px 5px 0 rgba(0,0,0,.16)}
+    .quest-icon{font-size:36px;line-height:1;flex:none}
+    .quest-panel h3{font-size:27px;margin:4px 0;color:#35502a;line-height:1.02}
+    .quest-panel p{margin:0;font-size:21px;line-height:1.14}
+    .source-strip{display:flex;justify-content:space-between;gap:18px;align-items:center;margin:16px 0;padding:16px;background:#d8e4ed;border:3px solid #486881;box-shadow:4px 5px 0 rgba(0,0,0,.15)}
+    .source-strip h3{margin:4px 0 7px;font-size:27px;line-height:1.02;color:#244663}
+    .source-strip p{font-size:20px;line-height:1.1;margin:0;max-width:820px}
+    .source-strip .pixel-btn{flex:none;font-size:17px}
+    .soil-profile{display:flex;gap:16px;align-items:flex-start;padding:18px;margin:10px 0 20px;background:#dce6c9;border:4px solid #526b39;box-shadow:4px 5px 0 rgba(0,0,0,.17)}
+    .soil-profile-icon{font-size:43px;flex:none}
+    .soil-profile h3{font-size:28px;line-height:1.02;margin:5px 0 8px;color:#36502d}
+    .soil-profile p{font-size:21px;line-height:1.14;margin:0 0 10px}
+    .data-tag{display:inline-block;padding:3px 8px;border:2px solid #805b37;background:#fff0c8;color:#664324;font-size:16px;line-height:1}
+    .data-tag.amber{background:#ffedc1;border-color:#a77a28;color:#78440f}.data-tag.green{background:#d6e8c4;border-color:#58773d;color:#304b25}
+    .section-title{padding:6px 2px 2px;margin:15px 0 4px}
+    .section-title h3{font-size:29px;line-height:1;margin:4px 0 10px;color:#254d72}
+    .checklist-card{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:11px;align-items:start}
+    .check-number{grid-row:span 2;display:grid;place-items:center;width:42px;height:42px;background:#284d71;color:#ffebb1;border:3px solid #142b47;font-family:'Press Start 2P',monospace;font-size:11px;box-shadow:2px 3px 0 rgba(0,0,0,.2)}
+    .checklist-card h3{margin:0}.checklist-card p{grid-column:2}
+    .crop-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:10px 0 22px}
+    .crop-card{display:flex;gap:13px;align-items:flex-start;padding:13px;background:#fff0c9;border:3px solid #987044;box-shadow:3px 4px 0 rgba(0,0,0,.13)}
+    .crop-glyph{display:grid;place-items:center;width:54px;height:54px;flex:none;background:#d6e2ba;border:3px solid #627b45;font-size:30px}
+    .crop-card h3{font-size:25px;line-height:1.02;color:#5b4026;margin:4px 0}
+    .crop-card p{font-size:18px;line-height:1.1;margin:6px 0 0}
+    .text-link{display:inline-block;margin-top:8px;color:#1d547d;text-decoration:underline;text-underline-offset:3px;font-weight:bold}
+    .source-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .source-card{display:flex;gap:12px;padding:13px;background:rgba(255,246,215,.88);border:3px solid #9b774b;box-shadow:3px 4px 0 rgba(0,0,0,.12)}
+    .source-index{display:grid;place-items:center;flex:none;width:39px;height:39px;background:#234a73;color:#fff0c7;border:3px solid #122e4b;font-family:'Press Start 2P',monospace;font-size:10px}
+    .source-card h3{font-size:24px;line-height:1;margin:5px 0 6px;color:#604127}
+    .source-card p{font-size:19px;line-height:1.12;margin:0}
+    .data-integrity{margin:18px 0 3px;padding:16px;background:#f2d7ca;border:3px solid #a35440}
+    .data-integrity h3{font-size:26px;margin:8px 0;color:#733e30}
+    .data-integrity p{font-size:20px;line-height:1.1;margin:6px 0}
+    .modal-content::-webkit-scrollbar{width:12px}.modal-content::-webkit-scrollbar-track{background:#dbc69b;border-left:2px solid #8d6842}.modal-content::-webkit-scrollbar-thumb{background:#8d6842;border:2px solid #dbc69b}
+    @media(max-width:850px){
+      .screen-hud{top:7px;width:calc(100vw - 14px);gap:5px}.logo-board{padding:7px 9px;min-height:55px;gap:7px}.logo-sprite{font-size:27px}.logo-subtitle{font-size:15px}
+      .hud-actions{gap:5px}.pixel-btn{padding:7px 8px;font-size:17px;box-shadow:inset 0 0 0 2px #7196ba,2px 3px 0 var(--shadow)}
+      #province-select-wrap{min-width:140px;padding:3px}.bottom-hud{left:8px;bottom:8px;padding:7px 10px;gap:8px}.bottom-hud .controller{font-size:22px}.bottom-hud p{font-size:17px}
+      .modal-shell{border-width:5px}.modal-header{padding:9px 11px;gap:8px}.modal-avatar{width:43px;height:43px;font-size:26px}.modal-close{padding:10px;font-size:10px}.tab-btn{font-size:17px;padding:8px 11px}.modal-content{padding:15px}
+      .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-grid .field-card:last-child{grid-column:1/-1}
+      .source-strip{align-items:flex-start;flex-direction:column}.source-strip .pixel-btn{align-self:flex-start}
+    }
+    @media(max-width:560px){
+      body{font-size:19px}.screen-hud{align-items:flex-start}.logo-board{padding:6px;min-height:48px}.logo-sprite{font-size:22px}.logo-subtitle{display:none}.logo-copy .pixel-label{font-size:8px}.hud-actions{flex-direction:column;max-width:44%}.hud-actions .pixel-btn{font-size:15px;padding:6px 8px}.hud-actions #province-select-wrap{min-width:0}
+      .bottom-hud{max-width:calc(100vw - 16px);bottom:7px}.bottom-hud p{font-size:16px}.map-status{top:96px}
+      .modal-shell{border-width:3px}.modal-header{padding:8px}.modal-heading{gap:8px}.modal-avatar{display:none}.modal-titles h1{font-size:25px}.modal-titles p{font-size:15px}.modal-stamp{font-size:9px}.modal-close{font-size:9px;padding:8px}
+      .tab-bar{padding:5px 4px 0}.tab-btn{font-size:15px;padding:8px 10px}.modal-content{padding:12px}.modal-footer{padding:6px 9px;font-size:13px;gap:4px}.footer-controls{font-size:12px}
+      .tile-grid,.overview-grid,.crop-list,.source-list{grid-template-columns:1fr}.overview-grid .field-card:last-child{grid-column:auto}.tab-intro h2{font-size:31px}.tab-intro p{font-size:20px}.field-card{padding:12px}.field-card h3{font-size:24px}.field-card p{font-size:19px}
+      .quest-panel{padding:11px;gap:9px}.quest-icon{font-size:28px}.quest-panel h3,.source-strip h3{font-size:24px}.quest-panel p,.source-strip p,.soil-profile p{font-size:19px}
+      .soil-profile{padding:12px;gap:10px}.soil-profile-icon{font-size:32px}.soil-profile h3{font-size:24px}.source-strip{padding:12px}
+      .checklist-card{grid-template-columns:39px minmax(0,1fr);column-gap:8px}.check-number{width:35px;height:35px;font-size:9px}.crop-glyph{width:45px;height:45px;font-size:25px}
+    }
+  </style>
 </head>
 <body>
+  <div id="map" role="application" aria-label="Interactive world and Indonesian province map"></div>
 
-    <!-- Judul Aplikasi -->
-    <div class="wood-sign">
-        📍 Global Agriculture & Land Restoration Map
+  <header class="screen-hud">
+    <div class="logo-board">
+      <div class="logo-sprite" aria-hidden="true">👨‍🌾</div>
+      <div class="logo-copy">
+        <div class="pixel-label">BACK TO NATURE</div>
+        <div class="logo-subtitle">Living Land Lab · field guide</div>
+      </div>
     </div>
+    <div class="hud-actions">
+      <button id="btn-provinces" class="pixel-btn green" type="button">🇮🇩 Province Explorer</button>
+      <button id="btn-world" class="pixel-btn wood" type="button" hidden>🌍 World Map</button>
+      <div id="province-select-wrap" hidden>
+        <select id="province-select" aria-label="Jump to a province">
+          <option value="">JUMP TO PROVINCE…</option>
+        </select>
+      </div>
+      <button id="btn-home" class="pixel-btn" type="button" title="Return to starting map">⌂ HOME</button>
+    </div>
+  </header>
 
-    <!-- Kontainer Peta -->
-    <div id="map"></div>
+  <div id="map-status" class="map-status" role="status" aria-live="polite">
+    <h2 id="map-status-title">Welcome, farmer!</h2>
+    <p id="map-status-text">Click Indonesia or open Province Explorer to get started.</p>
+  </div>
 
-    <!-- UI Dialogue Kotak ala Harvest Moon -->
-    <div id="dialogue-box" class="hm-dialogue">
-        <button class="btn-close" onclick="closeDialogue()">X</button>
-        <div class="hm-avatar" id="avatar-icon">👨‍🌾</div>
-        <div class="hm-text-container">
-            <div class="hm-title" id="region-title">Loading...</div>
-            <div id="dialogue-text">Click a region on the map to view data...</div>
+  <aside class="bottom-hud">
+    <div class="controller" aria-hidden="true">🕹️</div>
+    <p><strong id="map-title">GLOBAL LAND RESTORATION MAP</strong><br>
+      <span id="map-help">Click Indonesia to open the province map. Click a province to inspect its field guide.</span>
+    </p>
+  </aside>
+
+  <div id="province-modal" class="modal-backdrop" aria-hidden="true">
+    <div id="modal-backdrop" class="modal-shell" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="modal-header">
+        <div class="modal-heading">
+          <div class="modal-avatar" aria-hidden="true">🌱</div>
+          <div class="modal-titles">
+            <div id="modal-stamp" class="modal-stamp">FIELD NOTE / PROVINCE</div>
+            <h1 id="modal-title">Province Name</h1>
+            <p id="modal-subtitle">PROVINCE FIELD GUIDE</p>
+          </div>
         </div>
+        <button id="modal-close" class="modal-close" type="button" aria-label="Close field guide">✕ CLOSE</button>
+      </header>
+      <nav id="modal-tabs" class="tab-bar" role="tablist" aria-label="Province field guide sections"></nav>
+      <main id="modal-content" class="modal-content" tabindex="0"></main>
+      <footer class="modal-footer">
+        <span>🌿 BACK TO NATURE · Provincial agriculture fieldbook</span>
+        <span class="footer-controls">← → change tab · ESC close</span>
+      </footer>
     </div>
+  </div>
 
-    <script>
-        // Initialize Leaflet Map (Global View)
-        const map = L.map('map').setView([20.0, 0.0], 2);
-
-        // OpenStreetMap Basemap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        let typingInterval;
-        const dialogueBox = document.getElementById('dialogue-box');
-        const dialogueText = document.getElementById('dialogue-text');
-        const regionTitle = document.getElementById('region-title');
-        const avatarIcon = document.getElementById('avatar-icon');
-
-        function closeDialogue() {
-            dialogueBox.style.display = 'none';
-            clearInterval(typingInterval);
-        }
-
-        function typeWriter(text, element) {
-            clearInterval(typingInterval);
-            element.innerHTML = '';
-            element.classList.add('typing-cursor');
-            
-            let i = 0;
-            const speed = 25; 
-
-            typingInterval = setInterval(() => {
-                if (i < text.length) {
-                    if (text.charAt(i) === '\n') {
-                        element.innerHTML += '<br><br>';
-                    } else {
-                        element.innerHTML += text.charAt(i);
-                    }
-                    i++;
-                } else {
-                    clearInterval(typingInterval);
-                    element.classList.remove('typing-cursor');
-                }
-            }, speed);
-        }
-
-        // Standard Global Countries GeoJSON (Publicly accessible)
-        const geojsonUrl = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
-
-        const mapStyle = {
-            color: "#4a3728",
-            weight: 1, // Lighter borders for a global map
-            fillColor: "#8b9bb4",
-            fillOpacity: 0.4
-        };
-
-        const hoverStyle = {
-            color: "#ffd700",
-            weight: 2,
-            fillColor: "#e0d0a6",
-            fillOpacity: 0.7
-        };
-
-        fetch(geojsonUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                L.geoJSON(data, {
-                    style: mapStyle,
-                    onEachFeature: function (feature, layer) {
-                        layer.on('mouseover', function (e) {
-                            layer.setStyle(hoverStyle);
-                        });
-                        layer.on('mouseout', function (e) {
-                            layer.setStyle(mapStyle);
-                        });
-                        
-                        layer.on('click', function (e) {
-                            onRegionClick(e, feature);
-                        });
-                    }
-                }).addTo(map);
-            })
-            .catch(error => {
-                console.error('Failed to load GeoJSON:', error);
-                dialogueBox.style.display = 'flex';
-                regionTitle.innerText = "System Warning!";
-                typeWriter("It seems the satellite data connection failed. Please reload the page.", dialogueText);
-                avatarIcon.innerText = '⚠️';
-            });
-
-    </script>
-    <script src="./api.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
