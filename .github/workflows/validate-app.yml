@@ -1,0 +1,31 @@
+name: Validate JavaScript syntax
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app.js"
+      - "api.js"
+      - ".github/workflows/validate-app.yml"
+  pull_request:
+    paths:
+      - "app.js"
+      - "api.js"
+      - ".github/workflows/validate-app.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check application JavaScript syntax
+        run: |
+          node --check app.js
+          node --check api.js
+          echo "JavaScript syntax is valid."
