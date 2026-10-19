@@ -278,6 +278,7 @@
       '<div class="climate-preview-icon">🌦️</div><div class="climate-preview-copy">' +
       '<span class="mini-code">SEASONS / TEMPERATURE / WIND</span><h3>Climate & Planting Scout</h3>' +
       '<p id="climate-preview-status" aria-live="polite">Preparing climate profile for this ' + levelName + '…</p>' +
+      '<div id="climate-preview-crops" class="climate-preview-candidates">Planting candidates will appear here after the climate lookup.</div>' +
       '<p class="climate-preview-note">Historical monthly patterns help screen planting windows. They are not a farm-level forecast or a guarantee of crop suitability.</p>' +
       '</div><button id="open-climate-tab" class="pixel-btn green" type="button">OPEN CLIMATE & PLANTING ↗</button>' +
       '</section>';
@@ -310,7 +311,7 @@
           var window = crop.bestWindow || {};
           return '<span class="climate-candidate-chip"><b>' + esc(crop.name) + '</b><small>Try ' + esc(window.month || '—') + ' · ' + esc(window.score == null ? '—' : window.score) + '/100</small></span>';
         }).join('');
-      }';
+      }
     } else if (status && status.state === 'error') {
       statusNode.textContent = 'Climate data unavailable: ' + status.message + ' You can retry in Climate & Planting.';
     } else {
