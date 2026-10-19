@@ -38,6 +38,18 @@
     node.textContent = value;
   }
 
+  function dataField(row, names) {
+    var keys = Object.keys(row || {});
+    for (var i = 0; i < names.length; i++) {
+      for (var j = 0; j < keys.length; j++) {
+        if (keys[j].toLowerCase() === names[i].toLowerCase() && row[keys[j]] != null && row[keys[j]] !== '') {
+          return row[keys[j]];
+        }
+      }
+    }
+    return '';
+  }
+
   function provinceFeatureName(feature) {
     var p = feature && feature.properties ? feature.properties : {};
     return p.name || p.PROVINSI || p.provinsi || p.NAME_1 || p.NAME || p._prov || 'Unknown province';
@@ -272,8 +284,7 @@
           return;
         }
         rows.sort(function (a,b) {
-          return Number(api.valueOf ? api.valueOf(b,['Year','Year Code']) : (b.Year || b['Year Code'] || 0)) -
-            Number(api.valueOf ? api.valueOf(a,['Year','Year Code']) : (a.Year || a['Year Code'] || 0));
+          return Number(dataField(b, ['Year','Year Code']) || 0) - Number(dataField(a, ['Year','Year Code']) || 0);
         });
         var pick = [], seen = {};
         rows.forEach(function (row) {
@@ -284,11 +295,12 @@
         });
         var table = '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Item / indicator</th><th>Year</th><th>Value</th></tr></thead><tbody>';
         pick.forEach(function (row) {
-          var item = row.Item || row['Item Name'] || row.ItemName || 'Land-use item';
-          var elName = row.Element || row['Element Name'] || 'Observation';
-          var year = row.Year || row['Year Code'] || '—';
-          var value = row.Value != null ? row.Value : (row.value != null ? row.value : '—');
-          var unit = row.Unit || row['Unit Name'] || '';
+          var item = dataField(row, ['Item','Item Name','ItemName']) || 'Land-use item';
+          var elName = dataField(row, ['Element','Element Name']) || 'Observation';
+          var year = dataField(row, ['Year','Year Code']) || '—';
+          var value = dataField(row, ['Value','value']);
+          if (value === '') value = '—';
+          var unit = dataField(row, ['Unit','Unit Name']);
           table += '<tr><td>' + esc(item) + '<br><small>' + esc(elName) + '</small></td><td>' + esc(year) + '</td><td>' + esc(Number.isFinite(Number(value)) ? Number(value).toLocaleString('en-US',{maximumFractionDigits:2}) : value) + '<br><small>' + esc(unit) + '</small></td></tr>';
         });
         table += '</tbody></table></div><p class="live-note">Indonesia · domain Land Use (RL) · request window ' + esc(response.startYear) + '–' + esc(response.endYear) + '. Values, units and years follow the source response. These are national context, not province-level results.</p>';
