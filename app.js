@@ -1391,7 +1391,7 @@
                 await ensureBoundaryIndexes();
                 var iso3 = countryIso3ForFeature(feature, name);
                 if (!iso3) {
-                  showMapStatus(name + ' · country selected', 'Could not match this map polygon to an ISO-3 code in the boundary index. Use the Indonesia Explorer button or choose another country.');
+                  showMapStatus(name + ' · country selected', 'Could not match this map polygon to an ISO-3 code in the boundary index. Try another country or use the global region explorer.');
                   return;
                 }
                 await enterCountryMode(iso3, name, layer.getBounds());
@@ -1405,7 +1405,7 @@
       worldLayer = thisWorldLayer;
       if (mode === 'world') worldLayer.addTo(map);
       setText('map-status-title', 'World map ready');
-      setText('map-status-text', 'Click any country to explore its regions. Use Indonesia Explorer as a shortcut.');
+      setText('map-status-text', 'Click any country to explore its available regions and districts.');
       setTimeout(hideMapStatus, 2600);
     } catch (error) {
       showMapStatus('World boundaries unavailable', 'The map tiles may still work. ' + (error && error.message ? error.message : 'Reload to retry the country boundary data.'));
