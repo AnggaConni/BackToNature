@@ -160,3 +160,19 @@ The Open-Meteo seven-day outlook also requests the modelled topsoil moisture (0�
 When the Nature Data tab retrieves GBIF and iNaturalist plant observations, the application adds the returned coordinates as clickable Leaflet circle markers. GBIF points and iNaturalist points use different colours; each popup shows source, common/scientific name, record date when supplied, distance from the regional representative point, and links to the source record/taxon. The layer can be toggled from the map's top-right layer control. It is cleared when users select another region or change map scale so observations from a previous selection do not appear to belong to the new area.
 
 Markers are created only for georeferenced API records with valid coordinates. A lack of markers is not proof that the area lacks a species, because observation coverage and reporting effort vary. The points show reported observations, not full distribution boundaries, abundance, or crop-suitability.
+
+
+### Country-specific agriculture data sources
+The Sources tab uses a curated registry keyed by ISO-3 country code. Indonesia-only sources—BPS provincial rice statistics, BPS WebAPI and the Kementerian Pertanian geoportal—are displayed only when the selected country is Indonesia (IDN). BPS WebAPI is free after registration and requires a key/token; the Kementan geoportal's data coverage and layer conditions vary.
+
+The registry currently includes reviewed official sources for:
+- Canada (CAN): Statistics Canada Web Data Service public JSON API; no API key is documented.
+- Brazil (BRA): IBGE SIDRA / aggregate statistics APIs.
+- Australia (AUS): data.gov.au agriculture catalogue API and ABARES.
+- United States (USA): USDA NASS Quick Stats (free API key required) and public Quick Stats pages.
+- India (IND): data.gov.in APIs (registered API key required) and the Ministry of Agriculture portal.
+- Japan (JPN): e-Stat API (application ID required) and MAFF statistics.
+- Mexico (MEX): INEGI API documentation and SIAP agriculture statistics.
+- EU member states: Eurostat crop-production API, with a query URL filtered to the selected member state's GEO code.
+
+Countries without a reviewed national source preset are not assigned guessed API endpoints. Their Sources tab still provides global sources and the free World Bank Indicators API, which requests four country-filtered agriculture indicators by ISO-3 code. World Bank data are national context, not province/district/farm-level observations. To add another national source, extend the country source registry after checking official ownership, API availability, access requirements, and licensing.
