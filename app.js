@@ -93,6 +93,18 @@
       return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
     });
   }
+  // Render external URLs only when they use HTTPS; several UI renderers share this helper.
+  function safeHttps(value) {
+    try {
+      var raw = String(value == null ? '' : value).trim();
+      if (!raw) return '#';
+      var parsed = new URL(raw, window.location.href);
+      if (parsed.protocol !== 'https:') return '#';
+      return parsed.href;
+    } catch (_) {
+      return '#';
+    }
+  }
   function el(id) { return document.getElementById(id); }
   function setText(id, value) { var node = el(id); if (node) node.textContent = value; }
   function setStatus(id, value, type) {
@@ -607,6 +619,51 @@
     }).join('') + '</div>';
   }
 
+  function renderFaoFoodPricePanel(countryIso3, countryName) {
+    return '<section class="live-connectors fpma-panel"><div class="section-title"><span class="mini-code">FAO FPMA / PUBLIC API · NO LOGIN</span><h3>Food price intelligence · ' + esc(countryName || countryIso3) + '</h3></div>' +
+      '<p class="live-explainer">Search publicly available domestic and market price series for this country. Prices retain the source currency, unit and market type. The 90-day change compares a recent observation with the closest available point around three months earlier; it is not a forecast.</p>' +
+      '<div class="crop-lab-controls"><div class="crop-control"><label for="fpma-commodity-query">Commodity search</label><input id="fpma-commodity-query" type="search" value="rice" maxlength="60" placeholder="e.g. rice, maize, wheat, beans"></div></div>' +
+      '<button id="fpma-fetch-btn" class="pixel-btn green" type="button">FETCH FOOD PRICES</button>' +
+      '<div id="fpma-status" class="live-status" aria-live="polite">Not queried yet · no API key or account required</div>' +
+      '<div id="fpma-results" class="live-results">Live values appear here after you run a query. Search terms must match commodity names published by the source.</div>' +
+      '<p class="nature-method-note">Official API: <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://fpma-documentation.web.app/docs/api-docs/intro/">FAO FPMA API documentation ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://fpma.fao.org/giews/v4/global/swagger/">API explorer ↗</a></p></section>';
+  }
+
+  function formatPriceValue(value, currency) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return (currency ? currency + ' ' : '') + Number(value).toLocaleString('en-US',{maximumFractionDigits:3});
+  }
+
+  function renderFaoFoodPriceResults(data) {
+    var records = data && Array.isArray(data.series) ? data.series : [];
+    if (!records.length) {
+      return '<p>No matching FAO FPMA price series were returned for <b>' + esc(data && data.countryIso3 || '') +
+        '</b> and <b>' + esc(data && data.query || '') + '</b>. The country may have no published series for that commodity in the searched pages. Try a broader term such as maize, wheat, beans or onion.</p>' +
+        '<p class="nature-method-note">Searched ' + esc(data && data.searchedSeries || 0) + ' metadata series. No sample prices were substituted.</p>';
+    }
+    var table = '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Commodity / market</th><th>Latest price</th><th>Observation date</th><th>90-day change</th><th>Series</th></tr></thead><tbody>';
+    records.forEach(function (record) {
+      var place = [record.market,record.priceType].filter(Boolean).join(' · ') || 'Market not specified in series metadata';
+      var latest = record.latest;
+      var latestText = latest ? formatPriceValue(latest.value,record.currency) : 'No populated price value';
+      var priceMeta = [record.unit,record.periodicity].filter(Boolean).join(' · ');
+      var change = record.changePct90d == null ? 'Not enough comparable points' :
+        ((record.changePct90d > 0 ? '+' : '') + record.changePct90d.toFixed(1) + '%');
+      table += '<tr><td><b>' + esc(record.commodity) + '</b><br><small>' + esc(place) + '</small></td>' +
+        '<td>' + esc(latestText) + '<br><small>' + esc(priceMeta) + '</small>' +
+        (latest && latest.valueUsd != null && Number.isFinite(latest.valueUsd) ? '<br><small>Approx. USD ' + esc(Number(latest.valueUsd).toLocaleString('en-US',{maximumFractionDigits:3})) + '</small>' : '') + '</td>' +
+        '<td>' + esc(latest && latest.date || '—') + '</td><td>' + esc(change) +
+        (record.reference && record.changePct90d != null ? '<br><small>vs ' + esc(record.reference.date) + '</small>' : '') + '</td>' +
+        '<td><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://fpma.fao.org/giews/v4/global/swagger/">Open source API ↗</a></td></tr>';
+    });
+    table += '</tbody></table></div>';
+    var errors = data.errors && data.errors.length
+      ? '<p class="live-note">Some matching series could not return price history: ' + esc(data.errors.map(function (error) { return error.commodity + ': ' + error.message; }).join(' · ')) + '</p>' : '';
+    return table + errors + '<p class="live-note">Country ' + esc(data.countryIso3) + ' · searched ' + esc(data.searchedSeries) +
+      ' metadata series · retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) +
+      '. A missing 90-day change means comparable observations were unavailable. Compare currency, unit, market level and reporting dates before drawing conclusions.</p>';
+  }
+
   function renderWorldBankIndicatorPanel(countryIso3, countryName) {
     return '<section class="live-connectors country-worldbank-panel"><div class="section-title"><span class="mini-code">GLOBAL API / COUNTRY-FILTERED</span><h3>Agriculture snapshot · ' + esc(countryName || countryIso3) + '</h3></div>' +
       '<p class="live-explainer">Fetch recent country-level agricultural indicators from the free World Bank API (no API key). Coverage and latest year differ by indicator. These are national indicators, not province, district or farm measurements.</p>' +
@@ -962,6 +1019,10 @@
       {t:'iNaturalist API',d:'Community nature observations as an independent cross-check against GBIF. Observation effort varies by location.',u:'https://www.inaturalist.org/pages/developers',tag:'BIODIVERSITY API'},
       {t:'Pl@ntNet API',d:'Optional photo-based plant identification. Free quota, personal key and attribution terms apply.',u:'https://my.plantnet.org/terms_of_use',tag:'PHOTO IDENTIFICATION'},
       {t:'WOCAT QCAT',d:'Documented sustainable land-management practices and technologies. Live API calls may require an authorized token.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'FARMING PRACTICES'},
+      {t:'FAO FPMA — food price data API',d:'Public country-filtered price series for food commodities, with observations, currency and market metadata. A live query panel is available above; no API key or login is required.',u:'https://fpma-documentation.web.app/docs/api-docs/intro/',tag:'LIVE FOOD PRICES · NO LOGIN'},
+      {t:'Open-Meteo weather and agricultural variables',d:'Public forecast and historical weather endpoints used elsewhere in BackToNature, including rainfall and reference evapotranspiration. Free use is limited to non-commercial fair use and requires attribution.',u:'https://open-meteo.com/en/docs',tag:'WEATHER API · NO LOGIN'},
+      {t:'NASA POWER Data Access Viewer / API',d:'Public gridded meteorological and solar data used for monthly climate context. The app labels precipitation units explicitly and does not treat gridded estimates as farm measurements.',u:'https://power.larc.nasa.gov/docs/services/api/',tag:'CLIMATE API · NO LOGIN'},
+      {t:'World Bank Indicators API',d:'Public country-level time series for agriculture, land use, cereal yield and economic context. The live country snapshot above uses this keyless API.',u:'https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api',tag:'GLOBAL INDICATORS · NO LOGIN'},
       {t:'geoBoundaries administrative data',d:'Administrative boundary provenance. The represented year and license differ by country and administrative level.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
     ];
 
@@ -977,7 +1038,7 @@
       '. <b>Boundary license:</b> ' + esc(boundaryLicense) + '</p></section>';
 
     return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open the official sources to verify date, methodology, geography, license and units. National indicators are context—not parcel-level measurements.</p></div>' +
-      countrySourceMarkup + indonesiaLiveTerminal +
+      countrySourceMarkup + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + indonesiaLiveTerminal +
       '<div class="source-list">' + globalSources.map(function (source, index) {
         return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' + wocatBox + integrity;
@@ -1007,6 +1068,37 @@
         if (resultNode) resultNode.textContent = 'No example values were substituted. Check the API status and retry.';
       } finally {
         countryWbBtn.disabled = false;
+      }
+    });
+
+    var fpmaBtn = el('fpma-fetch-btn');
+    if (fpmaBtn) fpmaBtn.addEventListener('click', async function () {
+      if (!api || !api.fetchFaoFoodPrices) {
+        setLiveStatus('fpma-status', 'FAO FPMA connector is unavailable. Reload the page.', 'error');
+        return;
+      }
+      var queryInput = el('fpma-commodity-query');
+      var query = queryInput ? queryInput.value.trim() : '';
+      if (!query) {
+        setLiveStatus('fpma-status', 'Enter a commodity name such as rice, maize or wheat.', 'error');
+        return;
+      }
+      fpmaBtn.disabled = true;
+      setLiveStatus('fpma-status', 'Requesting public FAO price series for ' + currentSourceCountryName + '…', 'pending');
+      var resultNode = el('fpma-results');
+      if (resultNode) resultNode.textContent = 'Loading matching public price series and a bounded price history. No login or key is sent.';
+      try {
+        var result = await api.fetchFaoFoodPrices(currentSourceIso3, query);
+        if (currentProvince && currentCountryIso3() !== currentSourceIso3) return;
+        if (resultNode) resultNode.innerHTML = renderFaoFoodPriceResults(result);
+        var count = result.series ? result.series.length : 0;
+        setLiveStatus('fpma-status', count ? 'PUBLIC LIVE DATA · ' + count + ' matching price series' : 'No matching series returned · refine the search term', count ? 'success' : 'pending');
+      } catch (error) {
+        setLiveStatus('fpma-status', 'FAO FPMA request failed', 'error');
+        if (resultNode) resultNode.textContent = (error && error.message ? error.message : 'Unknown API error') +
+          ' The public API may be temporarily unavailable or block browser access. No sample prices were substituted.';
+      } finally {
+        fpmaBtn.disabled = false;
       }
     });
 
@@ -1938,7 +2030,16 @@
 
   el('modal-tabs').addEventListener('click', function (event) {
     var button = event.target.closest('.tab-btn');
-    if (button) renderTab(button.getAttribute('data-tab'));
+    if (!button) return;
+    try {
+      renderTab(button.getAttribute('data-tab'));
+    } catch (error) {
+      var content = el('modal-content');
+      if (content) content.innerHTML = '<section class="data-integrity"><h3>Could not load this section</h3><p>' +
+        esc(error && error.message ? error.message : 'Unexpected rendering error') +
+        '</p><p>Try another tab, then reopen this section. No source data have been substituted.</p></section>';
+      if (window.console && console.error) console.error('BackToNature tab rendering failed:', error);
+    }
   });
   el('modal-close').addEventListener('click', closeModal);
   el('region-summary-close').addEventListener('click', function () { closeRegionSummary(true); });
