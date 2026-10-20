@@ -92,6 +92,8 @@ async function main() {
   assert.ok(plantingWindows.every((crop) => crop.bestWindow && crop.bestWindow.month && crop.bestWindow.score >= 0 && crop.bestWindow.score <= 100), 'each climate candidate contains a scored planting window');
   assert.ok(plantingWindows.every((crop, i) => i === 0 || plantingWindows[i - 1].climateScore >= crop.climateScore), 'climate candidates are ranked by score');
   assert.ok(plantingWindows.every((crop) => ['suitable','caution','wait','unknown'].includes(crop.currentMonthStatus)), 'every crop exposes a current-month season assessment');
+  assert.ok(plantingWindows.every((crop) => crop.currentMonthWindow && crop.currentMonthWindow.monthIndex === new Date().getMonth()), 'current-month assessment evaluates a planting window that starts this month');
+
 
   // Test the historical archive response mapper without calling any external API.
   const dates = [];
