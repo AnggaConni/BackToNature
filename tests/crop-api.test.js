@@ -246,8 +246,38 @@ async function main() {
   assert.equal(nasaParams.get('start'),String(new Date().getFullYear()-5),'NASA POWER uses five complete calendar years');
   assert.equal(nasaParams.get('end'),String(new Date().getFullYear()-1),'NASA POWER excludes the incomplete current year');
 
+
+  // Plant-only GBIF queries request species-level Plantae records and collapse duplicate observations by taxon.
+  const plantCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    plantCalls.push(parsed);
+    return {
+      ok:true,
+      status:200,
+      text:async function () {
+        return JSON.stringify({
+          count:3,
+          results:[
+            {key:411,taxonKey:901,scientificName:'Piper betle L.',acceptedScientificName:'Piper betle',taxonRank:'SPECIES',vernacularName:'Betel',eventDate:'2025-03-01',decimalLatitude:-6.21,decimalLongitude:106.81,countryCode:'ID'},
+            {key:412,taxonKey:901,scientificName:'Piper betle L.',acceptedScientificName:'Piper betle',taxonRank:'SPECIES',vernacularName:'Betel',eventDate:'2024-04-01',decimalLatitude:-6.22,decimalLongitude:106.82,countryCode:'ID'},
+            {key:413,taxonKey:902,scientificName:'Cocos nucifera L.',acceptedScientificName:'Cocos nucifera',taxonRank:'SPECIES',vernacularName:'Coconut',eventDate:'2025-01-01',decimalLatitude:-6.23,decimalLongitude:106.83,countryCode:'ID'}
+          ]
+        });
+      }
+    };
+  };
+  const nearbyPlants = await api.fetchGbifOccurrences(-6.2,106.8,25,20,{plantOnly:true});
+  assert.equal(nearbyPlants.records.length,2,'plant-only nearby results collapse repeat records for the same taxon');
+  assert.equal(nearbyPlants.records[0].scientificName,'Piper betle','accepted scientific name is preferred when present');
+  assert.equal(nearbyPlants.records[0].taxonRank,'SPECIES','taxonomic rank is retained');
+  assert.equal(plantCalls[0].searchParams.get('kingdomKey'),'6','plant-only query filters to Plantae');
+  assert.equal(plantCalls[0].searchParams.get('taxonRank'),'SPECIES','plant-only query asks for species-level taxa');
+  await api.fetchGbifOccurrences(-6.2,106.8,25,20,{plantOnly:true,forceRefresh:true});
+  assert.equal(plantCalls.length,2,'forceRefresh bypasses the session cache');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence and NASA POWER smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species and NASA POWER smoke tests passed.');
 }
 
 main().catch((error) => {
