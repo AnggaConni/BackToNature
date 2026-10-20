@@ -39,6 +39,9 @@
   var climatePhotoRequestId = 0;
   var climatePhotosLoadedBySelection = {};
   var summarySelection = null;
+  var cropTaxonomyBySelection = {};
+  var cropTaxonomyPendingBySelection = {};
+  var cropTaxonomyStatusBySelection = {};
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -372,6 +375,7 @@
         delete climatePromisesBySelection[key];
         if (currentProvince && climateSelectionKey(currentProvince) === key) {
           updateClimatePreview();
+          if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
           if (el('province-modal').classList.contains('open') && currentTab === 'climate') {
             renderTab('climate');
           }
@@ -1037,6 +1041,116 @@
     return { profile:profile, techList:techList, countryName:countryName, level:level };
   }
 
+  function summaryCropCandidates(selection, profile, climateResult) {
+    var api = window.BackToNatureAPI;
+    var catalog = api && api.getCropCatalog ? api.getCropCatalog() : [];
+    var byId = {};
+    catalog.forEach(function (crop) { byId[crop.id] = crop; });
+    var output = [];
+    var seen = {};
+
+    function addId(id) {
+      var item = byId[id];
+      if (item && !seen[id]) {
+        seen[id] = true;
+        output.push(item);
+      }
+    }
+
+    // A fresh climate profile takes priority because its ranking changes with location.
+    if (climateResult && Array.isArray(climateResult.recommendations) && climateResult.recommendations.length) {
+      climateResult.recommendations.slice(0,4).forEach(function (crop) { addId(crop.id); });
+      if (output.length >= 3) return output;
+    }
+
+    var aliases = {
+      'padi sawah':['rice'],'padi rawa':['rice'],'padi lokal':['rice'],'padi':['rice'],'rice':['rice'],
+      'jagung':['maize'],'maize':['maize'],'corn':['maize'],
+      'sorgum':['sorghum'],'sorghum':['sorghum'],
+      'kacang hijau':['mung-bean'],'mung bean':['mung-bean'],
+      'kacang tanah':['peanut'],'peanut':['peanut'],'groundnut':['peanut'],
+      'kedelai':['soybean'],'soybean':['soybean'],
+      'singkong':['cassava'],'ubi kayu':['cassava'],'cassava':['cassava'],
+      'ubi jalar':['sweet-potato'],'sweet potato':['sweet-potato'],
+      'cabai':['chili'],'cabai rawit':['chili'],'chili':['chili'],'tomat':['tomato'],'tomato':['tomato'],
+      'sayuran daun':['leafy-greens'],'sayuran':['leafy-greens'],'sayuran skala kebun':['leafy-greens'],
+      'kentang':['potato'],'potato':['potato'],
+      'pisang':['banana'],'banana':['banana'],'kelapa':['coconut'],'coconut':['coconut'],
+      'kopi arabika':['coffee-arabica'],'kopi robusta':['coffee-robusta'],
+      'kopi':['coffee-arabica','coffee-robusta'],'arabica coffee':['coffee-arabica'],'robusta coffee':['coffee-robusta'],
+      'kakao':['cacao'],'cokelat':['cacao'],'cocoa':['cacao'],'cacao':['cacao'],
+      'mangga':['mango'],'mango':['mango'],'nanas':['pineapple'],'pineapple':['pineapple'],
+      'sagu':['sago'],'sago':['sago'],'vetiver':['vetiver'],'akar wangi':['vetiver'],
+      'jambu mete':['cashew'],'jambu monyet':['cashew'],'cashew':['cashew'],
+      'asam':['tamarind'],'asam jawa':['tamarind'],'tamarind':['tamarind']
+    };
+    (profile.crops || []).forEach(function (cropName) {
+      var keyName = norm(cropName);
+      var ids = aliases[keyName];
+      if (!ids && /padi|beras/.test(keyName)) ids = ['rice'];
+      if (!ids && /jambu mete|jambu monyet/.test(keyName)) ids = ['cashew'];
+      if (!ids && /asam( jawa)?/.test(keyName)) ids = ['tamarind'];
+      if (!ids && /kacang hijau/.test(keyName)) ids = ['mung-bean'];
+      if (!ids && /kacang kacangan|legumes/.test(keyName)) ids = ['mung-bean','peanut','soybean'];
+      if (!ids && /buah buahan|fruit|tree crops/.test(keyName)) ids = ['mango','banana','cashew'];
+      if (!ids && /umbi lokal|ubi ubian lokal|root crops/.test(keyName)) ids = ['cassava','sweet-potato'];
+      if (ids) ids.forEach(addId);
+    });
+
+    var fallbacks = {
+      'dryland':['maize','sorghum','mung-bean','cashew','tamarind','cassava','peanut'],
+      'humid-upland':['rice','coffee-arabica','coffee-robusta','cacao','banana','sweet-potato'],
+      'peat-wet':['sago','coconut','rice','cassava','pineapple'],
+      'islands':['coconut','cassava','cashew','sweet-potato','mango'],
+      'mixed-island':['cashew','coconut','cassava','maize','cacao'],
+      'irrigated-lowland':['rice','maize','soybean','chili','tomato'],
+      'urban':['leafy-greens','tomato','chili','banana'],
+      'mixed-lowland':['rice','maize','cassava','mung-bean','mango'],
+      'highland':['potato','coffee-arabica','tomato','leafy-greens','chili']
+    };
+    (fallbacks[profile.kind] || fallbacks['mixed-lowland']).forEach(addId);
+    return output;
+  }
+
+  async function loadRegionCropNames(selection) {
+    if (!selection || !window.BackToNatureAPI || !window.BackToNatureAPI.fetchCropTaxonomy) return;
+    var key = climateSelectionKey(selection);
+    var records = cropTaxonomyBySelection[key] || (cropTaxonomyBySelection[key] = {});
+    var pending = cropTaxonomyPendingBySelection[key] || (cropTaxonomyPendingBySelection[key] = {});
+    var context = regionSummaryContext(selection);
+    var climateResult = climateResultsBySelection[key] || null;
+    var crops = summaryCropCandidates(selection, context.profile, climateResult).slice(0,4);
+    var missing = crops.filter(function (crop) { return !records[crop.id] && !pending[crop.id]; });
+    if (!missing.length) {
+      cropTaxonomyStatusBySelection[key] = 'ready';
+      return;
+    }
+    cropTaxonomyStatusBySelection[key] = 'loading';
+    var iso3 = selection.countryIso3 || '';
+    var countryName = context.countryName;
+    await Promise.all(missing.map(async function (crop) {
+      pending[crop.id] = true;
+      try {
+        records[crop.id] = await window.BackToNatureAPI.fetchCropTaxonomy(crop, iso3, countryName);
+      } catch (error) {
+        records[crop.id] = {
+          cropId:crop.id,
+          englishName:crop.name,
+          localName:'',
+          localLanguage:window.BackToNatureAPI.getCountryLanguagePreference(iso3).label,
+          scientificName:crop.scientific,
+          status:'source-unavailable',
+          error:error && error.message ? error.message : 'Taxonomy lookup failed.',
+          sourceUrl:'https://www.gbif.org/species/search?q=' + encodeURIComponent(crop.scientific)
+        };
+      } finally {
+        delete pending[crop.id];
+      }
+    }));
+    cropTaxonomyStatusBySelection[key] = 'ready';
+    if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
+  }
+
   function renderRegionSummary() {
     if (!summarySelection) return '';
     var selection = summarySelection;
@@ -1045,12 +1159,42 @@
     var key = climateSelectionKey(selection);
     var climateResult = climateResultsBySelection[key];
     var climateStatus = climateStatusBySelection[key];
-    var cropCards = (profile.crops || []).slice(0,4).map(function (crop, index) {
-      var icon = /rice|padi/i.test(crop) ? '🌾' :
-        /coffee|kakao|cacao|cocoa|coconut|kelapa|mango|mangga|banana|pisang|tree|kayu/i.test(crop) ? '🌳' :
-        /vegetable|sayur|cabai|chili|potato|kentang|onion|bawang/i.test(crop) ? '🥬' :
-        /legume|bean|kacang/i.test(crop) ? '🫘' : '🌱';
-      return '<article class="region-summary-crop"><span class="region-summary-crop-icon">' + icon + '</span><div><span class="mini-code">STARTER IDEA ' + String(index+1).padStart(2,'0') + '</span><h4>' + esc(crop) + '</h4><p>Investigate local variety, soil, rainfall, water and planting season before deciding.</p></div></article>';
+    var cropObjects = summaryCropCandidates(selection, profile, climateResult).slice(0,4);
+    var nameRecords = cropTaxonomyBySelection[key] || {};
+    var taxonomyStatus = cropTaxonomyStatusBySelection[key] || 'loading';
+    var countryIsoForNames = String(selection.countryIso3 || '').toUpperCase();
+    var languagePref = window.BackToNatureAPI && window.BackToNatureAPI.getCountryLanguagePreference
+      ? window.BackToNatureAPI.getCountryLanguagePreference(countryIsoForNames)
+      : { label:'local language for this country', languages:[] };
+    var cropCards = cropObjects.map(function (crop, index) {
+      var taxonomy = nameRecords[crop.id] || null;
+      var english = taxonomy && taxonomy.englishName || crop.englishName || crop.name;
+      var localName = taxonomy && taxonomy.localName || '';
+      var localLanguage = taxonomy && taxonomy.localLanguage || languagePref.label || 'Local language';
+      var scientific = taxonomy && taxonomy.scientificName || crop.scientificName || crop.scientific || '';
+      var matchUrl = taxonomy && taxonomy.sourceUrl || 'https://www.gbif.org/species/search?q=' + encodeURIComponent(scientific);
+      var nameStatus = taxonomy && taxonomy.status === 'matched' ? 'GBIF TAXON MATCHED' :
+        taxonomy && taxonomy.status === 'broad-group' ? 'BROAD CROP GROUP' :
+        taxonomy && taxonomy.status === 'source-unavailable' ? 'TAXONOMY SOURCE UNAVAILABLE' :
+        taxonomy ? 'TAXON NOT CONFIRMED' : (taxonomyStatus === 'loading' ? 'LOOKING UP NAMES…' : 'VERNACULAR NAME NOT VERIFIED');
+      var icon = /rice|padi/i.test(english) ? '🌾' :
+        /coffee|cacao|cocoa|coconut|mango|banana|cashew|tamarind|tree/i.test(english) ? '🌳' :
+        /vegetable|greens|chili|potato|tomato/i.test(english) ? '🥬' :
+        /legume|bean|peanut|soy/i.test(english) ? '🫘' : '🌱';
+      var localMarkup = localName
+        ? '<p class="crop-name-local"><b>Local (' + esc(localLanguage) + '):</b> ' + esc(localName) + '</p>'
+        : '<p class="crop-name-missing"><b>Local (' + esc(localLanguage) + '):</b> No verified vernacular name found for this country in the current source.</p>';
+      var scientificMarkup = scientific
+        ? '<p class="crop-name-latin"><b>Scientific / Latin:</b> <i>' + esc(scientific) + '</i></p>'
+        : '<p class="crop-name-latin"><b>Scientific / Latin:</b> Species not resolved yet.</p>';
+      return '<article class="region-summary-crop"><span class="region-summary-crop-icon">' + icon + '</span><div class="region-summary-crop-copy">' +
+        '<span class="mini-code">STARTER IDEA ' + String(index+1).padStart(2,'0') + '</span>' +
+        '<h4>' + esc(english) + '</h4>' +
+        '<p class="crop-name-english"><b>English:</b> ' + esc(english) + '</p>' + localMarkup + scientificMarkup +
+        '<span class="crop-taxonomy-status">' + esc(nameStatus) + '</span>' +
+        '<p class="crop-name-note">A candidate to investigate, not an automatic planting prescription.</p>' +
+        '<a class="crop-taxonomy-source" href="' + esc(matchUrl) + '" target="_blank" rel="noopener noreferrer">Check taxonomy / name source ↗</a>' +
+        '</div></article>';
     }).join('');
     var technologyCards = context.techList.slice(0,3).map(function (technology, index) {
       return '<article class="region-summary-tech"><div class="region-summary-tech-title"><span>' + esc(technology.icon || '🛠️') + '</span><h4>' + esc(technology.title) + '</h4></div><p><b>Can help with:</b> ' + esc(technology.problem) + '</p><p>' + esc(technology.action) + '</p></article>';
@@ -1080,7 +1224,7 @@
       '<div class="region-summary-tags"><span>' + esc(context.countryName) + '</span><span>' + esc(context.level) + '</span><span>' + esc(profile.zone) + '</span></div>' +
       '</div>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌾</span><div><div class="mini-code">START HERE</div><h3>Plants worth investigating</h3></div></div>' +
-      '<p>These are first-pass ideas from the regional field guide—not yet a verdict for a particular farm. Elevation, soil tests, drainage, water and local varieties may change the answer.</p>' +
+      '<p>Each crop shows its English name, a country/language-based common name when GBIF records one, and the scientific name. Vernacular names are not available for every species or country. These are candidates to investigate, not a planting guarantee.</p>' +
       '<div class="region-summary-crops">' + cropCards + '</div></section>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🛠️</span><div><div class="mini-code">LOW-REGRET PRACTICES</div><h3>Technologies to consider</h3></div></div>' +
       '<div class="region-summary-tech-grid">' + technologyCards + '</div></section>' +
@@ -1095,6 +1239,7 @@
     var content = el('region-summary-content');
     if (!backdrop || !content || !backdrop.classList.contains('open') || !summarySelection) return;
     content.innerHTML = renderRegionSummary();
+    loadRegionCropNames(summarySelection);
   }
 
   function closeRegionSummary(clearSelection) {
