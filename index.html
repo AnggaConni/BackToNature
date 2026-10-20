@@ -140,6 +140,22 @@
     .crop-season-pill.is-wait{background:#f3d9ce;border-color:#b66d56;color:#873f2b}
     .crop-season-pill.is-unknown{background:#e7e0cd;border-color:#aaa08a;color:#625b4b}
     .crop-season-message{font-size:12px!important;line-height:1.35!important;color:#6a5439}
+    .field-brief-weather-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+    .field-brief-weather-metric{min-width:0;padding:10px;background:#e5eddb;border:2px solid #779064;box-shadow:2px 2px 0 rgba(0,0,0,.08)}
+    .field-brief-weather-metric span,.field-brief-weather-metric b{display:block}
+    .field-brief-weather-metric span{font-size:12px;line-height:1.3;color:#3f5b33}
+    .field-brief-weather-metric b{margin-top:4px;color:#294d2a;font-size:20px;line-height:1.15;overflow-wrap:anywhere}
+    .field-brief-weather-days{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:10px 0}
+    .field-brief-weather-day{display:flex;flex-direction:column;gap:4px;min-width:0;padding:8px;background:#fff3d2;border:2px solid #b99a61;font-size:12px;line-height:1.25}
+    .field-brief-weather-day b{color:#57402a;overflow-wrap:anywhere}
+    .field-brief-weather-day span{display:flex;justify-content:space-between;gap:5px}
+    .field-brief-weather-meaning{padding:9px 11px;background:#eaf0e1;border-left:4px solid #708e53;font-size:14px;line-height:1.45}
+    .field-brief-error{padding:8px 10px;background:#f5d5ca;border-left:4px solid #a65543;font-size:13px}
+    .field-brief-explainer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .field-brief-explainer-card{min-width:0;padding:10px;background:#fff3d2;border:2px solid #b99a61}
+    .field-brief-explainer-card h4{font-size:15px;line-height:1.25;margin:0 0 6px;color:#62472e}
+    .field-brief-explainer-card p{font-size:13px;line-height:1.45;margin:0}
+    .field-brief-method-note{margin:9px 0 0;font-size:12px;line-height:1.45;color:#6e5a3e}
     .climate-current-month{margin:6px 0;padding:6px 8px;background:#f6e6ba;border-left:3px solid #b69a55;font-size:13px;line-height:1.35}
     .climate-current-month.is-open{background:#dce9ce;border-left-color:#63874a}
     .climate-current-month.is-caution{background:#fff0c7;border-left-color:#b79a56}
@@ -650,7 +666,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261021-live-status-fix-v1"></script>
-  <script src="./app.js?v=20261021-live-status-fix-v1"></script>
+  <script src="./api.js?v=20261021-field-brief-intelligence-v1"></script>
+  <script src="./app.js?v=20261021-field-brief-intelligence-v1"></script>
 </body>
 </html>
