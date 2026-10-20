@@ -13,7 +13,7 @@ async function main() {
   // a Sources/ Nature handler calls a missing live-status helper.
   const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   assert.match(appSource, /function\s+setLiveStatus\s*\(/, 'live API status helper is defined');
-  assert.match(appSource, /node\.className\s*=\s*'live-status '\s*\\+\s*normalizedType/, 'live status helper uses the live-status style classes');
+  assert.ok(appSource.includes("node.className = 'live-status ' + normalizedType"), 'live status helper uses the live-status style classes');
   assert.ok((appSource.match(/setLiveStatus\s*\(/g) || []).length > 1, 'live API handlers can call the helper');
   assert.equal(typeof api.listCropRecommendations, 'function', 'crop screener is exported');
   assert.equal(typeof api.searchPlantImages, 'function', 'Commons image search is exported');
