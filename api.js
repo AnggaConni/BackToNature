@@ -946,6 +946,188 @@
     return resolved;
   }
 
+
+  // Lightweight live nature and climate connectors. Results are cached for this page session.
+  var occurrenceRequestCache = {};
+  var nasaMonthlyRequestCache = {};
+  var NASA_POWER_BASE = 'https://power.larc.nasa.gov/api/temporal/monthly/point';
+  var GBIF_OCCURRENCE_BASE = 'https://api.gbif.org/v1/occurrence/search';
+  var NATURE_MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function validateNatureCoordinates(latitude, longitude) {
+    var lat = Number(latitude);
+    var lon = Number(longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+        !Number.isFinite(lon) || lon < -180 || lon > 180) {
+      throw new Error('A valid latitude and longitude are required for this lookup.');
+    }
+    return { latitude:lat, longitude:lon };
+  }
+
+  function natureDistanceKm(lat1, lon1, lat2, lon2) {
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLon = (lon2 - lon1) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+  }
+
+  async function fetchGbifOccurrences(latitude, longitude, requestedRadiusKm, requestedLimit) {
+    var point = validateNatureCoordinates(latitude, longitude);
+    var radiusKm = Math.max(5, Math.min(100, Number(requestedRadiusKm) || 25));
+    var limit = Math.max(1, Math.min(20, Math.round(Number(requestedLimit) || 12)));
+    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + radiusKm + ':' + limit;
+    if (occurrenceRequestCache[cacheKey]) return occurrenceRequestCache[cacheKey];
+
+    var promise = (async function () {
+      // GBIF accepts coordinate range filters. Narrow the rectangular query to a
+      // circle locally so returned records are actually within the displayed radius.
+      var latDelta = radiusKm / 111.32;
+      var cosLat = Math.max(0.05, Math.abs(Math.cos(point.latitude * Math.PI / 180)));
+      var lonDelta = Math.min(180, radiusKm / (111.32 * cosLat));
+      var minLat = Math.max(-90, point.latitude - latDelta);
+      var maxLat = Math.min(90, point.latitude + latDelta);
+      var minLon = Math.max(-180, point.longitude - lonDelta);
+      var maxLon = Math.min(180, point.longitude + lonDelta);
+      var params = new URLSearchParams({
+        decimalLatitude:minLat.toFixed(5) + ',' + maxLat.toFixed(5),
+        decimalLongitude:minLon.toFixed(5) + ',' + maxLon.toFixed(5),
+        hasCoordinate:'true',
+        hasGeospatialIssue:'false',
+        limit:'300',
+        offset:'0'
+      });
+      var payload = await requestJSON(GBIF_OCCURRENCE_BASE + '?' + params.toString());
+      var raw = Array.isArray(payload.results) ? payload.results : [];
+      var records = raw.map(function (record) {
+        var lat = Number(record.decimalLatitude);
+        var lon = Number(record.decimalLongitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        var distanceKm = natureDistanceKm(point.latitude, point.longitude, lat, lon);
+        if (distanceKm > radiusKm) return null;
+        var key = record.key != null ? String(record.key) : '';
+        var taxonKey = record.taxonKey != null ? String(record.taxonKey) : '';
+        return {
+          key:key,
+          taxonKey:taxonKey,
+          scientificName:String(record.scientificName || record.acceptedScientificName || record.species || 'Unidentified taxon'),
+          vernacularName:String(record.vernacularName || ''),
+          eventDate:String(record.eventDate || (record.year ? String(record.year) : '') || ''),
+          locality:String(record.locality || record.verbatimLocality || record.stateProvince || ''),
+          countryCode:String(record.countryCode || ''),
+          basisOfRecord:String(record.basisOfRecord || ''),
+          datasetName:String(record.datasetName || ''),
+          latitude:lat,
+          longitude:lon,
+          distanceKm:Math.round(distanceKm * 10) / 10,
+          sourceUrl:key ? 'https://www.gbif.org/occurrence/' + encodeURIComponent(key) : 'https://www.gbif.org/occurrence/search'
+        };
+      }).filter(Boolean);
+      records.sort(function (a, b) {
+        if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+        return String(b.eventDate).localeCompare(String(a.eventDate));
+      });
+      return {
+        latitude:point.latitude,
+        longitude:point.longitude,
+        radiusKm:radiusKm,
+        searchedAt:new Date().toISOString(),
+        scanned:raw.length,
+        records:records.slice(0, limit),
+        source:'GBIF occurrence search',
+        sourceUrl:'https://www.gbif.org/occurrence/search'
+      };
+    })().catch(function (error) {
+      delete occurrenceRequestCache[cacheKey];
+      throw error;
+    });
+    occurrenceRequestCache[cacheKey] = promise;
+    return promise;
+  }
+
+  async function fetchNasaPowerMonthly(latitude, longitude, requestedYears) {
+    var point = validateNatureCoordinates(latitude, longitude);
+    var years = Math.max(3, Math.min(10, Math.round(Number(requestedYears) || 5)));
+    var currentYear = new Date().getFullYear();
+    var startYear = currentYear - years;
+    var endYear = currentYear - 1;
+    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + years;
+    if (nasaMonthlyRequestCache[cacheKey]) return nasaMonthlyRequestCache[cacheKey];
+
+    var promise = (async function () {
+      var params = new URLSearchParams({
+        parameters:'T2M,T2M_MIN,T2M_MAX,PRECTOTCORR,ALLSKY_SFC_SW_DWN',
+        community:'AG',
+        longitude:point.longitude.toFixed(5),
+        latitude:point.latitude.toFixed(5),
+        start:String(startYear),
+        end:String(endYear),
+        format:'JSON'
+      });
+      var payload = await requestJSON(NASA_POWER_BASE + '?' + params.toString());
+      var parameterData = payload && payload.properties && payload.properties.parameter;
+      if (!parameterData || typeof parameterData !== 'object') {
+        throw new Error('NASA POWER returned an unexpected response structure.');
+      }
+      var temperature = parameterData.T2M || {};
+      var monthlyKeys = Object.keys(temperature).filter(function (key) {
+        if (!/^\d{6}$/.test(key)) return false;
+        var year = Number(key.slice(0, 4));
+        var month = Number(key.slice(4, 6));
+        return year >= startYear && year <= endYear && month >= 1 && month <= 12;
+      }).sort();
+      if (!monthlyKeys.length) throw new Error('NASA POWER returned no monthly values for this point and period.');
+
+      var bins = NATURE_MONTH_LABELS.map(function (label, index) {
+        return { month:index + 1, label:label, t:[], tmin:[], tmax:[], rain:[], solar:[] };
+      });
+      function pushFinite(target, value) {
+        if (value == null) return;
+        var number = Number(value);
+        if (Number.isFinite(number) && number > -900) target.push(number);
+      }
+      monthlyKeys.forEach(function (key) {
+        var monthIndex = Number(key.slice(4, 6)) - 1;
+        pushFinite(bins[monthIndex].t, temperature[key]);
+        pushFinite(bins[monthIndex].tmin, (parameterData.T2M_MIN || {})[key]);
+        pushFinite(bins[monthIndex].tmax, (parameterData.T2M_MAX || {})[key]);
+        pushFinite(bins[monthIndex].rain, (parameterData.PRECTOTCORR || {})[key]);
+        pushFinite(bins[monthIndex].solar, (parameterData.ALLSKY_SFC_SW_DWN || {})[key]);
+      });
+      function average(values) {
+        return values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : null;
+      }
+      var monthly = bins.map(function (bin) {
+        return {
+          month:bin.month,
+          label:bin.label,
+          temperatureMean:average(bin.t),
+          temperatureMin:average(bin.tmin),
+          temperatureMax:average(bin.tmax),
+          precipitationRateMmPerDay:average(bin.rain),
+          solarRadiationKwhM2Day:average(bin.solar)
+        };
+      });
+      return {
+        latitude:point.latitude,
+        longitude:point.longitude,
+        startYear:startYear,
+        endYear:endYear,
+        years:years,
+        monthly:monthly,
+        source:'NASA POWER Monthly Point API',
+        sourceUrl:'https://power.larc.nasa.gov/docs/services/api/temporal/monthly/'
+      };
+    })().catch(function (error) {
+      delete nasaMonthlyRequestCache[cacheKey];
+      throw error;
+    });
+    nasaMonthlyRequestCache[cacheKey] = promise;
+    return promise;
+  }
+
   window.BackToNatureAPI = {
     fetchIndonesiaLandUse: fetchIndonesiaLandUse,
     searchFaoCatalog: searchFaoCatalog,
@@ -956,6 +1138,8 @@
     rankPlantingWindows: rankPlantingWindows,
     getCropCatalog: getCropCatalog,
     getCountryLanguagePreference: getCountryLanguagePreference,
-    fetchCropTaxonomy: fetchCropTaxonomy
+    fetchCropTaxonomy: fetchCropTaxonomy,
+    fetchGbifOccurrences: fetchGbifOccurrences,
+    fetchNasaPowerMonthly: fetchNasaPowerMonthly
   };
 })();
