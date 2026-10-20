@@ -162,6 +162,23 @@
     .region-summary-climate-loading small{display:block;margin-top:4px;font-size:17px;line-height:1.05}
     .region-summary-climate-status{padding:12px;background:#f5dfc5;border:3px solid #b47b43;font-size:18px;line-height:1.12}
     .region-summary-climate-status.is-error{color:#7e3b27}
+
+    .region-summary-nearby{margin-top:14px;padding:12px;background:#e0e9d0;border:3px solid #6b8950;box-shadow:3px 3px 0 rgba(0,0,0,.08)}
+    .region-summary-nearby-heading{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .region-summary-nearby-heading h3{margin:3px 0;color:#34552f;font-size:21px;line-height:1.05}
+    .region-summary-nearby-heading .pixel-btn{flex:none;padding:7px 9px;font-size:11px}
+    .region-summary-nearby>p{margin:7px 0 9px;font-family:'Inter',system-ui,sans-serif;font-size:13px;line-height:1.4}
+    .region-summary-nearby-status{margin:7px 0;padding:7px 9px;background:#f8edcd;border-left:3px solid #6b8950;font-family:'Inter',system-ui,sans-serif;font-size:12px;line-height:1.4}
+    .region-summary-nearby-status.is-error{border-left-color:#a14c3c;color:#82372b}
+    .region-summary-nearby-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+    .region-summary-nearby-plant{min-width:0;padding:9px;background:#fff5d8;border:2px solid #a58b58}
+    .region-summary-nearby-plant-top{display:flex;justify-content:space-between;align-items:center;gap:6px;color:#47653a;font-size:12px;font-weight:700}
+    .region-summary-nearby-plant h4{margin:5px 0 3px;color:#35552c;font-size:16px;line-height:1.1;overflow-wrap:anywhere}
+    .region-summary-nearby-plant p{margin:4px 0;font-family:'Inter',system-ui,sans-serif;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+    .region-summary-nearby-plant i{color:#365879;font-family:Georgia,'Times New Roman',serif}
+    .region-summary-nearby-source{margin-top:8px;font-family:'Inter',system-ui,sans-serif;font-size:11px;color:#665237}
+    .region-summary-nearby-source a{color:#2b5c85;text-decoration:underline}
+
     .region-summary-note{display:flex;gap:10px;padding:12px;background:#f4dfbc;border:3px solid #ad8a57}
     .region-summary-note>span{font-size:26px}
     .region-summary-note p{margin:0;font-size:18px;line-height:1.12}
@@ -546,7 +563,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-nature-v1"></script>
-  <script src="./app.js?v=20261020-nature-v1"></script>
+  <script src="./api.js?v=20261020-nearby-plants-v2"></script>
+  <script src="./app.js?v=20261020-nearby-plants-v2"></script>
 </body>
 </html>

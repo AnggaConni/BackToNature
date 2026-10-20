@@ -82,6 +82,10 @@ The **Nature Data** tab can request monthly NASA POWER agriculture-community par
 
 API documentation: https://power.larc.nasa.gov/docs/services/api/temporal/monthly/
 
+The **Nature Data** tab automatically starts both the nearby GBIF occurrence search and NASA POWER climate lookup the first time it is opened for a selected region. The buttons remain available as **Refresh** actions, including after a previous request fails.
+
+The quick region recommendation modal also includes **Plant species recorded nearby**, which queries species-level Plantae records from GBIF within 25 km of a representative point. This is an occurrence-evidence panel separate from the crop starter recommendations: a nearby record is not proof that a species is suitable for cultivation or will thrive at every site. The modal caches the region's returned records for the page session and provides an explicit refresh control.
+
 Both connectors load only after the user presses a button, use an in-memory page-session cache, and report failures rather than silently replacing missing data with examples. The APIs are accessed directly from the browser; source availability and CORS behavior can differ by environment.
 
 ### Wikimedia Commons — reference plant photos
