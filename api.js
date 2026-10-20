@@ -618,11 +618,29 @@
         if (spaced) selectedWindows.push(window);
       });
       if (!selectedWindows.length) selectedWindows = windows.slice(0,3);
+
+      // Assess the current local calendar month against every establishment window
+      // that includes it. This remains a historical climate screen, not a field calendar.
+      var currentMonthIndex = new Date().getMonth();
+      var currentMonthWindows = windows.filter(function (window) {
+        var offset = (currentMonthIndex - window.monthIndex + 12) % 12;
+        return offset < rule.months;
+      }).sort(function (a, b) {
+        return b.score - a.score || (a.windWarning === b.windWarning ? 0 : (a.windWarning ? 1 : -1));
+      });
+      var currentMonthWindow = currentMonthWindows[0] || null;
+      var currentMonthStatus = !currentMonthWindow ? 'unknown' :
+        (currentMonthWindow.score === 100 && !currentMonthWindow.windWarning ? 'suitable' :
+          (currentMonthWindow.score >= 78 ? 'caution' : 'wait'));
+
       return Object.assign({}, crop, {
         climateRule:rule,
         bestWindows:selectedWindows,
         bestWindow:selectedWindows[0] || null,
         climateScore:selectedWindows.length ? selectedWindows[0].score : 0,
+        currentMonthIndex:currentMonthIndex,
+        currentMonthStatus:currentMonthStatus,
+        currentMonthWindow:currentMonthWindow,
         climateProfile:'provisional temperature and rainfall window'
       });
     }).filter(Boolean).sort(function (a, b) {
