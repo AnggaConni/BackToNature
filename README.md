@@ -126,3 +126,7 @@ The mini-player uses the repository audio file `music/allicante-cozy-game-beats.
 4. Explore **Overview**, **Soil & Land**, **Crops & Farming**, **Technology**, and **Sources**.
 5. Use the mini jukebox to start/pause the uploaded “Cozy Game Beats — Alicante” track, adjust volume, mute or scrub the timeline. Audio never starts until the Play button is pressed.
 6. In Sources, request FAOSTAT or the FAO catalogue. Enter a WOCAT token only if you have authorized access.
+
+
+### District navigation in the Quick Field Brief
+The Quick Field Brief footer now offers a direct **View Districts / View Kabupaten & Cities** action when ADM2 boundaries are available for the selected country. The Detailed Fieldbook retains the same drill-down action. The direct action closes the brief and opens the district map, avoiding the need to discover the button in a second modal.

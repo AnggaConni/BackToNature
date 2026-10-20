@@ -1547,11 +1547,71 @@
       '<section class="region-summary-note"><span>📌</span><p><b>Before investing:</b> confirm actual soil conditions and water access, then check local planting calendars, seed availability, weather warnings, market access and advice from local agricultural extension services.</p></section>';
   }
 
+  function updateRegionSummaryDistrictButton() {
+    var button = el('region-summary-districts');
+    if (!button) return;
+    var selection = summarySelection;
+    var country = selection && String(selection.countryIso3 || '').toUpperCase();
+    var entry = country && adm2Index && adm2Index.countries ? adm2Index.countries[country] : null;
+    var available = !!(selection && Number(selection.adminLevel) === 1 && entry && entry.file);
+    button.hidden = !available;
+    button.disabled = false;
+    button.textContent = country === 'IDN' ? '🏘 VIEW KABUPATEN / CITIES' : '🏘 VIEW DISTRICTS';
+    button.title = country === 'IDN'
+      ? 'Open the map of regencies and cities (ADM2)'
+      : 'Open second-level administrative areas (ADM2)';
+  }
+
+  function openSummaryDistricts() {
+    var selection = summarySelection;
+    if (!selection || Number(selection.adminLevel) !== 1) return;
+    var country = String(selection.countryIso3 || '').toUpperCase();
+    var button = el('region-summary-districts');
+
+    if (!adm2Index) {
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'LOADING DISTRICT DATA…';
+      }
+      ensureBoundaryIndexes().then(function () {
+        updateRegionSummaryDistrictButton();
+        if (summarySelection === selection) openSummaryDistricts();
+      }).catch(function () {
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'DISTRICTS UNAVAILABLE';
+          button.title = 'Could not load district availability metadata. Close this dialog and retry.';
+        }
+      });
+      return;
+    }
+
+    var entry = adm2Index.countries && adm2Index.countries[country];
+    if (!country || !entry || !entry.file) {
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'DISTRICTS NOT AVAILABLE';
+      }
+      return;
+    }
+
+    var bounds = null;
+    if (provinceLayer && selection.feature) {
+      provinceLayer.eachLayer(function (layer) {
+        if (layer.feature === selection.feature && layer.getBounds) bounds = layer.getBounds();
+      });
+    }
+    closeRegionSummary(false);
+    summarySelection = null;
+    enterDistrictMode(country, selection.countryName || (countryByISO3[country] && countryByISO3[country].name) || country, bounds);
+  }
+
   function updateRegionSummary() {
     var backdrop = el('region-summary-modal');
     var content = el('region-summary-content');
     if (!backdrop || !content || !backdrop.classList.contains('open') || !summarySelection) return;
     content.innerHTML = renderRegionSummary();
+    updateRegionSummaryDistrictButton();
     wireSummaryNearbyPlantControls();
     loadRegionCropNames(summarySelection);
     loadSummaryNearbyPlantRecords(summarySelection);
@@ -1650,6 +1710,8 @@
   el('modal-close').addEventListener('click', closeModal);
   el('region-summary-close').addEventListener('click', function () { closeRegionSummary(true); });
   el('region-summary-details').addEventListener('click', openDetailedFieldbook);
+  var summaryDistrictButton = el('region-summary-districts');
+  if (summaryDistrictButton) summaryDistrictButton.addEventListener('click', openSummaryDistricts);
   el('region-summary-modal').addEventListener('click', function (event) {
     if (event.target === el('region-summary-modal')) closeRegionSummary(true);
   });
