@@ -184,6 +184,9 @@
     .region-summary-note p{margin:0;font-size:18px;line-height:1.12}
     .region-summary-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#cfb07b;border-top:4px solid #765230;font-size:17px;line-height:1.05}
     .region-summary-footer .pixel-btn{flex:none}
+    .region-summary-footer-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+    .region-summary-footer-actions .pixel-btn{max-width:100%;white-space:normal;text-align:center}
+    .region-summary-footer-actions [hidden]{display:none!important}
     .modal-shell{width:100vw;height:100dvh;max-height:100dvh;display:flex;flex-direction:column;background:var(--paper);border:8px solid #51321f;box-shadow:inset 0 0 0 4px #bb915c;color:var(--ink);overflow:hidden}
     .modal-header{flex:none;display:flex;gap:14px;justify-content:space-between;align-items:center;padding:13px 18px;background:linear-gradient(#315b91,#193a66);border-bottom:5px solid #102747;color:#fff1c9;box-shadow:inset 0 -2px #6587b1}
     .modal-heading{display:flex;gap:13px;align-items:center;min-width:0}
@@ -437,7 +440,13 @@
       .soil-profile{padding:12px;gap:10px}.soil-profile-icon{font-size:32px}.soil-profile h3{font-size:24px}.source-strip{padding:12px}
       .checklist-card{grid-template-columns:39px minmax(0,1fr);column-gap:8px}.check-number{width:35px;height:35px;font-size:9px}.crop-glyph{width:45px;height:45px;font-size:25px}
     }
-  </style>
+  
+    @media (max-width: 620px) {
+      .region-summary-footer{align-items:stretch;flex-direction:column;gap:8px}
+      .region-summary-footer-actions{display:grid;grid-template-columns:1fr;justify-content:stretch}
+      .region-summary-footer-actions .pixel-btn{width:100%;font-size:10px;padding:9px 7px}
+    }
+</style>
 </head>
 <body>
   <div id="map" role="application" aria-label="Interactive world, region and district map"></div>
@@ -535,7 +544,10 @@
       <main id="region-summary-content" class="region-summary-content"></main>
       <footer class="region-summary-footer">
         <span>🌱 First-pass guidance · verify conditions on the actual plot</span>
-        <button id="region-summary-details" class="pixel-btn green" type="button">📖 DETAILED FIELDBOOK →</button>
+        <div class="region-summary-footer-actions">
+          <button id="region-summary-districts" class="pixel-btn" type="button" hidden>🏘 VIEW DISTRICTS</button>
+          <button id="region-summary-details" class="pixel-btn green" type="button">📖 DETAILED FIELDBOOK →</button>
+        </div>
       </footer>
     </section>
   </div>
@@ -563,7 +575,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-nearby-plants-v2"></script>
-  <script src="./app.js?v=20261020-nearby-plants-v2"></script>
+  <script src="./api.js?v=20261020-district-nav-v1"></script>
+  <script src="./app.js?v=20261020-district-nav-v1"></script>
 </body>
 </html>
