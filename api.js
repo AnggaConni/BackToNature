@@ -1021,7 +1021,8 @@
         return {
           key:key,
           taxonKey:taxonKey,
-          scientificName:String(record.scientificName || record.acceptedScientificName || record.species || 'Unidentified taxon'),
+          scientificName:String(record.acceptedScientificName || record.scientificName || record.species || 'Unidentified taxon'),
+          taxonRank:String(record.taxonRank || ''),
           vernacularName:String(record.vernacularName || ''),
           eventDate:String(record.eventDate || (record.year ? String(record.year) : '') || ''),
           locality:String(record.locality || record.verbatimLocality || record.stateProvince || ''),
