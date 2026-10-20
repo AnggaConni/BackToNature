@@ -24,9 +24,13 @@
     opacity:0.76,
     attribution:'&copy; ESA WorldCover 2021 / Contains modified Copernicus Sentinel data'
   });
+  // Observation points appear after live GBIF/iNaturalist data has loaded in Nature Data.
+  var natureObservationLayer = L.layerGroup();
   L.control.layers(null, {
-    'ESA WorldCover 2021 · land cover':esaWorldCover2021Layer
+    'ESA WorldCover 2021 · land cover':esaWorldCover2021Layer,
+    'Species observations · GBIF + iNaturalist':natureObservationLayer
   }, { collapsed:true, position:'topright' }).addTo(map);
+  var natureObservationLayerSelectionKey = '';
 
   var worldLayer = null;
   var provinceLayer = null;
@@ -72,6 +76,13 @@
   var natureWaporRequestId = 0;
   var plantNetRequestId = 0;
   var naturePowerRequestId = 0;
+
+
+  function clearNatureObservationMarkers() {
+    if (natureObservationLayer) natureObservationLayer.clearLayers();
+    natureObservationLayerSelectionKey = '';
+    if (natureObservationLayer && map.hasLayer(natureObservationLayer)) map.removeLayer(natureObservationLayer);
+  }
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -1154,6 +1165,78 @@
     '<p class="nature-method-note">Catalog metadata loaded at ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. The links list source raster metadata; this panel does not claim to have extracted a value for this point.</p>';
   }
 
+
+  function renderNatureObservationMarkers(selectionKey) {
+    if (!natureObservationLayer || !map || !selectionKey) return;
+    natureObservationLayer.clearLayers();
+    natureObservationLayerSelectionKey = selectionKey;
+    var gbif = natureOccurrenceDataBySelection[selectionKey];
+    var inat = natureINaturalistDataBySelection[selectionKey];
+    var markerCount = 0;
+    var seen = {};
+
+    function addRecord(record, source) {
+      if (!record) return;
+      var latitude = Number(record.latitude);
+      var longitude = Number(record.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+          latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return;
+      var sourceId = String(record.key || record.id || '');
+      var scientificName = String(record.scientificName || 'Unidentified species');
+      var date = String(record.eventDate || record.observedOn || '');
+      var recordKey = source + ':' + (sourceId || scientificName.toLowerCase() + ':' + latitude.toFixed(5) + ':' + longitude.toFixed(5));
+      if (seen[recordKey]) return;
+      seen[recordKey] = true;
+
+      var commonName = String(record.vernacularName || record.commonName || '');
+      var displayName = commonName || scientificName;
+      var distance = Number(record.distanceKm);
+      var distanceText = Number.isFinite(distance) ? distance.toFixed(1) + ' km from representative point' : 'Distance not supplied';
+      var sourceUrl = safeHttps(record.sourceUrl || record.uri);
+      var taxonUrl = safeHttps(record.taxonUrl ||
+        (/^\\d+$/.test(String(record.taxonKey || '')) ? 'https://www.gbif.org/species/' + record.taxonKey : sourceUrl));
+      var detailLines = [
+        '<div class="nature-map-popup">',
+        '<div class="nature-map-popup-source">' + (source === 'GBIF' ? 'GBIF OCCURRENCE' : 'iNATURALIST OBSERVATION') + '</div>',
+        '<h3>' + esc(displayName) + '</h3>',
+        '<p class="nature-map-popup-scientific"><i>' + esc(scientificName) + '</i></p>',
+        date ? '<p><b>Observed / recorded:</b> ' + esc(date) + '</p>' : '',
+        '<p>' + esc(distanceText) + '</p>',
+        source === 'GBIF' && record.locality ? '<p>' + esc(record.locality) + '</p>' : '',
+        source === 'iNaturalist' && record.place ? '<p>' + esc(record.place) + '</p>' : '',
+        source === 'iNaturalist' && record.observer ? '<p><b>Observer:</b> ' + esc(record.observer) + '</p>' : '',
+        '<p class="nature-map-popup-note">A reported observation, not a complete species distribution or crop-suitability assessment.</p>',
+        '<div class="nature-map-popup-links">',
+        sourceUrl !== '#' ? '<a href="' + esc(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Open source record ↗</a>' : '',
+        taxonUrl !== '#' ? '<a href="' + esc(taxonUrl) + '" target="_blank" rel="noopener noreferrer">Open taxon ↗</a>' : '',
+        '</div></div>'
+      ].filter(Boolean).join('');
+      var isGbif = source === 'GBIF';
+      var marker = L.circleMarker([latitude,longitude], {
+        radius:isGbif ? 7 : 6,
+        color:isGbif ? '#2e6b45' : '#2367a8',
+        weight:2,
+        fillColor:isGbif ? '#70b778' : '#6ab5ef',
+        fillOpacity:0.9,
+        opacity:1
+      });
+      marker.bindTooltip(esc(displayName), { direction:'top', sticky:true, className:'retro-tooltip' });
+      marker.bindPopup(detailLines, { maxWidth:300, minWidth:220, autoPan:true });
+      marker.addTo(natureObservationLayer);
+      markerCount += 1;
+    }
+
+    (gbif && Array.isArray(gbif.records) ? gbif.records : []).forEach(function (record) { addRecord(record,'GBIF'); });
+    (inat && Array.isArray(inat.records) ? inat.records : []).forEach(function (record) { addRecord(record,'iNaturalist'); });
+
+    if (markerCount) {
+      natureObservationLayer.addTo(map);
+    } else if (map.hasLayer(natureObservationLayer)) {
+      map.removeLayer(natureObservationLayer);
+    }
+    return markerCount;
+  }
+
   function renderNatureExplorer(profile) {
     var key = climateSelectionKey(currentProvince);
     var occurrenceData = natureOccurrenceDataBySelection[key];
@@ -1171,7 +1254,8 @@
     var pointText = point ? (Number(point.latitude).toFixed(4) + ', ' + Number(point.longitude).toFixed(4)) : 'representative point unavailable';
     return '<div class="tab-intro"><div class="eyebrow">NATURE & CLIMATE / LIVE DATA</div>' +
       '<h2>Explore nearby life and climate 🌿</h2>' +
-      '<p>Detailed evidence for <b>' + esc(region) + '</b>. Live searches use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p></div>' +
+      '<p>Detailed evidence for <b>' + esc(region) + '</b>. Live searches use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p>' +
+      '<p class="nature-map-hint">Map markers appear as each source loads. Close this fieldbook to click a point; use the top-right map layer control to show or hide observations.</p></div>' +
       '<div class="tile-grid nature-connectors-grid">' +
       '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌱</span><span class="mini-code">GBIF / PLANT OCCURRENCES</span></div>' +
       '<h3>Plant species recorded nearby</h3><p>Species-level, georeferenced plant records from GBIF within 25 km. Records document reported occurrence, not crop suitability or abundance.</p>' +
@@ -1225,6 +1309,7 @@
     if (!selection) return;
     var key = climateSelectionKey(selection);
     var point = geometryCentroid(selection.feature);
+    renderNatureObservationMarkers(key);
 
     function updateAsyncConnector(config) {
       var button = el(config.buttonId);
@@ -1248,6 +1333,7 @@
           var result = await api[config.method].apply(api, config.args(point, true));
           if (requestId !== config.requestCounter.value || currentProvince !== selection) return;
           config.dataStore[key] = result;
+          if (typeof config.onSuccess === 'function') config.onSuccess(result, key, selection);
           config.statusStore[key] = { type:'success', message:config.successMessage(result) };
           if (currentTab === 'nature') {
             setLiveStatus(config.statusId, config.statusStore[key].message, 'success');
@@ -1281,7 +1367,8 @@
       loadingMessage:'Searching GBIF for plant species records…',
       successMessage:function(d){return (d.records||[]).length+' distinct nearby plant taxa returned by GBIF.';},
       failureMessage:'GBIF plant search failed.',
-      render:renderNatureOccurrenceCards
+      render:renderNatureOccurrenceCards,
+      onSuccess:function(){renderNatureObservationMarkers(key);}
     });
     updateAsyncConnector({
       buttonId:'nature-inat-btn', statusId:'nature-inat-status', resultsId:'nature-inat-results',
@@ -1292,7 +1379,8 @@
       loadingMessage:'Searching iNaturalist for recent research-grade plant observations…',
       successMessage:function(d){return (d.records||[]).length+' distinct nearby plant taxa returned by iNaturalist.';},
       failureMessage:'iNaturalist search failed.',
-      render:renderINaturalistPlantRecords
+      render:renderINaturalistPlantRecords,
+      onSuccess:function(){renderNatureObservationMarkers(key);}
     });
     updateAsyncConnector({
       buttonId:'nature-power-btn', statusId:'nature-power-status', resultsId:'nature-power-results',
@@ -1711,6 +1799,7 @@
   }
 
   function showRegionSummary(name, feature, context) {
+    clearNatureObservationMarkers();
     var summary = Object.assign({ name:name, feature:feature || null, adminLevel:activeAdminLevel }, context || {});
     summary.feature = feature || summary.feature || null;
     summary.name = name;
@@ -2012,6 +2101,7 @@
   }
 
   async function enterCountryMode(iso3, countryName, focusBounds) {
+    clearNatureObservationMarkers();
     var requestId = ++adminLoadRequestId;
     closeModal();
     hideMapStatus();
@@ -2038,6 +2128,7 @@
   }
 
   async function enterDistrictMode(iso3, countryName, focusBounds) {
+    clearNatureObservationMarkers();
     var requestId = ++adminLoadRequestId;
     closeModal();
     hideMapStatus();
@@ -2064,6 +2155,7 @@
   }
 
   function enterWorldMode() {
+    clearNatureObservationMarkers();
     ++adminLoadRequestId;
     closeModal();
     mode = 'world';

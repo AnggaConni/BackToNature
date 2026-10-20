@@ -154,3 +154,9 @@ Official references:
 
 
 The Open-Meteo seven-day outlook also requests the modelled topsoil moisture (0–7 cm), topsoil temperature (0–7 cm), and vapour-pressure deficit series. Hourly values are averaged by local forecast date and displayed in the Detailed Nature Data tab. These forecast/model variables are location-grid estimates and must not be presented as in-situ soil readings; field decisions should be confirmed with soil moisture probes or field observations.
+
+
+### Clickable species observations on the map
+When the Nature Data tab retrieves GBIF and iNaturalist plant observations, the application adds the returned coordinates as clickable Leaflet circle markers. GBIF points and iNaturalist points use different colours; each popup shows source, common/scientific name, record date when supplied, distance from the regional representative point, and links to the source record/taxon. The layer can be toggled from the map's top-right layer control. It is cleared when users select another region or change map scale so observations from a previous selection do not appear to belong to the new area.
+
+Markers are created only for georeferenced API records with valid coordinates. A lack of markers is not proof that the area lacks a species, because observation coverage and reporting effort vary. The points show reported observations, not full distribution boundaries, abundance, or crop-suitability.
