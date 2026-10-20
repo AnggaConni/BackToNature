@@ -1547,6 +1547,162 @@
     return promise;
   }
 
+
+  // Public FAO FPMA food-price API: no key/login. Keep per-query traffic bounded.
+  var FAO_FPMA_BASE = 'https://fpma.fao.org/giews/v4/global/price_module/api/v1';
+
+  function fpmaText(record, candidates) {
+    if (!record || typeof record !== 'object') return '';
+    var keys = Object.keys(record);
+    for (var i = 0; i < candidates.length; i++) {
+      for (var j = 0; j < keys.length; j++) {
+        if (keys[j].toLowerCase() === candidates[i].toLowerCase() &&
+            record[keys[j]] != null && record[keys[j]] !== '') {
+          var value = record[keys[j]];
+          if (typeof value === 'string' || typeof value === 'number') return String(value);
+        }
+      }
+    }
+    return '';
+  }
+
+  function fpmaPeriodicity(series) {
+    var periods = Array.isArray(series && series.periodicity) ? series.periodicity : [];
+    var names = periods.map(function (item) {
+      return typeof item === 'string' ? item.toLowerCase() : String(item && (item.period || item.name) || '').toLowerCase();
+    });
+    var preferred = ['monthly','weekly','daily'];
+    for (var i = 0; i < preferred.length; i++) {
+      if (names.indexOf(preferred[i]) >= 0) return preferred[i];
+    }
+    return names[0] || 'monthly';
+  }
+
+  function summarizeFpmaPrices(points) {
+    var clean = (Array.isArray(points) ? points : []).filter(function (point) {
+      return point && point.date && Number.isFinite(Date.parse(point.date));
+    }).slice().sort(function (a, b) {
+      return Date.parse(a.date) - Date.parse(b.date);
+    });
+    var latest = clean.length ? clean[clean.length - 1] : null;
+    var latestValue = latest && Number(latest.price_value);
+    var reference = null;
+    if (latest) {
+      var target = Date.parse(latest.date) - 90 * 24 * 60 * 60 * 1000;
+      clean.forEach(function (point) {
+        if (Date.parse(point.date) <= target) reference = point;
+      });
+      if (!reference && clean.length > 1) reference = clean[0];
+    }
+    var referenceValue = reference && Number(reference.price_value);
+    var changePct = latest && reference &&
+      Number.isFinite(latestValue) && Number.isFinite(referenceValue) && referenceValue !== 0
+      ? ((latestValue - referenceValue) / referenceValue) * 100 : null;
+    return {
+      latest:latest,
+      reference:reference,
+      changePct:Number.isFinite(changePct) ? changePct : null,
+      points:clean.slice(-24)
+    };
+  }
+
+  async function fetchFaoFoodPrices(iso3, commodityQuery) {
+    var country = String(iso3 || '').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(country)) throw new Error('A valid ISO-3 country code is required for FAO FPMA.');
+    var query = String(commodityQuery || 'rice').trim().toLowerCase();
+    var allSeries = [];
+    var page = 1;
+    var morePages = true;
+    // Three pages bounds metadata traffic to at most 300 series for this search.
+    while (morePages && page <= 3) {
+      var params = new URLSearchParams({
+        iso3_country_codes:country,
+        page_size:'100',
+        page:String(page)
+      });
+      var payload = await requestJSON(FAO_FPMA_BASE + '/FpmaSerie/?' + params.toString());
+      var pageRows = payload && Array.isArray(payload.results) ? payload.results : [];
+      allSeries = allSeries.concat(pageRows);
+      morePages = !!(payload && payload.next && pageRows.length);
+      page += 1;
+    }
+
+    var candidates = allSeries.filter(function (series) {
+      var commodity = fpmaText(series, ['commodity','commodity_name','commodity_label','product','product_name','name']);
+      return !query || commodity.toLowerCase().indexOf(query) >= 0;
+    });
+    candidates.sort(function (a, b) {
+      var aName = fpmaText(a, ['commodity','commodity_name','commodity_label','product','product_name','name']);
+      var bName = fpmaText(b, ['commodity','commodity_name','commodity_label','product','product_name','name']);
+      var aExact = aName.toLowerCase() === query ? 0 : 1;
+      var bExact = bName.toLowerCase() === query ? 0 : 1;
+      return aExact - bExact || aName.localeCompare(bName);
+    });
+    var chosen = candidates.slice(0, 4);
+    if (!chosen.length) {
+      return {countryIso3:country,query:query,series:[],searchedSeries:allSeries.length,retrievedAt:new Date().toISOString(),errors:[]};
+    }
+
+    var fetched = await Promise.allSettled(chosen.map(async function (source) {
+      var uuid = fpmaText(source, ['uuid','id']);
+      if (!uuid) throw new Error('The FAO FPMA source series did not include a UUID.');
+      var periodicity = fpmaPeriodicity(source);
+      var params = new URLSearchParams({uuid__in:uuid,periodicity:periodicity,page_size:'100'});
+      var response = await requestJSON(FAO_FPMA_BASE + '/FpmaSeriePrice/?' + params.toString());
+      var resultRows = response && Array.isArray(response.results) ? response.results : [];
+      var priceSeries = resultRows.find(function (row) { return String(row.uuid || '') === uuid; }) || resultRows[0] || {};
+      var datapoints = Array.isArray(priceSeries.datapoints) ? priceSeries.datapoints :
+        (Array.isArray(priceSeries.prices) ? priceSeries.prices : []);
+      var summary = summarizeFpmaPrices(datapoints);
+      return {
+        uuid:uuid,
+        commodity:fpmaText(source, ['commodity','commodity_name','commodity_label','product','product_name','name']) || 'Unlabelled commodity',
+        priceType:fpmaText(source, ['price_type','price_type_name','priceType']),
+        market:fpmaText(source, ['market','market_name','market_type','admin_unit_name','administrative_unit','admin_units','region']),
+        currency:fpmaText(source, ['currency','currency_code','currency_iso_code']),
+        unit:fpmaText(source, ['measure_unit_label','measure_unit','unit','unit_label']),
+        periodicity:periodicity,
+        observationCount:summary.points.length,
+        latest:summary.latest ? {
+          date:summary.latest.date,
+          value:Number.isFinite(Number(summary.latest.price_value)) ? Number(summary.latest.price_value) : null,
+          valueUsd:summary.latest.price_value_dollar == null ? null : Number(summary.latest.price_value_dollar),
+          realValue:summary.latest.price_value_real == null ? null : Number(summary.latest.price_value_real)
+        } : null,
+        reference:summary.reference ? {
+          date:summary.reference.date,
+          value:Number.isFinite(Number(summary.reference.price_value)) ? Number(summary.reference.price_value) : null
+        } : null,
+        changePct90d:summary.changePct,
+        prices:summary.points.map(function (point) {
+          return {
+            date:String(point.date),
+            value:point.price_value == null ? null : Number(point.price_value),
+            valueUsd:point.price_value_dollar == null ? null : Number(point.price_value_dollar)
+          };
+        })
+      };
+    }));
+    var records = [];
+    var errors = [];
+    fetched.forEach(function (result, index) {
+      if (result.status === 'fulfilled') records.push(result.value);
+      else errors.push({
+        commodity:fpmaText(chosen[index], ['commodity','commodity_name','commodity_label','product','product_name','name']) || 'Series ' + (index + 1),
+        message:result.reason && result.reason.message ? result.reason.message : 'Price series request failed'
+      });
+    });
+    return {
+      countryIso3:country,
+      query:query,
+      series:records,
+      searchedSeries:allSeries.length,
+      retrievedAt:new Date().toISOString(),
+      errors:errors,
+      sourceUrl:'https://fpma.fao.org/giews/v4/global/swagger/'
+    };
+  }
+
   var COUNTRY_SOURCE_REGISTRY = {
     IDN:[
       {title:'BPS — provincial paddy statistics',description:'Official harvested area, productivity and production tables for Indonesian provinces.',url:'https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html',kind:'Official statistics table',access:'Free table'},
@@ -1629,6 +1785,7 @@
     identifyPlantWithPlantNet: identifyPlantWithPlantNet,
     fetchWaporMapsets: fetchWaporMapsets,
     getCountrySourceCatalog: getCountrySourceCatalog,
-    fetchWorldBankAgricultureSnapshot: fetchWorldBankAgricultureSnapshot
+    fetchWorldBankAgricultureSnapshot: fetchWorldBankAgricultureSnapshot,
+    fetchFaoFoodPrices: fetchFaoFoodPrices
   };
 })();
