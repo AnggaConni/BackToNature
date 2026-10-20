@@ -1263,6 +1263,7 @@
         latitude:point.latitude.toFixed(5),
         longitude:point.longitude.toFixed(5),
         daily:'temperature_2m_mean,temperature_2m_min,temperature_2m_max,precipitation_sum,et0_fao_evapotranspiration',
+        hourly:'soil_moisture_0_to_7cm,soil_temperature_0_to_7cm,vapour_pressure_deficit',
         forecast_days:'7',
         timezone:'auto',
         temperature_unit:'celsius',
@@ -1274,9 +1275,31 @@
       if (!daily || !Array.isArray(daily.time) || !daily.time.length) {
         throw new Error('Open-Meteo returned no daily outlook for this point.');
       }
+      var hourly = payload && payload.hourly || {};
+      var hourlyByDate = {};
+      function addHourlyValue(date, key, value) {
+        if (value == null || !Number.isFinite(Number(value))) return;
+        if (!hourlyByDate[date]) hourlyByDate[date] = { soilMoisture:[], soilTemperature:[], vpd:[] };
+        if (key === 'soil_moisture_0_to_7cm') hourlyByDate[date].soilMoisture.push(Number(value));
+        if (key === 'soil_temperature_0_to_7cm') hourlyByDate[date].soilTemperature.push(Number(value));
+        if (key === 'vapour_pressure_deficit') hourlyByDate[date].vpd.push(Number(value));
+      }
+      (Array.isArray(hourly.time) ? hourly.time : []).forEach(function (stamp, hourIndex) {
+        var date = String(stamp).slice(0,10);
+        addHourlyValue(date,'soil_moisture_0_to_7cm',(hourly.soil_moisture_0_to_7cm || [])[hourIndex]);
+        addHourlyValue(date,'soil_temperature_0_to_7cm',(hourly.soil_temperature_0_to_7cm || [])[hourIndex]);
+        addHourlyValue(date,'vapour_pressure_deficit',(hourly.vapour_pressure_deficit || [])[hourIndex]);
+      });
+      function average(values) {
+        return values && values.length ? values.reduce(function (sum, value) { return sum + value; }, 0) / values.length : null;
+      }
       var days = daily.time.map(function (date, index) {
         var rain = daily.precipitation_sum && daily.precipitation_sum[index] != null ? Number(daily.precipitation_sum[index]) : null;
         var et0 = daily.et0_fao_evapotranspiration && daily.et0_fao_evapotranspiration[index] != null ? Number(daily.et0_fao_evapotranspiration[index]) : null;
+        var soil = hourlyByDate[String(date)] || {};
+        var moisture = average(soil.soilMoisture);
+        var soilTemperature = average(soil.soilTemperature);
+        var vpd = average(soil.vpd);
         return {
           date:String(date),
           temperatureMean:daily.temperature_2m_mean && daily.temperature_2m_mean[index] != null ? Number(daily.temperature_2m_mean[index]) : null,
@@ -1284,7 +1307,10 @@
           temperatureMax:daily.temperature_2m_max && daily.temperature_2m_max[index] != null ? Number(daily.temperature_2m_max[index]) : null,
           precipitationMm:rain != null && Number.isFinite(rain) ? rain : null,
           referenceEt0Mm:et0 != null && Number.isFinite(et0) ? et0 : null,
-          waterBalanceMm:rain != null && et0 != null && Number.isFinite(rain) && Number.isFinite(et0) ? Math.round((rain-et0)*10)/10 : null
+          waterBalanceMm:rain != null && et0 != null && Number.isFinite(rain) && Number.isFinite(et0) ? Math.round((rain-et0)*10)/10 : null,
+          soilMoistureTopM3M3:moisture == null ? null : Math.round(moisture*10000)/10000,
+          soilTemperatureTopC:soilTemperature == null ? null : Math.round(soilTemperature*10)/10,
+          vapourPressureDeficitKpa:vpd == null ? null : Math.round(vpd*100)/100
         };
       });
       return {
