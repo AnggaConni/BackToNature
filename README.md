@@ -94,6 +94,19 @@ The Crop & Soil Lab queries the Wikimedia Commons MediaWiki API for reference ph
 ### SoilGrids and FAO ECOCROP — future evidence connectors
 ISRIC SoilGrids has a public REST API for selected soil properties at a supplied coordinate, but it is still described as beta and applies a fair-use limit. The current interface does not infer soil conditions from a province polygon; users enter their own soil observations, and the optional numeric pH should come from a real soil test. FAO ECOCROP provides crop environmental requirements through the GAEZ platform/web interface, but the legacy database was discontinued as a standalone database and no supported public API is assumed by this app. These are potential next-step data sources after their access and output schemas are verified.
 
+### FAO FPMA — public food-price API (no login)
+The Sources tab includes a live FAO FPMA price panel. It queries the public `FpmaSerie` endpoint filtered by the selected country's ISO-3 code, searches up to three pages of series metadata, then requests history for at most four matching series. No API key, login or token is sent. Enter a commodity keyword such as `rice`, `maize`, `wheat` or `beans`.
+
+Each series preserves the publisher's currency, unit, market/price type and date. The panel shows the latest populated observation and, where comparable points exist, an approximately 90-day change against the closest earlier observation. It is descriptive, not a forecast or an explanation of causality. Series coverage differs by country/commodity; a missing series is not a zero price. Failures are reported and no example values are substituted. Browser access still depends on the public server's CORS configuration.
+
+Official API documentation:
+- Introduction and no-authentication public API: https://fpma-documentation.web.app/docs/api-docs/intro/
+- Series metadata and ISO-3 filtering: https://fpma-documentation.web.app/docs/api-docs/time-series/
+- Price history endpoint and units: https://fpma-documentation.web.app/docs/api-docs/series-price/
+
+### Sources tab rendering fix
+The source/photo links used `safeHttps()`, but that helper was missing from the app bundle. Its absence threw during `renderSources()`, making Sources appear unresponsive. The helper is now defined centrally; external links are restricted to HTTPS, and a tab-rendering failure produces an explicit on-screen message instead of a silent no-op.
+
 ### BPS — province-level paddy statistics
 The Overview tab links to BPS's official table for harvested area, productivity and production of paddy by province. The values are not copied into the site as fabricated or manually inferred figures; open the source table to verify the year and units.
 
