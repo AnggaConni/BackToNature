@@ -167,6 +167,16 @@
     .plantnet-result-copy p{margin:4px 0;font-size:12px;line-height:1.35}
     .plantnet-powered-logo{display:block;width:min(245px,100%);height:auto;margin:10px auto 0}
     .nature-method-note{margin-top:8px;font-size:12px;line-height:1.4}
+
+    .wapor-panel{margin-top:18px;padding:14px;background:#eee5c8;border:3px solid #967448}
+    .wapor-mapset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
+    .wapor-mapset-card{min-width:0;padding:9px;background:#fff5d8;border:2px solid #ad925a}
+    .wapor-mapset-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+    .wapor-level-tag{padding:3px 5px;background:#dce9ce;border:1px solid #75945c;font-size:10px;font-weight:700}
+    .wapor-mapset-card h4{margin:7px 0;font-size:15px;line-height:1.25;color:#36552e;overflow-wrap:anywhere}
+    .wapor-mapset-meta{display:flex;gap:5px;flex-wrap:wrap}
+    .wapor-mapset-meta span{padding:3px 5px;background:#ece0bd;font-size:10px;color:#6b5234}
+    .wapor-mapset-card p{margin:7px 0;font-size:12px;line-height:1.35}
     .region-summary-crop-icon{display:grid;place-items:center;flex:none;width:43px;height:43px;background:#dbe7c7;border:2px solid #76925a;font-size:28px}
     .region-summary-crop h4{margin:4px 0 6px;color:#3f5a2e;font-size:23px;line-height:1.05}
     .region-summary-crop p{margin:5px 0 0;font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
@@ -489,6 +499,8 @@
       .nature-observation-grid,.outlook-day-grid{grid-template-columns:1fr}
       .plantnet-controls{grid-template-columns:1fr}
     }
+
+    @media(max-width:620px){.wapor-mapset-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -618,7 +630,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261021-season-smart-v1"></script>
-  <script src="./app.js?v=20261021-season-smart-v1"></script>
+  <script src="./api.js?v=20261021-wapor-catalog-v1"></script>
+  <script src="./app.js?v=20261021-wapor-catalog-v1"></script>
 </body>
 </html>
