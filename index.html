@@ -130,6 +130,43 @@
     .region-summary-section>p{margin:7px 0 10px;font-size:19px;line-height:1.12}
     .region-summary-crops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
     .region-summary-crop{display:flex;gap:10px;min-width:0;padding:11px;background:#fff2cf;border:3px solid #aa8753;box-shadow:3px 3px 0 rgba(0,0,0,.1)}
+
+    .region-summary-crop-brief{align-items:flex-start;padding:10px;gap:9px}
+    .region-summary-crop-brief .region-summary-crop-icon{width:36px;height:36px;font-size:23px}
+    .region-summary-crop-brief h4{font-size:19px;margin:4px 0 7px}
+    .crop-season-pill{display:inline-block;padding:4px 6px;border:1px solid #b29a68;background:#f7e6bb;color:#755534;font-family:'Press Start 2P',monospace;font-size:7px;line-height:1.6}
+    .crop-season-pill.is-open{background:#dce9ce;border-color:#75945c;color:#34582a}
+    .crop-season-pill.is-caution{background:#fff0c7;border-color:#b79a56;color:#745022}
+    .crop-season-pill.is-wait{background:#f3d9ce;border-color:#b66d56;color:#873f2b}
+    .crop-season-pill.is-unknown{background:#e7e0cd;border-color:#aaa08a;color:#625b4b}
+    .crop-season-message{font-size:12px!important;line-height:1.35!important;color:#6a5439}
+    .climate-current-month{margin:6px 0;padding:6px 8px;background:#f6e6ba;border-left:3px solid #b69a55;font-size:13px;line-height:1.35}
+    .climate-current-month.is-open{background:#dce9ce;border-left-color:#63874a}
+    .climate-current-month.is-caution{background:#fff0c7;border-left-color:#b79a56}
+    .climate-current-month.is-wait{background:#f3d9ce;border-left-color:#b66d56}
+    .water-deficit{color:#933e2f!important}
+    .nature-observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+    .nature-observation-card{padding:10px}
+    .nature-observation-card h3{margin:4px 0;font-size:17px;line-height:1.15;overflow-wrap:anywhere}
+    .nature-observation-card p{font-size:12px;line-height:1.35}
+    .outlook-day-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+    .outlook-day-card{display:flex;flex-direction:column;gap:5px;padding:8px;background:#fff5d8;border:2px solid #ad925a;font-family:'Inter',system-ui,sans-serif;font-size:12px;line-height:1.3}
+    .outlook-day-card>b{font-size:13px;color:#4d3a26}
+    .outlook-temperature{font-size:22px;font-weight:800;color:#33552c}
+    .plantnet-panel{margin-top:18px;padding:14px;background:#f2e3bc;border:3px solid #987044}
+    .plantnet-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;margin:12px 0}
+    .plantnet-controls label{display:block;font-size:13px;font-weight:700}
+    .plantnet-controls input,.plantnet-controls select{width:100%;max-width:100%;min-width:0;margin-top:4px;padding:8px;border:2px solid #a68b57;background:#fff8e2;color:#3c2b1d;font:inherit;font-size:13px}
+    .plantnet-controls input[type="password"]{grid-column:1/-1}
+    .plantnet-controls input[type="file"]{grid-column:1/-1}
+    .plantnet-controls button{grid-column:1/-1;justify-self:start}
+    .plantnet-result-list{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+    .plantnet-result-card{display:flex;gap:9px;padding:9px;background:#fff5d8;border:2px solid #ad925a}
+    .plantnet-result-rank{display:grid;place-items:center;flex:none;width:29px;height:29px;background:#dce9ce;border:1px solid #63874a;font-weight:900}
+    .plantnet-result-copy h4{margin:0;font-size:16px;color:#34552f}
+    .plantnet-result-copy p{margin:4px 0;font-size:12px;line-height:1.35}
+    .plantnet-powered-logo{display:block;width:min(245px,100%);height:auto;margin:10px auto 0}
+    .nature-method-note{margin-top:8px;font-size:12px;line-height:1.4}
     .region-summary-crop-icon{display:grid;place-items:center;flex:none;width:43px;height:43px;background:#dbe7c7;border:2px solid #76925a;font-size:28px}
     .region-summary-crop h4{margin:4px 0 6px;color:#3f5a2e;font-size:23px;line-height:1.05}
     .region-summary-crop p{margin:5px 0 0;font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
@@ -446,6 +483,12 @@
       .region-summary-footer-actions{display:grid;grid-template-columns:1fr;justify-content:stretch}
       .region-summary-footer-actions .pixel-btn{width:100%;font-size:10px;padding:9px 7px}
     }
+
+    @media (max-width: 620px) {
+      .region-summary-crops{grid-template-columns:1fr}
+      .nature-observation-grid,.outlook-day-grid{grid-template-columns:1fr}
+      .plantnet-controls{grid-template-columns:1fr}
+    }
 </style>
 </head>
 <body>
@@ -575,7 +618,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261020-district-nav-v1"></script>
-  <script src="./app.js?v=20261020-district-nav-v1"></script>
+  <script src="./api.js?v=20261021-season-smart-v1"></script>
+  <script src="./app.js?v=20261021-season-smart-v1"></script>
 </body>
 </html>
