@@ -127,7 +127,7 @@ async function main() {
   assert.ok(climate.monthly[0].precipitationMm >= 140 && climate.monthly[0].precipitationMm <= 160,'daily precipitation is aggregated into monthly rainfall');
   assert.equal(climate.monthly[0].windDirection,'E','wind direction is translated to compass direction');
   assert.equal(climate.monthly[0].referenceEt0Mm,93,'daily reference ET0 is aggregated to a monthly total');
-  assert.equal(climate.monthly[0].waterBalanceMm,57,'monthly rain-minus-ET0 balance is calculated when data are available');
+  assert.equal(climate.monthly[0].waterBalanceMm,62,'monthly rain-minus-ET0 balance is calculated from averaged rain and ET0 totals');
   assert.match(climateRequestUrl,/archive-api\.open-meteo\.com\/v1\/archive/,'uses the Open-Meteo Historical Weather API');
   const climateParams = new URL(climateRequestUrl).searchParams;
   assert.ok(climateParams.get('daily').includes('wind_gusts_10m_max'),'asks for wind gust information');
