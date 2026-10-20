@@ -1234,6 +1234,7 @@
         '<h4>' + esc(english) + '</h4>' +
         '<p class="crop-name-english"><b>English:</b> ' + esc(english) + '</p>' + localMarkup + scientificMarkup +
         '<span class="crop-taxonomy-status">' + esc(nameStatus) + '</span>' +
+        '<p class="crop-name-note">' + esc(taxonomy && taxonomy.localNameSource || 'Local names may vary by region; confirm with local agricultural sources.') + '</p>' +
         '<p class="crop-name-note">A candidate to investigate, not an automatic planting prescription.</p>' +
         '<a class="crop-taxonomy-source" href="' + esc(matchUrl) + '" target="_blank" rel="noopener noreferrer">Check taxonomy / name source ↗</a>' +
         '</div></article>';
