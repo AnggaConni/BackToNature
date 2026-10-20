@@ -53,6 +53,19 @@ The Sources tab links to CGIAR GARDIAN as a research-publication and dataset dis
 
 OpenFarm is deliberately **not** called as a live API: the OpenFarm maintainers announced that the service servers were shut down in April 2025 and the project was archived. The original repository remains linked as a reference, not as a working endpoint. Crop candidates in this site are curated starter ideas and are not presented as OpenFarm data.
 
+### Quick Field Brief — explainable season advice and live weather
+The Quick Field Brief's crop badges are deliberately phrased as timing guidance: “Timing looks promising”, “Check before planting”, “Better to wait”, or “Not enough season data”. A “wait” status does not mean the crop cannot grow in the selected region; it means the app's broad historical monthly climate screen points to a different start window, where available.
+
+The climate screen compares five complete calendar years of monthly temperature and rainfall at one representative coordinate against broad crop screening ranges. It does not measure the selected farm's soil, pH, peat depth, water table, local elevation, drainage, irrigation supply, pests, protected-area/tenure constraints or market access. The brief now explains those limitations in plain language, including an extra peat/wetland safeguard: crop ideas must not be used to justify draining peat; protect water-table conditions and fire prevention first.
+
+When the brief opens, it also queries Open-Meteo's public seven-day forecast without a key. The panel summarizes forecast rain, mean temperature and rain minus reference ET₀ at the same representative point. This is a short-term planning cue, not a full water balance, field sensor reading or crop-specific forecast. Users can refresh it; API failures are shown rather than replaced with sample values. Open-Meteo's free public API terms require attribution and restrict the no-cost public hosted service to non-commercial use.
+
+### FAO WaPOR v3 — public water/vegetation catalogue
+The Sources tab can fetch official FAO WaPOR v3 mapset metadata through the GISMGR API. FAO documents that v3 API access does not need a token or account. The panel lists available water and vegetation datasets such as actual evapotranspiration, reference evapotranspiration, relative soil moisture, precipitation and net primary production, with resolution/temporal metadata and official raster links. It does **not** claim to have sampled a raster value at the user's coordinates; raster extraction is a separate geospatial processing step. Spatial coverage and time ranges differ by layer.
+
+Official access guide: https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en
+Official API reference: https://data.apps.fao.org/gismgr/shared/docs/api-reference/index.html
+
 ### Historical climate & planting-window API
 When a user opens a province/region or district fieldbook, the app calculates an area-weighted representative coordinate from the selected boundary geometry and requests five complete calendar years of daily historical weather from the Open-Meteo Historical Weather API. The API module aggregates observations into monthly temperature averages, average monthly rainfall, rainy-day counts, mean/max wind speed, gust statistics and dominant wind direction. The Climate & Planting tab uses these month-by-month patterns to rank provisional establishment windows for the crop screening library.
 
