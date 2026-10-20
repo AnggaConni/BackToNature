@@ -151,3 +151,6 @@ The Detailed Fieldbook's Nature Data tab queries the public FAO GISMGR v2 catalo
 Official references:
 - https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en
 - https://data.apps.fao.org/gismgr/shared/docs/api-reference/index.html
+
+
+The Open-Meteo seven-day outlook also requests the modelled topsoil moisture (0–7 cm), topsoil temperature (0–7 cm), and vapour-pressure deficit series. Hourly values are averaged by local forecast date and displayed in the Detailed Nature Data tab. These forecast/model variables are location-grid estimates and must not be presented as in-situ soil readings; field decisions should be confirmed with soil moisture probes or field observations.

@@ -1112,6 +1112,9 @@
         '<span>Rain <b>' + esc(numberOrDash(day.precipitationMm,' mm')) + '</b></span>' +
         '<span>ET₀ <b>' + esc(numberOrDash(day.referenceEt0Mm,' mm')) + '</b></span>' +
         '<span class="' + (day.waterBalanceMm != null && day.waterBalanceMm < 0 ? 'water-deficit' : '') + '">Rain − ET₀ <b>' + esc(numberOrDash(day.waterBalanceMm,' mm')) + '</b></span>' +
+        '<span>Model soil moisture · 0–7 cm <b>' + esc(day.soilMoistureTopM3M3 == null ? '—' : numberOrDash(day.soilMoistureTopM3M3*100,' %')) + '</b></span>' +
+        '<span>Model soil temperature · 0–7 cm <b>' + esc(numberOrDash(day.soilTemperatureTopC,' °C')) + '</b></span>' +
+        '<span>Vapour pressure deficit <b>' + esc(numberOrDash(day.vapourPressureDeficitKpa,' kPa')) + '</b></span>' +
         '</article>';
     }).join('') + '</div>';
   }
@@ -1189,7 +1192,7 @@
       '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'Opening this tab loads the historical climate cross-check.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER API ↗</a></p></article>' +
       '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">💧</span><span class="mini-code">OPEN-METEO / NEXT 7 DAYS</span></div>' +
-      '<h3>Rain versus reference water demand</h3><p>Forecast precipitation minus FAO reference evapotranspiration (ET₀) is a rough weather-context signal, not crop-specific irrigation advice.</p>' +
+      '<h3>Rain versus reference water demand</h3><p>Forecast rain minus FAO reference evapotranspiration (ET₀), plus modelled topsoil moisture/temperature and vapour-pressure deficit. These are weather-model estimates, not field measurements or crop-specific irrigation advice.</p>' +
       '<button id="nature-outlook-btn" class="pixel-btn green" type="button">↻ REFRESH 7-DAY OUTLOOK</button>' +
       '<div id="nature-outlook-status" class="live-status ' + esc(outlookStatus.type) + '" aria-live="polite">' + esc(outlookStatus.message) + '</div>' +
       '<div id="nature-outlook-results" class="live-results">' + (outlookData ? renderOpenMeteoOutlook(outlookData) : 'Opening this tab loads the next seven days.') + '</div>' +
