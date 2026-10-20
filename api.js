@@ -974,11 +974,15 @@
     return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
   }
 
-  async function fetchGbifOccurrences(latitude, longitude, requestedRadiusKm, requestedLimit) {
+  async function fetchGbifOccurrences(latitude, longitude, requestedRadiusKm, requestedLimit, options) {
     var point = validateNatureCoordinates(latitude, longitude);
+    var opts = options && typeof options === 'object' ? options : {};
+    var plantOnly = opts.plantOnly === true;
+    var forceRefresh = opts.forceRefresh === true;
     var radiusKm = Math.max(5, Math.min(100, Number(requestedRadiusKm) || 25));
     var limit = Math.max(1, Math.min(20, Math.round(Number(requestedLimit) || 12)));
-    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + radiusKm + ':' + limit;
+    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + radiusKm + ':' + limit + ':' + (plantOnly ? 'plants' : 'all');
+    if (forceRefresh) delete occurrenceRequestCache[cacheKey];
     if (occurrenceRequestCache[cacheKey]) return occurrenceRequestCache[cacheKey];
 
     var promise = (async function () {
@@ -999,6 +1003,10 @@
         limit:'300',
         offset:'0'
       });
+      if (plantOnly) {
+        params.set('kingdomKey', '6'); // GBIF Backbone key for Plantae.
+        params.set('taxonRank', 'SPECIES');
+      }
       var payload = await requestJSON(GBIF_OCCURRENCE_BASE + '?' + params.toString());
       var raw = Array.isArray(payload.results) ? payload.results : [];
       var records = raw.map(function (record) {
@@ -1030,6 +1038,15 @@
         if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
         return String(b.eventDate).localeCompare(String(a.eventDate));
       });
+      if (plantOnly) {
+        var seenPlantTaxa = {};
+        records = records.filter(function (record) {
+          var taxonId = record.taxonKey || record.scientificName.toLowerCase();
+          if (!taxonId || seenPlantTaxa[taxonId]) return false;
+          seenPlantTaxa[taxonId] = true;
+          return true;
+        });
+      }
       return {
         latitude:point.latitude,
         longitude:point.longitude,
@@ -1048,13 +1065,14 @@
     return promise;
   }
 
-  async function fetchNasaPowerMonthly(latitude, longitude, requestedYears) {
+  async function fetchNasaPowerMonthly(latitude, longitude, requestedYears, forceRefresh) {
     var point = validateNatureCoordinates(latitude, longitude);
     var years = Math.max(3, Math.min(10, Math.round(Number(requestedYears) || 5)));
     var currentYear = new Date().getFullYear();
     var startYear = currentYear - years;
     var endYear = currentYear - 1;
     var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + years;
+    if (forceRefresh === true) delete nasaMonthlyRequestCache[cacheKey];
     if (nasaMonthlyRequestCache[cacheKey]) return nasaMonthlyRequestCache[cacheKey];
 
     var promise = (async function () {
