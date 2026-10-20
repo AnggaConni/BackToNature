@@ -175,6 +175,8 @@
     {id:'coffee-robusta', name:'Robusta Coffee', local:'Kopi Robusta', scientific:'Coffea canephora', category:'perennial', soils:['volcanic','loam','acidic'], phMin:4.5, phMax:6.5, drainage:['well','moderate'], water:['reliable','seasonal'], climates:['humid-tropical','seasonal-tropical'], uses:['market'], note:'A warm tropical coffee candidate that usually needs moisture and good drainage.', caution:'Confirm local elevation, rainfall, clone/variety and pest/disease conditions.'},
     {id:'cacao', name:'Cacao', local:'Kakao', scientific:'Theobroma cacao', category:'perennial', soils:['loam','alluvial','volcanic'], phMin:5.0, phMax:7.0, drainage:['well','moderate'], water:['reliable'], climates:['humid-tropical'], uses:['market'], note:'Typically prefers warm humid environments, deep soils and reliable moisture without prolonged root-zone flooding.', caution:'Check shade, drainage, local disease pressure and access to fermentation/drying facilities.'},
     {id:'mango', name:'Mango', local:'Mangga', scientific:'Mangifera indica', category:'perennial', soils:['sandy','loam','volcanic','alluvial'], phMin:5.5, phMax:7.5, drainage:['well'], water:['seasonal','limited','reliable'], climates:['seasonal-tropical','dry-tropical','subtropical'], uses:['fruit','market'], note:'Often suits warm seasonally dry climates and deep well-drained soils; flowering can be affected by local rainfall patterns.', caution:'Choose varieties for local rainfall, disease pressure, fruit quality and market timing.'},
+    {id:'cashew', name:'Cashew', local:'Jambu mete / Jambu monyet', scientific:'Anacardium occidentale', category:'perennial', soils:['sandy','loam','alluvial'], phMin:4.5, phMax:7.5, drainage:['well'], water:['limited','seasonal','reliable'], climates:['seasonal-tropical','dry-tropical','humid-tropical'], uses:['fruit','market','restoration'], note:'A tropical tree crop often considered in seasonally dry systems; establishment needs enough moisture even where mature trees tolerate dry periods.', caution:'Verify local cultivar, flowering/rainfall timing, fire exposure, soil depth and access to safe nut processing.'},
+    {id:'tamarind', name:'Tamarind', local:'Asam jawa', scientific:'Tamarindus indica', category:'perennial', soils:['sandy','loam','alluvial'], phMin:5.0, phMax:8.0, drainage:['well','moderate'], water:['limited','seasonal','reliable'], climates:['seasonal-tropical','dry-tropical','humid-tropical'], uses:['fruit','market','restoration'], note:'A long-lived tropical tree often adapted to seasonal dry periods once established.', caution:'Use locally appropriate planting material and check land tenure, establishment water, grazing and harvest needs.'},
     {id:'pineapple', name:'Pineapple', local:'Nanas', scientific:'Ananas comosus', category:'fruit', soils:['sandy','loam','acidic'], phMin:4.5, phMax:6.5, drainage:['well'], water:['seasonal','reliable'], climates:['humid-tropical','seasonal-tropical','dry-tropical'], uses:['fruit','market'], note:'Often tolerates acidic soils better than many crops and requires good drainage.', caution:'Do not expand onto natural peatlands or clear sensitive ecosystems just because acidity appears suitable.'},
     {id:'sago', name:'Sago Palm', local:'Sagu', scientific:'Metroxylon sagu', category:'perennial', soils:['peat','alluvial'], phMin:4.0, phMax:6.5, drainage:['moderate','waterlogged'], water:['standing','reliable'], climates:['humid-tropical'], uses:['staple','market'], note:'A wet-tropical starch crop associated with suitable swampy landscapes in parts of Southeast Asia and the Pacific.', caution:'Suitability depends on local ecology, land tenure and existing managed landscapes; do not drain or convert peat ecosystems.'},
     {id:'vetiver', name:'Vetiver Grass', local:'Akar wangi / vetiver', scientific:'Chrysopogon zizanioides', category:'restoration', soils:['sandy','loam','clay','volcanic','acidic','alluvial'], phMin:4.0, phMax:8.0, drainage:['well','moderate'], water:['seasonal','limited','reliable'], climates:['humid-tropical','seasonal-tropical','dry-tropical','subtropical'], uses:['restoration'], note:'A candidate for contour hedges and erosion-control trials where locally appropriate; it is not a food crop.', caution:'Use a non-invasive, locally approved variety and design erosion-control measures for the actual slope and flow path.'},
@@ -205,6 +207,8 @@
     'cacao': {months:6,tempMin:21,tempMax:32,rainMin:500,rainMax:1500},
     'mango': {months:4,tempMin:24,tempMax:35,rainMin:150,rainMax:600},
     'pineapple': {months:4,tempMin:20,tempMax:32,rainMin:180,rainMax:600},
+    'cashew': {months:6,tempMin:22,tempMax:35,rainMin:250,rainMax:900},
+    'tamarind': {months:6,tempMin:22,tempMax:38,rainMin:180,rainMax:800},
     'sago': {months:6,tempMin:24,tempMax:32,rainMin:600,rainMax:1800},
     'vetiver': {months:3,tempMin:18,tempMax:35,rainMin:100,rainMax:450},
     'sunn-hemp': {months:3,tempMin:20,tempMax:35,rainMin:100,rainMax:350}
@@ -593,6 +597,325 @@
     }).slice(0,8);
   }
 
+  // Country-aware plant names via the public GBIF Species API.
+  // Crop labels authored in this app remain the English display baseline;
+  // vernacular names are shown only when a published source record is returned.
+  var COUNTRY_LOCALIZATION = {
+    IDN:{iso2:'ID',languages:['id'],label:'Indonesian',names:['indonesia']},
+    TLS:{iso2:'TL',languages:['tet','pt'],label:'Tetum / Portuguese',names:['timor leste','east timor','timor leste']},
+    MYS:{iso2:'MY',languages:['ms'],label:'Malay',names:['malaysia']},
+    SGP:{iso2:'SG',languages:['en','ms','zh','ta'],label:'Singapore languages',names:['singapore']},
+    BRN:{iso2:'BN',languages:['ms'],label:'Malay',names:['brunei darussalam','brunei']},
+    PHL:{iso2:'PH',languages:['fil','tl','en'],label:'Filipino / Tagalog',names:['philippines']},
+    THA:{iso2:'TH',languages:['th'],label:'Thai',names:['thailand']},
+    VNM:{iso2:'VN',languages:['vi'],label:'Vietnamese',names:['viet nam','vietnam']},
+    KHM:{iso2:'KH',languages:['km'],label:'Khmer',names:['cambodia']},
+    LAO:{iso2:'LA',languages:['lo'],label:'Lao',names:['lao peoples democratic republic','laos']},
+    MMR:{iso2:'MM',languages:['my'],label:'Burmese',names:['myanmar']},
+    CHN:{iso2:'CN',languages:['zh'],label:'Chinese',names:['china']},
+    JPN:{iso2:'JP',languages:['ja'],label:'Japanese',names:['japan']},
+    KOR:{iso2:'KR',languages:['ko'],label:'Korean',names:['republic of korea','south korea']},
+    PRK:{iso2:'KP',languages:['ko'],label:'Korean',names:['democratic peoples republic of korea','north korea']},
+    IND:{iso2:'IN',languages:['hi','bn','ta','te','mr'],label:'Indian language (varies by region)',names:['india']},
+    BGD:{iso2:'BD',languages:['bn'],label:'Bengali',names:['bangladesh']},
+    PAK:{iso2:'PK',languages:['ur','pa'],label:'Urdu / Punjabi',names:['pakistan']},
+    NPL:{iso2:'NP',languages:['ne'],label:'Nepali',names:['nepal']},
+    LKA:{iso2:'LK',languages:['si','ta'],label:'Sinhala / Tamil',names:['sri lanka']},
+    BTN:{iso2:'BT',languages:['dz'],label:'Dzongkha',names:['bhutan']},
+    MDV:{iso2:'MV',languages:['dv'],label:'Dhivehi',names:['maldives']},
+    RUS:{iso2:'RU',languages:['ru'],label:'Russian',names:['russian federation','russia']},
+    KAZ:{iso2:'KZ',languages:['kk','ru'],label:'Kazakh / Russian',names:['kazakhstan']},
+    UZB:{iso2:'UZ',languages:['uz','ru'],label:'Uzbek / Russian',names:['uzbekistan']},
+    KGZ:{iso2:'KG',languages:['ky','ru'],label:'Kyrgyz / Russian',names:['kyrgyzstan']},
+    TJK:{iso2:'TJ',languages:['tg','ru'],label:'Tajik / Russian',names:['tajikistan']},
+    TKM:{iso2:'TM',languages:['tk','ru'],label:'Turkmen / Russian',names:['turkmenistan']},
+    MNG:{iso2:'MN',languages:['mn'],label:'Mongolian',names:['mongolia']},
+    TUR:{iso2:'TR',languages:['tr'],label:'Turkish',names:['turkiye','turkey']},
+    IRN:{iso2:'IR',languages:['fa'],label:'Persian',names:['iran islamic republic of','iran']},
+    IRQ:{iso2:'IQ',languages:['ar','ku'],label:'Arabic / Kurdish',names:['iraq']},
+    SAU:{iso2:'SA',languages:['ar'],label:'Arabic',names:['saudi arabia']},
+    ARE:{iso2:'AE',languages:['ar'],label:'Arabic',names:['united arab emirates']},
+    EGY:{iso2:'EG',languages:['ar'],label:'Arabic',names:['egypt']},
+    ETH:{iso2:'ET',languages:['am'],label:'Amharic',names:['ethiopia']},
+    KEN:{iso2:'KE',languages:['sw','en'],label:'Swahili / English',names:['kenya']},
+    TZA:{iso2:'TZ',languages:['sw','en'],label:'Swahili / English',names:['united republic of tanzania','tanzania']},
+    UGA:{iso2:'UG',languages:['sw','en'],label:'Swahili / English',names:['uganda']},
+    RWA:{iso2:'RW',languages:['rw','fr','en'],label:'Kinyarwanda / French / English',names:['rwanda']},
+    BDI:{iso2:'BI',languages:['rn','fr'],label:'Kirundi / French',names:['burundi']},
+    ZAF:{iso2:'ZA',languages:['zu','af','en','xh'],label:'South African languages',names:['south africa']},
+    NGA:{iso2:'NG',languages:['en','ha','yo','ig'],label:'Nigerian languages',names:['nigeria']},
+    GHA:{iso2:'GH',languages:['en','tw'],label:'English / Akan',names:['ghana']},
+    SEN:{iso2:'SN',languages:['fr','wo'],label:'French / Wolof',names:['senegal']},
+    CIV:{iso2:'CI',languages:['fr'],label:'French',names:['cote d ivoire','ivory coast']},
+    MAR:{iso2:'MA',languages:['ar','fr'],label:'Arabic / French',names:['morocco']},
+    DZA:{iso2:'DZ',languages:['ar','fr'],label:'Arabic / French',names:['algeria']},
+    TUN:{iso2:'TN',languages:['ar','fr'],label:'Arabic / French',names:['tunisia']},
+    FRA:{iso2:'FR',languages:['fr'],label:'French',names:['france']},
+    DEU:{iso2:'DE',languages:['de'],label:'German',names:['germany']},
+    ESP:{iso2:'ES',languages:['es'],label:'Spanish',names:['spain']},
+    PRT:{iso2:'PT',languages:['pt'],label:'Portuguese',names:['portugal']},
+    ITA:{iso2:'IT',languages:['it'],label:'Italian',names:['italy']},
+    NLD:{iso2:'NL',languages:['nl'],label:'Dutch',names:['netherlands']},
+    BEL:{iso2:'BE',languages:['nl','fr','de'],label:'Dutch / French / German',names:['belgium']},
+    CHE:{iso2:'CH',languages:['de','fr','it'],label:'Swiss languages',names:['switzerland']},
+    AUT:{iso2:'AT',languages:['de'],label:'German',names:['austria']},
+    POL:{iso2:'PL',languages:['pl'],label:'Polish',names:['poland']},
+    UKR:{iso2:'UA',languages:['uk'],label:'Ukrainian',names:['ukraine']},
+    CZE:{iso2:'CZ',languages:['cs'],label:'Czech',names:['czechia','czech republic']},
+    SVK:{iso2:'SK',languages:['sk'],label:'Slovak',names:['slovakia']},
+    HUN:{iso2:'HU',languages:['hu'],label:'Hungarian',names:['hungary']},
+    ROU:{iso2:'RO',languages:['ro'],label:'Romanian',names:['romania']},
+    BGR:{iso2:'BG',languages:['bg'],label:'Bulgarian',names:['bulgaria']},
+    GRC:{iso2:'GR',languages:['el'],label:'Greek',names:['greece']},
+    NOR:{iso2:'NO',languages:['no','nb'],label:'Norwegian',names:['norway']},
+    SWE:{iso2:'SE',languages:['sv'],label:'Swedish',names:['sweden']},
+    FIN:{iso2:'FI',languages:['fi','sv'],label:'Finnish / Swedish',names:['finland']},
+    DNK:{iso2:'DK',languages:['da'],label:'Danish',names:['denmark']},
+    ISL:{iso2:'IS',languages:['is'],label:'Icelandic',names:['iceland']},
+    IRL:{iso2:'IE',languages:['ga','en'],label:'Irish / English',names:['ireland']},
+    GBR:{iso2:'GB',languages:['en'],label:'English',names:['united kingdom']},
+    USA:{iso2:'US',languages:['en'],label:'English',names:['united states','united states of america']},
+    CAN:{iso2:'CA',languages:['en','fr'],label:'English / French',names:['canada']},
+    MEX:{iso2:'MX',languages:['es'],label:'Spanish',names:['mexico']},
+    GTM:{iso2:'GT',languages:['es'],label:'Spanish',names:['guatemala']},
+    CRI:{iso2:'CR',languages:['es'],label:'Spanish',names:['costa rica']},
+    PAN:{iso2:'PA',languages:['es'],label:'Spanish',names:['panama']},
+    COL:{iso2:'CO',languages:['es'],label:'Spanish',names:['colombia']},
+    PER:{iso2:'PE',languages:['es','qu'],label:'Spanish / Quechua',names:['peru']},
+    BOL:{iso2:'BO',languages:['es','ay','qu'],label:'Spanish / Indigenous languages',names:['bolivia plurinational state of','bolivia']},
+    CHL:{iso2:'CL',languages:['es'],label:'Spanish',names:['chile']},
+    ARG:{iso2:'AR',languages:['es'],label:'Spanish',names:['argentina']},
+    URY:{iso2:'UY',languages:['es'],label:'Spanish',names:['uruguay']},
+    PRY:{iso2:'PY',languages:['es','gn'],label:'Spanish / Guarani',names:['paraguay']},
+    BRA:{iso2:'BR',languages:['pt'],label:'Portuguese',names:['brazil']},
+    AUS:{iso2:'AU',languages:['en'],label:'English',names:['australia']},
+    NZL:{iso2:'NZ',languages:['en','mi'],label:'English / Māori',names:['new zealand']},
+    PNG:{iso2:'PG',languages:['en','tpi'],label:'English / Tok Pisin',names:['papua new guinea']},
+    FJI:{iso2:'FJ',languages:['en','fj'],label:'Fijian / English',names:['fiji']},
+    WSM:{iso2:'WS',languages:['sm'],label:'Samoan',names:['samoa']},
+    TON:{iso2:'TO',languages:['to'],label:'Tongan',names:['tonga']}
+  };
+  var GBIF_TAXON_CACHE = {};
+  var GBIF_VERNACULAR_CACHE = {};
+
+  function normalizeLanguageCode(value) {
+    if (value && typeof value === 'object') value = value.code || value.isoCode || value.name || '';
+    var code = String(value || '').trim().toLowerCase();
+    var aliases = {
+      eng:'en',ind:'id',indonesian:'id',por:'pt',fra:'fr',fre:'fr',deu:'de',ger:'de',
+      spa:'es',ita:'it',rus:'ru',zho:'zh',chi:'zh',jpn:'ja',jpn:'ja',kor:'ko',
+      tha:'th',vie:'vi',tuk:'tk',ara:'ar',fas:'fa',per:'fa',urd:'ur',ben:'bn',
+      hin:'hi',tam:'ta',tel:'te',msa:'ms',may:'ms',fil:'fil',tgl:'tl',swa:'sw',
+      cym:'cy',wel:'cy',ell:'el',gre:'el',nld:'nl',dut:'nl',nor:'no',nob:'nb'
+    };
+    return aliases[code] || code;
+  }
+
+  function localizedValue(value) {
+    if (value && typeof value === 'object') return value.title || value.name || value.code || '';
+    return value == null ? '' : String(value);
+  }
+
+  function languageLabel(code) {
+    var labels = {
+      en:'English',id:'Indonesian',tet:'Tetum',pt:'Portuguese',ms:'Malay',fil:'Filipino',tl:'Tagalog',
+      th:'Thai',vi:'Vietnamese',km:'Khmer',lo:'Lao',my:'Burmese',zh:'Chinese',ja:'Japanese',ko:'Korean',
+      hi:'Hindi',bn:'Bengali',ta:'Tamil',te:'Telugu',ne:'Nepali',si:'Sinhala',ur:'Urdu',ru:'Russian',
+      kk:'Kazakh',uz:'Uzbek',ky:'Kyrgyz',tg:'Tajik',tk:'Turkmen',mn:'Mongolian',tr:'Turkish',fa:'Persian',
+      ar:'Arabic',sw:'Swahili',am:'Amharic',zu:'Zulu',af:'Afrikaans',xh:'Xhosa',ha:'Hausa',yo:'Yoruba',
+      ig:'Igbo',fr:'French',de:'German',es:'Spanish',it:'Italian',nl:'Dutch',pl:'Polish',uk:'Ukrainian',
+      cs:'Czech',sk:'Slovak',hu:'Hungarian',ro:'Romanian',bg:'Bulgarian',el:'Greek',no:'Norwegian',
+      nb:'Norwegian Bokmål',sv:'Swedish',fi:'Finnish',da:'Danish',is:'Icelandic',ga:'Irish',qu:'Quechua',
+      ay:'Aymara',gn:'Guarani',mi:'Māori',tpi:'Tok Pisin',fj:'Fijian',sm:'Samoan',to:'Tongan'
+    };
+    return labels[normalizeLanguageCode(code)] || String(code || '').toUpperCase() || 'Other language';
+  }
+
+  function getCountryLanguagePreference(iso3) {
+    var key = String(iso3 || '').toUpperCase();
+    var entry = COUNTRY_LOCALIZATION[key];
+    return entry ? {
+      iso3:key, iso2:entry.iso2, languages:entry.languages.slice(),
+      label:entry.label, countryNames:entry.names.slice()
+    } : {
+      iso3:key, iso2:'', languages:[], label:'local language for this country', countryNames:[]
+    };
+  }
+
+  function getCropCatalog() {
+    return CROP_LIBRARY.map(function (crop) {
+      return Object.assign({}, crop, {
+        localNameIndonesian:crop.local,
+        englishName:crop.name,
+        scientificName:crop.scientific
+      });
+    });
+  }
+
+  function taxonCacheKey(scientificName) {
+    return String(scientificName || '').trim().toLowerCase();
+  }
+
+  async function loadGbifTaxon(crop) {
+    var scientific = String(crop && (crop.scientificName || crop.scientific) || '').trim();
+    var key = taxonCacheKey(scientific);
+    if (!scientific || /\b(spp?\.?|sp\.)\b|\/|\bvegetables\b/i.test(scientific) || !/^[A-Z][a-z-]+\s+[a-z][a-z-]+$/.test(scientific)) {
+      return {
+        key:null, scientificName:scientific, rank:'UNRESOLVED_GROUP',
+        canonicalName:scientific, sourceUrl:'https://www.gbif.org/species/search?q=' + encodeURIComponent(scientific),
+        vernacularNames:[], matchType:'NOT_QUERIED'
+      };
+    }
+    if (GBIF_TAXON_CACHE[key]) return GBIF_TAXON_CACHE[key];
+    var pending = (async function () {
+      var url = 'https://api.gbif.org/v1/species/match?name=' + encodeURIComponent(scientific) +
+        '&rank=SPECIES&strict=true&kingdom=Plantae';
+      var match = await requestJSON(url);
+      var usageKey = match && (match.usageKey || match.key);
+      var rank = String(match && (match.rank || match.usage && match.usage.rank) || '').toUpperCase();
+      if (!usageKey || (rank && rank !== 'SPECIES')) {
+        return {
+          key:null, scientificName:scientific, rank:rank || 'UNMATCHED',
+          canonicalName:scientific, sourceUrl:'https://www.gbif.org/species/search?q=' + encodeURIComponent(scientific),
+          vernacularNames:[], matchType:'UNMATCHED'
+        };
+      }
+      var acceptedName = match.canonicalName || match.scientificName || scientific;
+      var vernacularNames = [];
+      if (GBIF_VERNACULAR_CACHE[String(usageKey)]) {
+        vernacularNames = await GBIF_VERNACULAR_CACHE[String(usageKey)];
+      } else {
+        var namesPromise = requestJSON('https://api.gbif.org/v1/species/' + encodeURIComponent(String(usageKey)) + '/vernacularNames?limit=1000');
+        GBIF_VERNACULAR_CACHE[String(usageKey)] = namesPromise;
+        try {
+          var namesResponse = await namesPromise;
+          vernacularNames = rowsFrom(namesResponse);
+          GBIF_VERNACULAR_CACHE[String(usageKey)] = Promise.resolve(vernacularNames);
+        } catch (error) {
+          delete GBIF_VERNACULAR_CACHE[String(usageKey)];
+          throw error;
+        }
+      }
+      return {
+        key:usageKey, scientificName:acceptedName, rank:rank || 'SPECIES',
+        canonicalName:acceptedName, sourceUrl:'https://www.gbif.org/species/' + encodeURIComponent(String(usageKey)),
+        vernacularNames:vernacularNames, matchType:match.matchType || 'MATCH'
+      };
+    })();
+    GBIF_TAXON_CACHE[key] = pending;
+    try {
+      var result = await pending;
+      GBIF_TAXON_CACHE[key] = Promise.resolve(result);
+      return result;
+    } catch (error) {
+      delete GBIF_TAXON_CACHE[key];
+      throw error;
+    }
+  }
+
+  function resolveCropTaxonomyName(taxon, crop, iso3, countryName) {
+    var pref = getCountryLanguagePreference(iso3);
+    var names = Array.isArray(taxon.vernacularNames) ? taxon.vernacularNames : [];
+    function nameInfo(record) {
+      var language = normalizeLanguageCode(record.language);
+      var country = record.country;
+      var countryCode = '';
+      var countryTitle = '';
+      if (country && typeof country === 'object') {
+        countryCode = String(country.code || country.iso2 || country.isoCode || '').trim().toUpperCase();
+        countryTitle = String(country.title || country.name || '').trim();
+      } else if (country) {
+        var text = String(country).trim();
+        if (/^[A-Za-z]{2,3}$/.test(text)) countryCode = text.toUpperCase();
+        else countryTitle = text;
+      }
+      var countryMatches = !!(
+        (pref.iso2 && countryCode && (countryCode === pref.iso2 || countryCode === iso3)) ||
+        [countryTitle].concat(pref.countryNames).some(function (item) {
+          return item && pref.countryNames.concat([countryName || '']).some(function (candidate) {
+            return candidate && String(item).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim() ===
+              String(candidate).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+          });
+        })
+      );
+      var langIndex = pref.languages.indexOf(language);
+      return {
+        record:record,
+        language:language,
+        languageLabel:languageLabel(language),
+        vernacularName:String(record.vernacularName || record.name || '').trim(),
+        countryMatches:countryMatches,
+        languageIndex:langIndex,
+        languageMatches:langIndex >= 0
+      };
+    }
+    var candidates = names.map(nameInfo).filter(function (item) { return !!item.vernacularName; });
+    candidates.sort(function (a,b) {
+      function score(item) {
+        var total = 0;
+        if (item.countryMatches) total += 100;
+        if (item.languageMatches) total += 30 - Math.max(item.languageIndex,0);
+        if (item.language === 'en') total -= 4;
+        return total;
+      }
+      return score(b)-score(a) || a.vernacularName.localeCompare(b.vernacularName);
+    });
+    var preferred = candidates.find(function (item) { return item.countryMatches; }) ||
+      candidates.find(function (item) { return item.languageMatches; }) ||
+      candidates.find(function (item) { return item.language === 'en'; }) ||
+      candidates[0] || null;
+    var localName = preferred ? preferred.vernacularName : '';
+    var localLabel = preferred ? preferred.languageLabel :
+      (pref.label || 'Local language');
+    var nameOrigin = preferred ? (
+      preferred.countryMatches ? 'GBIF vernacular record associated with the selected country' :
+      preferred.languageMatches ? 'GBIF vernacular record in a preferred language; country association not verified' :
+      'GBIF vernacular name; country association not verified'
+    ) : 'No matching published vernacular name found';
+    if (!localName && String(iso3 || '').toUpperCase() === 'IDN' && crop.local) {
+      localName = crop.local;
+      localLabel = 'Indonesian';
+      nameOrigin = 'BackToNature curated Indonesian common name; verify locally';
+    }
+    return {
+      cropId:crop.id || '',
+      englishName:crop.englishName || crop.name || crop.commonName || '',
+      localName:localName,
+      localLanguage:localLabel,
+      localLanguageCode:preferred ? preferred.language : (String(iso3).toUpperCase() === 'IDN' ? 'id' : ''),
+      localNameSource: nameOrigin,
+      scientificName:taxon.scientificName || crop.scientificName || crop.scientific || '',
+      rank:taxon.rank || 'UNVERIFIED',
+      gbifKey:taxon.key || null,
+      sourceUrl:taxon.sourceUrl || '',
+      source:'GBIF Backbone Taxonomy / Vernacular Names API'
+    };
+  }
+
+  async function fetchCropTaxonomy(cropOrId, countryIso3, countryName) {
+    var crop = typeof cropOrId === 'string'
+      ? CROP_LIBRARY.find(function (item) { return item.id === cropOrId; })
+      : cropOrId;
+    if (!crop) throw new Error('Unknown crop record.');
+    var taxon;
+    try {
+      taxon = await loadGbifTaxon(crop);
+    } catch (error) {
+      return Object.assign(resolveCropTaxonomyName({
+        key:null, scientificName:crop.scientificName || crop.scientific,
+        rank:'UNVERIFIED', sourceUrl:'https://www.gbif.org/species/search?q=' + encodeURIComponent(crop.scientific || crop.name),
+        vernacularNames:[]
+      }, crop, countryIso3, countryName), {
+        status:'source-unavailable',
+        error:error && error.message ? error.message : 'GBIF taxonomy lookup failed.'
+      });
+    }
+    var resolved = resolveCropTaxonomyName(taxon,crop,countryIso3,countryName);
+    resolved.status = taxon.key ? 'matched' : taxon.matchType === 'NOT_QUERIED' ? 'broad-group' : 'no-match';
+    resolved.matchType = taxon.matchType;
+    return resolved;
+  }
+
   window.BackToNatureAPI = {
     fetchIndonesiaLandUse: fetchIndonesiaLandUse,
     searchFaoCatalog: searchFaoCatalog,
@@ -600,6 +923,9 @@
     listCropRecommendations: listCropRecommendations,
     searchPlantImages: searchPlantImages,
     fetchHistoricalClimate: fetchHistoricalClimate,
-    rankPlantingWindows: rankPlantingWindows
+    rankPlantingWindows: rankPlantingWindows,
+    getCropCatalog: getCropCatalog,
+    getCountryLanguagePreference: getCountryLanguagePreference,
+    fetchCropTaxonomy: fetchCropTaxonomy
   };
 })();
