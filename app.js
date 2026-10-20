@@ -587,7 +587,39 @@
     if (result) loadClimateCropPhotos(result.recommendations, currentProvince);
   }
 
+
+  function currentCountryIso3() {
+    return String(currentProvince && currentProvince.countryIso3 ||
+      selectedCountry && selectedCountry.iso3 || '').toUpperCase();
+  }
+
+  function countrySourceCardsMarkup(sources) {
+    if (!Array.isArray(sources) || !sources.length) {
+      return '<p class="country-source-empty">No country-specific API preset has been reviewed for this country yet. Global country-filtered indicators remain available below.</p>';
+    }
+    return '<div class="source-list country-source-list">' + sources.map(function (source, index) {
+      var links = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.url)) + '">Official source ↗</a>';
+      if (source.apiUrl && source.apiUrl !== source.url) links += ' <a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.apiUrl)) + '">Open API ↗</a>';
+      return '<article class="source-card"><div class="source-index">' + String(index+1).padStart(2,'0') + '</div><div class="source-main">' +
+        '<span class="mini-code">' + esc(source.access || source.kind || 'OFFICIAL SOURCE') + '</span>' +
+        '<h3>' + esc(source.title) + '</h3><p>' + esc(source.description) + '</p>' +
+        '<div class="country-source-links">' + links + '</div></div></article>';
+    }).join('') + '</div>';
+  }
+
+  function renderWorldBankIndicatorPanel(countryIso3, countryName) {
+    return '<section class="live-connectors country-worldbank-panel"><div class="section-title"><span class="mini-code">GLOBAL API / COUNTRY-FILTERED</span><h3>Agriculture snapshot · ' + esc(countryName || countryIso3) + '</h3></div>' +
+      '<p class="live-explainer">Fetch recent country-level agricultural indicators from the free World Bank API (no API key). Coverage and latest year differ by indicator. These are national indicators, not province, district or farm measurements.</p>' +
+      '<button id="country-wb-fetch-btn" class="pixel-btn green" type="button">FETCH COUNTRY INDICATORS</button>' +
+      '<div id="country-wb-status" class="live-status" aria-live="polite">Not queried yet</div>' +
+      '<div id="country-wb-results" class="live-results">No figures are shown until the API responds.</div>' +
+      '<p class="nature-method-note">Source: <a href="https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation" target="_blank" rel="noopener noreferrer">World Bank Indicators API documentation ↗</a></p></section>';
+  }
+
   function renderOverview(profile) {
+    var indonesiaProductionMarkup = currentCountryIso3() === 'IDN'
+      ? '<section class="source-strip"><div><span class="mini-code">OFFICIAL PRODUCTION DATA / INDONESIA</span><h3>Rice area, productivity and output by province</h3><p>BPS provides official provincial paddy statistics. Open the source table to verify year and units.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS TABLE ↗</a></section>'
+      : '';
     return '<div class="tab-intro"><div class="eyebrow">PROVINCE FIELD NOTE / ' + esc(profile.name.toUpperCase()) +
       '</div><h2>Welcome to ' + esc(profile.name) + '!</h2><p>' + esc(profile.intro) + '</p>' +
       '<div class="profile-stamp"><span>🌱</span><div><b>Starting field profile</b><small>Regional planning cues · not a field survey</small></div></div></div>' +
@@ -597,8 +629,7 @@
       '<article class="field-card"><div class="card-topline"><span class="card-emoji">🌾</span><span class="mini-code">CROP IDEAS</span></div><h3>' + profile.crops.length + ' crop candidates</h3><p>Candidate crops to validate against elevation, soil, local water, varieties, markets and farmer knowledge.</p></article>' +
       '</div>' +
       '<section class="quest-panel"><div class="quest-icon">📜</div><div><div class="mini-code">TODAY\'S FIELD QUEST</div><h3>Know the site before you plant</h3><p>Choose a specific farm or landscape unit, collect soil and water observations, check local rainfall and consult the agricultural extension service. A province is too large to have one universal soil profile.</p></div></section>' +
-      '<section class="source-strip"><div><span class="mini-code">OFFICIAL PRODUCTION DATA</span><h3>Rice area, productivity and output by province</h3><p>BPS provides official provincial paddy statistics for 2024. This app links to the source instead of inventing statistics inside the profile.</p></div>' +
-      '<a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS TABLE ↗</a></section>' + climatePreviewMarkup();
+      indonesiaProductionMarkup + climatePreviewMarkup();
   }
 
   function renderSoil(profile) {
@@ -612,7 +643,10 @@
       '<section class="soil-profile"><div class="soil-profile-icon">🧪</div><div><span class="mini-code">REGIONAL LANDSCAPE CUE</span><h3>' + esc(profile.zone) + '</h3><p>' + esc(profile.soilCue) + '</p><span class="data-tag amber">Not a measured soil result</span></div></section>' +
       '<div class="section-title"><span class="mini-code">FIELD CHECKLIST</span><h3>Collect these four clues</h3></div><div class="tile-grid">' +
       soilChecks.map(function (c) { return '<article class="field-card checklist-card"><span class="check-number">' + c.n + '</span><h3>' + c.t + '</h3><p>' + c.d + '</p></article>'; }).join('') +
-      '</div><section class="source-strip"><div><span class="mini-code">MAP SOURCES</span><h3>Look up the actual soil unit</h3><p>The Ministry of Agriculture geoportal hosts detailed soil-map services in some areas, but coverage is not uniform nationwide. Confirm the map scale and whether your site falls inside the mapped area.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://geoportal.pertanian.go.id/">OPEN KEMENTAN GEOPORTAL ↗</a></section>' +
+      '</div>' +
+      (currentCountryIso3() === 'IDN'
+        ? '<section class="source-strip"><div><span class="mini-code">INDONESIA ONLY / KEMENTAN</span><h3>Look up the actual soil unit</h3><p>The Ministry of Agriculture geoportal hosts detailed soil-map services in some areas, but coverage is not uniform nationwide. Confirm map scale and availability for the actual site.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://geoportal.pertanian.go.id/">OPEN KEMENTAN GEOPORTAL ↗</a></section>'
+        : '<section class="source-strip"><div><span class="mini-code">COUNTRY DATA</span><h3>National soil and agriculture sources</h3><p>National soil surveys and agriculture portals differ by country. Open the Sources tab for reviewed official APIs and data portals for this selection.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://data.apps.fao.org/?lang=en">BROWSE OPEN GEOSPATIAL DATA ↗</a></section>') +
       '<section class="source-strip"><div><span class="mini-code">LANDSCAPE CONTEXT</span><h3>FAO Hand-in-Hand</h3><p>Use geospatial layers for broader context, then validate them against local observations and current official datasets.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://data.apps.fao.org/?lang=en">OPEN FAO MAP ↗</a></section>';
   }
 
@@ -873,77 +907,109 @@
       '<section class="source-strip"><div><span class="mini-code">DOCUMENTED PRACTICES</span><h3>Search WOCAT sustainable land management technologies</h3><p>WOCAT records can help compare documented techniques and contexts. Exact live API queries may require authorized access; the public catalogue remains available for browsing.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://qcat.wocat.net/en/wocat/list/">BROWSE WOCAT ↗</a></section>';
   }
 
+
+  function renderWorldBankAgricultureSnapshot(data) {
+    var indicators = data && Array.isArray(data.indicators) ? data.indicators : [];
+    var rows = indicators.map(function (indicator) {
+      return '<tr><td><b>' + esc(indicator.label) + '</b><small>' + esc(indicator.id) + '</small></td>' +
+        '<td>' + esc(indicator.value == null ? 'No value returned' : Number(indicator.value).toLocaleString('en-US',{maximumFractionDigits:2})) + '</td>' +
+        '<td>' + esc(indicator.unit) + '</td><td>' + esc(indicator.year || '—') + '</td>' +
+        '<td><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(indicator.sourceUrl)) + '">API record ↗</a></td></tr>';
+    }).join('');
+    return '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Indicator</th><th>Latest value</th><th>Unit</th><th>Year</th><th>Source</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<p class="nature-method-note">Retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. ' +
+      (data.failedIndicators && data.failedIndicators.length ? 'Some indicator endpoints failed: ' + esc(data.failedIndicators.join(', ')) + '. ' : '') +
+      'World Bank values are country-level and may lag behind the current year.</p>';
+  }
+
+
   function renderSources(profile) {
-    var selectedIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
-    var wocatCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[selectedIso3] && countryByISO3[selectedIso3].name) || selectedIso3;
-    if (selectedIso3 !== 'IDN') {
-      var selectedCountryName = currentProvince.countryName || selectedCountry && selectedCountry.name || selectedIso3;
-      var featureProps = currentProvince.feature && currentProvince.feature.properties ? currentProvince.feature.properties : {};
-      var boundaryMetadataUrl = featureProps._bt_source_metadata_url || '';
-      var boundaryLicense = featureProps._bt_boundary_license || 'See the source metadata for applicable license and attribution terms.';
-      var generalSources = [
-        {t:'FAO Hand-in-Hand geospatial catalogue',d:'Explore available land, water, climate and agricultural geospatial datasets. Coverage varies by country and layer.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL DATA'},
-        {t:'FAOSTAT',d:'Country-level agriculture, land-use and food-system indicators. These are national statistics, not measurements for this specific region.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL STATISTICS'},
-        {t:'World Bank Climate Change Knowledge Portal',d:'Country-level climate context to support further investigation. Validate local seasons and field conditions with national services and extension specialists.',u:'https://climateknowledgeportal.worldbank.org/',tag:'CLIMATE CONTEXT'},
-        {t:'WOCAT sustainable land management',d:'Browse documented soil, water and sustainable land management practices. A method should only be applied when the local conditions fit the documented context.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'FARMING PRACTICES'},
-        {t:'geoBoundaries administrative data',d:'Boundary provenance for the selected region. The represented year and license can differ between countries and administrative levels.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
-      ];
-      return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Regional field notes for <b>' + esc(selectedCountryName) + '</b>. These are discovery resources, not proof that a crop is suitable for a particular farm.</p></div>' +
-        '<div class="source-list">' + generalSources.map(function (source, i) {
-          return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
-        }).join('') + '</div>' +
-        '<details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary>' +
-        '<p>Search published sustainable land management technologies for <b>' + esc(wocatCountryName) + '</b>. Browsing the WOCAT database is free; API calls require an authorized token. The token is used for this request only and is not saved. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://qcat.readthedocs.io/en/latest/api/v2.html">API authorization guide ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wocat.net/en/account/register/">WOCAT registration ↗</a></p>' +
-        '<label for="live-wocat-token">WOCAT QCAT API token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste an authorized token for one request">' +
-        '<button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">No sample records are fabricated.</div></details>' +
-        '<section class="data-integrity"><span class="data-tag green">BOUNDARY METADATA</span><h3>Check the original source</h3><p><b>Administrative level:</b> ' + esc(currentProvince.adminLevel === 2 ? 'ADM2 · second-level local unit' : 'ADM1 · first-level region') + '.</p><p><b>Boundary license:</b> ' + esc(boundaryLicense) + '</p><p>Administrative names and legal categories differ between countries. Do not interpret this generic regional fieldbook as a verified local soil survey or crop prescription.</p></section>';
-    }
-    var sources = [
-      {t:'BPS — provincial rice statistics',d:'Official harvested area, productivity and production table. Open the source table and select the relevant year.',u:'https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html',tag:'OFFICIAL STATISTICS'},
-      {t:'Kementerian Pertanian — soil and agricultural geodata',d:'Explore available soil and land-resource layers. Coverage, scale and licensing must be checked for each layer.',u:'https://geoportal.pertanian.go.id/',tag:'SOIL / GIS'},
-      {t:'FAO Hand-in-Hand',d:'Spatial datasets and context for land, water, climate and agricultural systems.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL'},
-      {t:'ESA WorldCover 2021',d:'A freely accessible 10 m global land-cover product; the map layer can be toggled from the Leaflet layer control. It is not a parcel survey and is not current-year land cover.',u:'https://esa-worldcover.org/en/data-access',tag:'LAND COVER / WMS'},
-      {t:'FAO WaPOR v3',d:'Open water-productivity and evapotranspiration datasets. Check level/resolution and time coverage for the selected point before interpreting values.',u:'https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en',tag:'WATER / ET DATA'},
-      {t:'iNaturalist API',d:'Research-grade community plant observations used as an independent cross-check against GBIF.',u:'https://www.inaturalist.org/pages/developers',tag:'BIODIVERSITY'},
-      {t:'Pl@ntNet API',d:'Optional personal-key image identification. Free quota is up to 500 queries/day; account and attribution terms apply.',u:'https://my.plantnet.org/terms_of_use',tag:'PHOTO IDENTIFICATION'},
-      {t:'FAOSTAT',d:'Country-level agricultural indicators and land-use statistics. These are not provincial measurements.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL INDICATORS'},
-      {t:'WOCAT QCAT',d:'Documented sustainable land management approaches and technologies. API access may require a token.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'RESTORATION METHODS'},
-      {t:'FAO AGROVOC',d:'Multilingual agricultural vocabulary and concept relationships for structured discovery.',u:'https://agrovoc.fao.org/browse/agrovoc/en/',tag:'TAXONOMY'},
-      {t:'CGIAR GARDIAN',d:'Agricultural research and dataset discovery. The discovery portal is linked here; verify current API access, schema and authentication before building an automated connector.',u:'https://gardian.bigdata.cgiar.org/',tag:'RESEARCH DISCOVERY'},
-      {t:'OpenFarm growing guides — archived',d:'OpenFarm announced that its servers shut down in April 2025. The original growing-guide API is not treated as live; its archived repository is available for reference only.',u:'https://github.com/openfarmcc/OpenFarm',tag:'ARCHIVED / NOT LIVE'},
-      {t:'Provincial boundary GeoJSON',d:'38 Indonesian province boundaries. Repository README cites Kepmendagri No. 300.2.2-2138/2025 and MIT licensing; review the original metadata when reusing.',u:'https://github.com/AlfianAliM/Indonesia-GeoJSON',tag:'MAP BOUNDARIES'}
+    var selectedIso3 = currentCountryIso3() || 'UNK';
+    var selectedCountryName = (currentProvince && currentProvince.countryName) ||
+      (selectedCountry && selectedCountry.name) ||
+      (countryByISO3[selectedIso3] && countryByISO3[selectedIso3].name) || selectedIso3;
+    var wocatCountryName = selectedCountryName;
+    var featureProps = currentProvince && currentProvince.feature && currentProvince.feature.properties
+      ? currentProvince.feature.properties : {};
+    var boundaryMetadataUrl = featureProps._bt_source_metadata_url || '';
+    var boundaryLicense = featureProps._bt_boundary_license || 'See the source metadata for applicable license and attribution terms.';
+    var api = window.BackToNatureAPI;
+    var countrySources = api && api.getCountrySourceCatalog
+      ? api.getCountrySourceCatalog(selectedIso3, selectedCountryName) : [];
+    var isIndonesia = selectedIso3 === 'IDN';
+
+    var countrySourceMarkup = '<section class="country-api-section"><div class="section-title"><span class="mini-code">NATIONAL DATA / ' + esc(selectedIso3) + '</span><h3>Official APIs for ' + esc(selectedCountryName) + '</h3></div>' +
+      '<p class="live-explainer">Only reviewed country-relevant sources are listed. Access labels distinguish public APIs from services that require registration or a key.</p>' +
+      countrySourceCardsMarkup(countrySources) + '</section>' +
+      renderWorldBankIndicatorPanel(selectedIso3, selectedCountryName);
+
+    var indonesiaLiveTerminal = isIndonesia
+      ? '<section class="live-connectors"><div class="section-title"><span class="mini-code">LIVE DATA TERMINAL / INDONESIA</span><h3>Query national and spatial sources</h3></div>' +
+        '<p class="live-explainer">BPS and Kementerian Pertanian are Indonesia-only sources. FAOSTAT returns national context, not province-level measurements.</p>' +
+        '<div class="tile-grid">' +
+        '<article class="field-card"><div class="card-topline"><span class="card-emoji">📊</span><span class="mini-code">FAOSTAT / LIVE</span></div><h3>Land use · Indonesia</h3><p>Request Indonesia-level land-use observations from the public FAOSTAT API.</p><button id="live-faostat-btn" class="pixel-btn" type="button">FETCH NATIONAL DATA</button><div id="live-faostat-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-faostat-results" class="live-results">No values are shown until the live API responds.</div></article>' +
+        '<article class="field-card"><div class="card-topline"><span class="card-emoji">🗺️</span><span class="mini-code">FAO CATALOGUE / LIVE</span></div><h3>Spatial metadata · ' + esc(profile.name) + '</h3><p>Search FAO catalogue metadata for records mentioning this region and soil, land, water, climate or agriculture.</p><button id="live-fao-catalog-btn" class="pixel-btn" type="button">SEARCH FAO CATALOGUE</button><div id="live-fao-catalog-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-fao-catalog-results" class="live-results">No catalogue results loaded.</div></article>' +
+        '</div></section>'
+      : '';
+
+    var globalSources = [
+      {t:'FAO Hand-in-Hand geospatial catalogue',d:'Explore land, water, climate and agriculture geospatial datasets. Coverage varies by country and layer.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL DATA'},
+      {t:'FAOSTAT',d:'Country-level agriculture, land-use and food-system indicators. These are national statistics, not measurements for this specific region.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL STATISTICS'},
+      {t:'World Bank Climate Change Knowledge Portal',d:'Country-level climate context. Validate local seasons and field conditions with national services and extension specialists.',u:'https://climateknowledgeportal.worldbank.org/',tag:'CLIMATE CONTEXT'},
+      {t:'ESA WorldCover 2021',d:'A 10 m global land-cover product. It is not a parcel survey and does not represent current-year land cover.',u:'https://esa-worldcover.org/en/data-access',tag:'LAND COVER'},
+      {t:'FAO WaPOR v3',d:'Open water-productivity and evapotranspiration datasets. Check resolution and time coverage for the selected point.',u:'https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en',tag:'WATER / ET DATA'},
+      {t:'GBIF Occurrence API',d:'Global taxonomic and georeferenced species records. Occurrences are not abundance estimates or crop-suitability evidence.',u:'https://techdocs.gbif.org/en/openapi/v1/occurrence',tag:'BIODIVERSITY API'},
+      {t:'iNaturalist API',d:'Community nature observations as an independent cross-check against GBIF. Observation effort varies by location.',u:'https://www.inaturalist.org/pages/developers',tag:'BIODIVERSITY API'},
+      {t:'Pl@ntNet API',d:'Optional photo-based plant identification. Free quota, personal key and attribution terms apply.',u:'https://my.plantnet.org/terms_of_use',tag:'PHOTO IDENTIFICATION'},
+      {t:'WOCAT QCAT',d:'Documented sustainable land-management practices and technologies. Live API calls may require an authorized token.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'FARMING PRACTICES'},
+      {t:'geoBoundaries administrative data',d:'Administrative boundary provenance. The represented year and license differ by country and administrative level.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
     ];
-    return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open source records to check update date, methodology, geographic coverage, license and units. This app separates a curated regional starter profile from measured statistics.</p></div>' +
-      '<section class="live-connectors"><div class="section-title"><span class="mini-code">LIVE DATA TERMINAL</span><h3>Query the source systems</h3></div>' +
-      '<p class="live-explainer">These connectors request real records when you press a button. National FAOSTAT observations provide country context only; they are not provincial soil or yield measurements.</p>' +
-      '<div class="tile-grid">' +
-      '<article class="field-card"><div class="card-topline"><span class="card-emoji">📊</span><span class="mini-code">FAOSTAT / LIVE</span></div><h3>Land use · Indonesia</h3><p>Request Indonesia-level land-use observations from the public FAOSTAT API.</p><button id="live-faostat-btn" class="pixel-btn" type="button">FETCH NATIONAL DATA</button><div id="live-faostat-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-faostat-results" class="live-results">No values are shown until the live API responds.</div></article>'
-      '<article class="field-card"><div class="card-topline"><span class="card-emoji">🗺️</span><span class="mini-code">FAO CATALOGUE / LIVE</span></div><h3>Spatial metadata · ' + esc(profile.name) + '</h3><p>Search FAO catalogue metadata for records mentioning this province and soil, land, water, climate or agriculture.</p><button id="live-fao-catalog-btn" class="pixel-btn" type="button">SEARCH FAO CATALOGUE</button><div id="live-fao-catalog-status" class="live-status" aria-live="polite">Not queried yet</div><div id="live-fao-catalog-results" class="live-results">No catalogue results loaded.</div></article>' +
-      '</div><details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary><p>Search published sustainable land management technologies for <b>' + esc(wocatCountryName) + '</b>. Browsing the WOCAT database is free; API calls require an authorized token. The token is used for this request only and is not saved. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://qcat.readthedocs.io/en/latest/api/v2.html">API authorization guide ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wocat.net/en/account/register/">WOCAT registration ↗</a></p><label for="live-wocat-token">WOCAT QCAT API token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste an authorized token for one request"><button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">No sample records are fabricated.</div></details></section>' +
-      '<div class="source-list">' + sources.map(function (s, i) {
-        return '<article class="source-card"><div class="source-index">' + String(i + 1).padStart(2, '0') + '</div><div class="source-main"><span class="mini-code">' + esc(s.tag) + '</span><h3>' + esc(s.t) + '</h3><p>' + esc(s.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(s.u) + '">Open source ↗</a></div></article>';
-      }).join('') + '</div>' +
-      '<section class="data-integrity"><span class="data-tag green">DATA INTEGRITY</span><h3>What this panel does—and does not—claim</h3><p><b>It does:</b> organize regional planning cues, crop candidates, field-check lists and trusted data portals.</p><p><b>It does not:</b> claim laboratory soil values, precise yield, farm-level suitability or confirmed API measurements where those data were not retrieved and validated.</p><p>Selected province: <b>' + esc(profile.name) + '</b>. Profile type: <b>curated regional starter</b>.</p></section>';
-  }
 
-  function setLiveStatus(id, text, type) {
-    var node = el(id);
-    if (!node) return;
-    node.className = 'live-status ' + (type || 'neutral');
-    node.textContent = text;
-  }
+    var wocatBox = '<details class="token-box"><summary>🔐 Connect authorized WOCAT QCAT access (optional)</summary>' +
+      '<p>Search published sustainable land-management technologies for <b>' + esc(wocatCountryName) + '</b>. Browsing the database is free; API calls require an authorized token. The token is used for this request only and is not saved. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://qcat.readthedocs.io/en/latest/api/v2.html">API authorization guide ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wocat.net/en/account/register/">WOCAT registration ↗</a></p>' +
+      '<label for="live-wocat-token">WOCAT QCAT API token</label><input id="live-wocat-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste an authorized token for one request">' +
+      '<button id="live-wocat-btn" class="pixel-btn wood" type="button">FETCH WOCAT TECHNOLOGIES</button><div id="live-wocat-status" class="live-status" aria-live="polite">Token not supplied</div><div id="live-wocat-results" class="live-results">No sample records are fabricated.</div></details>';
 
-  function safeHttps(value) {
-    try {
-      var parsed = new URL(String(value || ''), window.location.href);
-      return parsed.protocol === 'https:' ? parsed.href : '#';
-    } catch (_) { return '#'; }
+    var integrity = '<section class="data-integrity"><span class="data-tag green">DATA INTEGRITY</span><h3>What this panel does—and does not—claim</h3>' +
+      '<p><b>It does:</b> provide country-appropriate official source links and country-filtered data where a live connector is available.</p>' +
+      '<p><b>It does not:</b> claim laboratory soil values, precise yield, farm-level suitability or official measurements where those values were not retrieved and validated.</p>' +
+      '<p><b>Administrative level:</b> ' + esc(currentProvince && Number(currentProvince.adminLevel) === 2 ? 'ADM2 · second-level local unit' : 'ADM1 · first-level region') +
+      '. <b>Boundary license:</b> ' + esc(boundaryLicense) + '</p></section>';
+
+    return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open the official sources to verify date, methodology, geography, license and units. National indicators are context—not parcel-level measurements.</p></div>' +
+      countrySourceMarkup + indonesiaLiveTerminal +
+      '<div class="source-list">' + globalSources.map(function (source, index) {
+        return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
+      }).join('') + '</div>' + wocatBox + integrity;
   }
 
   function wireSourceControls(profile) {
     var api = window.BackToNatureAPI;
     var currentSourceIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
     var currentSourceCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[currentSourceIso3] && countryByISO3[currentSourceIso3].name) || currentSourceIso3;
+    var countryWbBtn = el('country-wb-fetch-btn');
+    if (countryWbBtn) countryWbBtn.addEventListener('click', async function () {
+      if (!api || !api.fetchWorldBankAgricultureSnapshot) {
+        setLiveStatus('country-wb-status', 'Country-indicator API is unavailable. Reload the page.', 'error');
+        return;
+      }
+      countryWbBtn.disabled = true;
+      setLiveStatus('country-wb-status', 'Requesting country-filtered agriculture indicators from the World Bank API…', 'pending');
+      var resultNode = el('country-wb-results');
+      if (resultNode) resultNode.textContent = 'Waiting for official country-level observations. No placeholder values are used.';
+      try {
+        var result = await api.fetchWorldBankAgricultureSnapshot(currentSourceIso3, true);
+        if (currentProvince && currentCountryIso3() !== currentSourceIso3) return;
+        if (resultNode) resultNode.innerHTML = renderWorldBankAgricultureSnapshot(result);
+        setLiveStatus('country-wb-status', result.indicators.length + ' indicator series retrieved for ' + currentSourceIso3 + '.', 'success');
+      } catch (error) {
+        setLiveStatus('country-wb-status', error && error.message ? error.message : 'World Bank API request failed.', 'error');
+        if (resultNode) resultNode.textContent = 'No example values were substituted. Check the API status and retry.';
+      } finally {
+        countryWbBtn.disabled = false;
+      }
+    });
+
     var faoBtn = el('live-faostat-btn');
     if (faoBtn) faoBtn.addEventListener('click', async function () {
       if (!api || !api.fetchIndonesiaLandUse) {

@@ -1486,6 +1486,131 @@
     return promise;
   }
 
+
+  var worldBankAgricultureCache = {};
+  var WORLD_BANK_AGRICULTURE_INDICATORS = [
+    {id:'AG.LND.AGRI.ZS',label:'Agricultural land',unit:'% of land area'},
+    {id:'AG.YLD.CREL.KG',label:'Cereal yield',unit:'kg per hectare'},
+    {id:'AG.PRD.CROP.XD',label:'Crop production index',unit:'2014–2016 = 100'},
+    {id:'NV.AGR.TOTL.ZS',label:'Agriculture, forestry and fishing value added',unit:'% of GDP'}
+  ];
+
+  async function fetchWorldBankAgricultureSnapshot(iso3, forceRefresh) {
+    var country = String(iso3 || '').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(country)) throw new Error('A valid ISO-3 country code is required.');
+    if (forceRefresh === true) delete worldBankAgricultureCache[country];
+    if (worldBankAgricultureCache[country]) return worldBankAgricultureCache[country];
+
+    var promise = (async function () {
+      var results = await Promise.allSettled(WORLD_BANK_AGRICULTURE_INDICATORS.map(async function (indicator) {
+        var params = new URLSearchParams({format:'json',per_page:'100'});
+        var url = 'https://api.worldbank.org/v2/country/' + encodeURIComponent(country) +
+          '/indicator/' + encodeURIComponent(indicator.id) + '?' + params.toString();
+        var payload = await requestJSON(url);
+        var observations = Array.isArray(payload) && Array.isArray(payload[1]) ? payload[1] : [];
+        var available = observations.filter(function (observation) {
+          return observation && observation.value != null && Number.isFinite(Number(observation.value));
+        });
+        var latest = available.length ? available[0] : null;
+        return {
+          id:indicator.id,
+          label:indicator.label,
+          unit:indicator.unit,
+          value:latest ? Number(latest.value) : null,
+          year:latest ? String(latest.date || '') : '',
+          observations:available.slice(0,5).map(function (observation) {
+            return {year:String(observation.date || ''),value:Number(observation.value)};
+          }),
+          sourceUrl:url
+        };
+      }));
+      var indicators = [];
+      var errors = [];
+      results.forEach(function (result, index) {
+        if (result.status === 'fulfilled') indicators.push(result.value);
+        else errors.push(WORLD_BANK_AGRICULTURE_INDICATORS[index].id);
+      });
+      if (!indicators.length) throw new Error('The World Bank API did not return any country agriculture indicators. The country may have limited coverage or the service may be unavailable.');
+      return {
+        countryIso3:country,
+        retrievedAt:new Date().toISOString(),
+        indicators:indicators,
+        failedIndicators:errors,
+        source:'World Bank Indicators API v2',
+        sourceUrl:'https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation'
+      };
+    })().catch(function (error) {
+      delete worldBankAgricultureCache[country];
+      throw error;
+    });
+    worldBankAgricultureCache[country] = promise;
+    return promise;
+  }
+
+  var COUNTRY_SOURCE_REGISTRY = {
+    IDN:[
+      {title:'BPS — provincial paddy statistics',description:'Official harvested area, productivity and production tables for Indonesian provinces.',url:'https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html',kind:'Official statistics table',access:'Free table'},
+      {title:'BPS WebAPI',description:'Programmatic access to BPS statistical products. Free registration is required to obtain an API key/token.',url:'https://webapi.bps.go.id/developer',kind:'National statistics API',access:'Free registration + key'},
+      {title:'Kementerian Pertanian — Geoportal',description:'Official Indonesian agriculture/soil and land-resource map services. Coverage and map scale vary by layer.',url:'https://geoportal.pertanian.go.id/',kind:'Agriculture / soil geodata',access:'Portal access; layer terms vary'}
+    ],
+    USA:[
+      {title:'USDA NASS Quick Stats API',description:'Agricultural statistics by commodity, geography and year. API queries require a free API key; do not put a personal key in public source code.',url:'https://quickstats.nass.usda.gov/api',kind:'National agriculture statistics API',access:'Free API key required'},
+      {title:'USDA NASS Quick Stats',description:'Browse agricultural data and downloadable reports without configuring an API client.',url:'https://www.nass.usda.gov/Quick_Stats/',kind:'Official agriculture statistics',access:'Public portal'},
+      {title:'USDA NASS datasets',description:'Official datasets and precomputed agriculture products for the United States.',url:'https://www.nass.usda.gov/datasets/',kind:'Agriculture datasets',access:'Public downloads vary by product'}
+    ],
+    CAN:[
+      {title:'Statistics Canada Web Data Service',description:'Official REST/JSON API for Canadian statistical tables and time series, including agriculture data.',url:'https://www.statcan.gc.ca/en/developers/wds/user-guide',apiUrl:'https://www150.statcan.gc.ca/t1/wds/rest/getAllCubesListLite',kind:'National statistics API',access:'Public API; no API key documented'},
+      {title:'Statistics Canada agriculture statistics',description:'Official agriculture data, including farm structure, crops, livestock and food statistics.',url:'https://www.statcan.gc.ca/en/subjects-start/agriculture_and_food',kind:'Agriculture statistics',access:'Public portal'}
+    ],
+    BRA:[
+      {title:'IBGE SIDRA API',description:'Brazilian official statistical tables, including agricultural production. Query table and geography before interpreting a result.',url:'https://apisidra.ibge.gov.br/',kind:'National statistics API',access:'Public API; no key generally required'},
+      {title:'IBGE Aggregate API documentation',description:'API documentation for Brazilian geographic and statistical aggregates.',url:'https://servicodados.ibge.gov.br/api/docs/agregados?versao=3',apiUrl:'https://servicodados.ibge.gov.br/api/v3/agregados',kind:'Official statistics API',access:'Public API'}
+    ],
+    AUS:[
+      {title:'data.gov.au — agriculture dataset API search',description:'Search the Australian open-data catalogue for agriculture-related datasets. Individual resources can have different formats, licences or access conditions.',url:'https://data.gov.au/data/',apiUrl:'https://data.gov.au/data/api/3/action/package_search?q=agriculture',kind:'National open-data catalogue API',access:'Public catalogue search; resource terms vary'},
+      {title:'ABARES — Australian agriculture and resource economics',description:'Official Australian agriculture, commodities, land and resource-economics research and statistics.',url:'https://www.agriculture.gov.au/abares',kind:'Agriculture statistics and research',access:'Public portal'}
+    ],
+    IND:[
+      {title:'data.gov.in — agriculture datasets/API',description:'Indian government open-data catalogue with agriculture and allied-sector datasets. API use requires a registered API key.',url:'https://api.data.gov.in/',kind:'National open-data API',access:'Free registration + API key'},
+      {title:'Ministry of Agriculture & Farmers Welfare',description:'Official Indian agriculture policies, schemes, statistics and publications.',url:'https://agriwelfare.gov.in/',kind:'Agriculture ministry data',access:'Public portal'}
+    ],
+    JPN:[
+      {title:'e-Stat Government Statistics API',description:'Japan’s official statistical portal provides machine-readable statistics; API usage requires an application ID.',url:'https://www.e-stat.go.jp/api/',kind:'National statistics API',access:'Free registration + app ID'},
+      {title:'MAFF Japan',description:'Official Ministry of Agriculture, Forestry and Fisheries statistics, reports and policy data.',url:'https://www.maff.go.jp/e/data/stat/',kind:'Agriculture statistics',access:'Public portal'}
+    ],
+    MEX:[
+      {title:'INEGI APIs',description:'Mexico’s national statistics and geography APIs. Some calls require a registered token; review the dataset and API conditions.',url:'https://www.inegi.org.mx/servicios/api_indicadores.html',kind:'National statistics API',access:'Free registration/token may be required'},
+      {title:'SIAP — agricultural and fisheries information',description:'Official Mexican agriculture, livestock, fisheries and food-production statistics.',url:'https://www.gob.mx/siap',kind:'Agriculture statistics',access:'Public portal; dataset access varies'}
+    ]
+  };
+
+  var EUROSTAT_ISO3_TO_GEO = {
+    AUT:'AT', BEL:'BE', BGR:'BG', HRV:'HR', CYP:'CY', CZE:'CZ', DNK:'DK',
+    EST:'EE', FIN:'FI', FRA:'FR', DEU:'DE', GRC:'EL', HUN:'HU', IRL:'IE',
+    ITA:'IT', LVA:'LV', LTU:'LT', LUX:'LU', MLT:'MT', NLD:'NL', POL:'PL',
+    PRT:'PT', ROU:'RO', SVK:'SK', SVN:'SI', ESP:'ES', SWE:'SE'
+  };
+
+  function getCountrySourceCatalog(iso3, countryName) {
+    var country = String(iso3 || '').toUpperCase();
+    var records = (COUNTRY_SOURCE_REGISTRY[country] || []).map(function (item) {
+      return Object.assign({}, item);
+    });
+    var euroGeo = EUROSTAT_ISO3_TO_GEO[country];
+    if (euroGeo) {
+      records.unshift({
+        title:'Eurostat — crop production API',
+        description:'Official EU crop-production statistics, including area and production indicators. The API is keyless; this endpoint filters the dataset to the selected EU member country.',
+        url:'https://ec.europa.eu/eurostat/databrowser/product/page/apro_cpsh1',
+        apiUrl:'https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/apro_cpsh1?geo=' + euroGeo + '&lang=EN',
+        kind:'Regional agriculture statistics API',
+        access:'Public API; no key',
+        queryCountry:euroGeo
+      });
+    }
+    return records;
+  }
+
   window.BackToNatureAPI = {
     fetchIndonesiaLandUse: fetchIndonesiaLandUse,
     searchFaoCatalog: searchFaoCatalog,
@@ -1502,6 +1627,8 @@
     fetchINaturalistPlantObservations: fetchINaturalistPlantObservations,
     fetchOpenMeteoAgroOutlook: fetchOpenMeteoAgroOutlook,
     identifyPlantWithPlantNet: identifyPlantWithPlantNet,
-    fetchWaporMapsets: fetchWaporMapsets
+    fetchWaporMapsets: fetchWaporMapsets,
+    getCountrySourceCatalog: getCountrySourceCatalog,
+    fetchWorldBankAgricultureSnapshot: fetchWorldBankAgricultureSnapshot
   };
 })();
