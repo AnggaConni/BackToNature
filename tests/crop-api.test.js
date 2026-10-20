@@ -1,5 +1,7 @@
 /* Offline smoke tests for BackToNature's crop screening and photo mapper. */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 global.window = {};
 const originalFetch = global.fetch;
@@ -7,6 +9,12 @@ require('../api.js');
 const api = global.window.BackToNatureAPI;
 
 async function main() {
+  // Browser app can't be required in Node, but guard against regressions where
+  // a Sources/ Nature handler calls a missing live-status helper.
+  const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  assert.match(appSource, /function\\s+setLiveStatus\\s*\\(/, 'live API status helper is defined');
+  assert.match(appSource, /node\\.className\\s*=\\s*'live-status '\\s*\\+\\s*normalizedType/, 'live status helper uses the live-status style classes');
+  assert.ok((appSource.match(/setLiveStatus\\s*\\(/g) || []).length > 1, 'live API handlers can call the helper');
   assert.equal(typeof api.listCropRecommendations, 'function', 'crop screener is exported');
   assert.equal(typeof api.searchPlantImages, 'function', 'Commons image search is exported');
 
