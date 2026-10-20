@@ -184,8 +184,70 @@ async function main() {
   assert.equal(gbifCalls.filter((url) => new URL(url).pathname === '/v1/species/match').length,1,'scientific matching is cached across selected countries');
   assert.equal(gbifCalls.filter((url) => new URL(url).pathname.endsWith('/vernacularNames')).length,1,'vernacular records are cached across selected countries');
 
+
+  // Test nearby GBIF occurrence filtering and the public record URL mapper.
+  const occurrenceCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    occurrenceCalls.push(parsed);
+    return {
+      ok:true,
+      status:200,
+      text:async function () {
+        return JSON.stringify({
+          count:3,
+          results:[
+            {key:111, taxonKey:2705644, scientificName:'Zea mays', vernacularName:'Maize', eventDate:'2025-03-01', decimalLatitude:-6.21, decimalLongitude:106.81, countryCode:'ID', basisOfRecord:'HUMAN_OBSERVATION', datasetName:'Local test dataset'},
+            {key:222, taxonKey:12345, scientificName:'Birdus testus', eventDate:'2024-08-10', decimalLatitude:-6.30, decimalLongitude:106.80, countryCode:'ID'},
+            {key:333, scientificName:'Too far', decimalLatitude:-6.70, decimalLongitude:106.80}
+          ]
+        });
+      }
+    };
+  };
+  const nearby = await api.fetchGbifOccurrences(-6.2,106.8,25,12);
+  assert.equal(nearby.records.length,2,'GBIF records outside the true radius are filtered out');
+  assert.equal(nearby.records[0].key,'111','nearby records are sorted by distance');
+  assert.equal(nearby.records[0].vernacularName,'Maize','common name is kept when supplied');
+  assert.match(nearby.records[0].sourceUrl,/gbif\.org\/occurrence\/111/,'source occurrence URL is supplied');
+  assert.ok(occurrenceCalls[0].searchParams.get('decimalLatitude').includes(','),'GBIF is queried with coordinate range filters');
+  assert.equal(occurrenceCalls[0].searchParams.get('hasCoordinate'),'true','GBIF query requests georeferenced records');
+
+  // Test the NASA POWER monthly climate mapper with mocked monthly parameter values.
+  let nasaRequestUrl = '';
+  global.fetch = async function (url) {
+    nasaRequestUrl = String(url);
+    return {
+      ok:true,
+      status:200,
+      text:async function () {
+        return JSON.stringify({
+          properties:{
+            parameter:{
+              T2M:{'202301':20,'202401':22,'202501':24,'202302':25,'202402':27},
+              T2M_MIN:{'202301':15,'202401':17,'202501':19,'202302':20,'202402':22},
+              T2M_MAX:{'202301':26,'202401':28,'202501':30,'202302':31,'202402':33},
+              PRECTOTCORR:{'202301':1,'202401':2,'202501':3,'202302':4,'202402':6},
+              ALLSKY_SFC_SW_DWN:{'202301':4,'202401':5,'202501':6,'202302':6,'202402':8}
+            }
+          }
+        });
+      }
+    };
+  };
+  const nasa = await api.fetchNasaPowerMonthly(-6.3,106.9,5);
+  assert.equal(nasa.monthly.length,12,'NASA POWER returns all twelve calendar months');
+  assert.equal(nasa.monthly[0].temperatureMean,22,'January is averaged across available complete years');
+  assert.equal(nasa.monthly[0].precipitationRateMmPerDay,2,'precipitation remains labelled as a daily rate');
+  assert.equal(nasa.monthly[1].temperatureMean,26,'February monthly values are aggregated across years');
+  assert.match(nasaRequestUrl,/power\.larc\.nasa\.gov\/api\/temporal\/monthly\/point/,'NASA POWER monthly endpoint is used');
+  const nasaParams = new URL(nasaRequestUrl).searchParams;
+  assert.equal(nasaParams.get('community'),'AG','NASA POWER uses its agriculture community');
+  assert.equal(nasaParams.get('start'),String(new Date().getFullYear()-5),'NASA POWER uses five complete calendar years');
+  assert.equal(nasaParams.get('end'),String(new Date().getFullYear()-1),'NASA POWER excludes the incomplete current year');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window and climate API smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence and NASA POWER smoke tests passed.');
 }
 
 main().catch((error) => {

@@ -42,6 +42,12 @@
   var cropTaxonomyBySelection = {};
   var cropTaxonomyPendingBySelection = {};
   var cropTaxonomyStatusBySelection = {};
+  var natureOccurrenceDataBySelection = {};
+  var natureOccurrenceStatusBySelection = {};
+  var naturePowerDataBySelection = {};
+  var naturePowerStatusBySelection = {};
+  var natureOccurrenceRequestId = 0;
+  var naturePowerRequestId = 0;
 
   function norm(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -1007,6 +1013,165 @@
     });
   }
 
+
+  function renderNatureOccurrenceCards(data) {
+    var records = data && Array.isArray(data.records) ? data.records : [];
+    if (!records.length) {
+      return '<p>No coordinate-backed GBIF records were returned inside this search radius. This does not mean the area has no wildlife; recording effort and data coverage vary.</p>';
+    }
+    return '<div class="nature-record-grid">' + records.map(function (record) {
+      var detail = [record.locality, record.countryCode].filter(Boolean).join(' · ');
+      var taxonUrl = /^\d+$/.test(String(record.taxonKey || ''))
+        ? 'https://www.gbif.org/species/' + encodeURIComponent(record.taxonKey)
+        : 'https://www.gbif.org/occurrence/search?scientific_name=' + encodeURIComponent(record.scientificName);
+      return '<article class="field-card nature-record-card">' +
+        '<div class="card-topline"><span class="card-emoji">🦋</span><span class="mini-code">' + esc(numberOrDash(record.distanceKm,' km away')) + '</span></div>' +
+        '<h3>' + esc(record.vernacularName || record.scientificName) + '</h3>' +
+        (record.vernacularName ? '<p><i>' + esc(record.scientificName) + '</i></p>' : '<p><i>Scientific name / identification supplied by record</i></p>') +
+        (record.eventDate ? '<p><b>Observation date:</b> ' + esc(record.eventDate) + '</p>' : '') +
+        (detail ? '<p>' + esc(detail) + '</p>' : '') +
+        (record.basisOfRecord ? '<p><b>Record type:</b> ' + esc(record.basisOfRecord.replace(/_/g,' ').toLowerCase()) + '</p>' : '') +
+        (record.datasetName ? '<p><b>Dataset:</b> ' + esc(record.datasetName) + '</p>' : '') +
+        '<div class="nature-record-links"><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(taxonUrl)) + '">Open taxon ↗</a>' +
+        ' <a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Source record ↗</a></div>' +
+        '</article>';
+    }).join('') + '</div>';
+  }
+
+  function renderNasaPowerMonthCards(data) {
+    var months = data && Array.isArray(data.monthly) ? data.monthly : [];
+    if (!months.length) return '<p>No monthly climate values were returned by NASA POWER.</p>';
+    return '<div class="climate-month-grid">' + months.map(function (month) {
+      return '<article class="climate-month-card">' +
+        '<div class="climate-month-top"><b>' + esc(month.label) + '</b><span>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</span></div>' +
+        '<div class="climate-month-metrics">' +
+        '<span>Mean temperature</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
+        '<span>Typical low–high</span><b>' + esc(numberOrDash(month.temperatureMin,'–') + numberOrDash(month.temperatureMax,' °C')) + '</b>' +
+        '<span>Precipitation rate</span><b>' + esc(numberOrDash(month.precipitationRateMmPerDay,' mm/day')) + '</b>' +
+        '<span>Solar radiation</span><b>' + esc(numberOrDash(month.solarRadiationKwhM2Day,' kWh/m²/day')) + '</b>' +
+        '</div></article>';
+    }).join('') + '</div>';
+  }
+
+  function renderNatureExplorer(profile) {
+    var key = climateSelectionKey(currentProvince);
+    var occurrenceData = natureOccurrenceDataBySelection[key];
+    var occurrenceStatus = natureOccurrenceStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
+    var powerData = naturePowerDataBySelection[key];
+    var powerStatus = naturePowerStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
+    var region = currentProvince && currentProvince.name || profile.name;
+    var point = currentProvince && geometryCentroid(currentProvince.feature);
+    var pointText = point ? (Number(point.latitude).toFixed(4) + ', ' + Number(point.longitude).toFixed(4)) : 'representative point unavailable';
+    return '<div class="tab-intro"><div class="eyebrow">NATURE & CLIMATE / LIVE DATA</div>' +
+      '<h2>Explore nearby life and climate 🌿</h2>' +
+      '<p>Use public source data around <b>' + esc(region) + '</b>. Both queries use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p></div>' +
+      '<div class="tile-grid nature-connectors-grid">' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🦋</span><span class="mini-code">GBIF / OCCURRENCES</span></div>' +
+      '<h3>Species observations nearby</h3><p>Retrieve coordinate-backed biodiversity records from GBIF, then keep only records inside a configurable nearby radius. A record shows that an observation was reported—not population size or complete biodiversity.</p>' +
+      '<button id="nature-gbif-btn" class="pixel-btn green" type="button">FETCH NEARBY SPECIES</button>' +
+      '<div id="nature-gbif-status" class="live-status ' + esc(occurrenceStatus.type) + '" aria-live="polite">' + esc(occurrenceStatus.message) + '</div>' +
+      '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Press the button to request live records. No sample observations are fabricated.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://techdocs.gbif.org/en/openapi/v1/occurrence">GBIF Occurrence API ↗</a></p></article>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">☀️</span><span class="mini-code">NASA POWER / MONTHLY</span></div>' +
+      '<h3>Climate cross-check</h3><p>Compare monthly average temperature, daily precipitation rate and solar radiation across five completed calendar years. This is a gridded regional estimate, not a farm station or forecast.</p>' +
+      '<button id="nature-power-btn" class="pixel-btn green" type="button">FETCH NASA POWER DATA</button>' +
+      '<div id="nature-power-status" class="live-status ' + esc(powerStatus.type) + '" aria-live="polite">' + esc(powerStatus.message) + '</div>' +
+      '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'Press the button to retrieve a historical climate summary. No example values are shown as live data.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER Monthly API ↗</a></p></article>' +
+      '</div>' +
+      '<section class="climate-method-note"><b>How to interpret this panel</b><p>Administrative-area centroids are only a convenient starting point. Large regions, islands and high-relief areas can have very different conditions. GBIF observation density depends on reporting effort. NASA POWER is a separate data source and should be compared with Open-Meteo, local meteorological records and field observations rather than treated as exact ground truth.</p></section>';
+  }
+
+  function wireNatureControls() {
+    var selection = currentProvince;
+    if (!selection) return;
+    var key = climateSelectionKey(selection);
+    var occurrenceButton = el('nature-gbif-btn');
+    if (occurrenceButton) occurrenceButton.addEventListener('click', async function () {
+      var api = window.BackToNatureAPI;
+      var point = geometryCentroid(selection.feature);
+      if (!point) {
+        natureOccurrenceStatusBySelection[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
+        setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'error');
+        return;
+      }
+      if (!api || !api.fetchGbifOccurrences) {
+        setLiveStatus('nature-gbif-status', 'The GBIF connector is unavailable. Reload the page and retry.', 'error');
+        return;
+      }
+      var requestId = ++natureOccurrenceRequestId;
+      occurrenceButton.disabled = true;
+      natureOccurrenceStatusBySelection[key] = { type:'pending', message:'Searching GBIF for nearby coordinate records…' };
+      setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'pending');
+      try {
+        var result = await api.fetchGbifOccurrences(point.latitude, point.longitude, 25, 12);
+        if (requestId !== natureOccurrenceRequestId || currentProvince !== selection || currentTab !== 'nature') return;
+        natureOccurrenceDataBySelection[key] = result;
+        var count = (result.records || []).length;
+        natureOccurrenceStatusBySelection[key] = {
+          type:count ? 'success' : 'neutral',
+          message:count + ' nearby record' + (count === 1 ? '' : 's') + ' returned from GBIF; maximum display is 12.'
+        };
+        setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, natureOccurrenceStatusBySelection[key].type);
+        var results = el('nature-gbif-results');
+        if (results) results.innerHTML = renderNatureOccurrenceCards(result);
+      } catch (error) {
+        if (requestId !== natureOccurrenceRequestId || currentProvince !== selection || currentTab !== 'nature') return;
+        natureOccurrenceStatusBySelection[key] = { type:'error', message:error && error.message ? error.message : 'GBIF query failed.' };
+        setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'error');
+        var failedResults = el('nature-gbif-results');
+        if (failedResults) failedResults.textContent = 'No fallback observations were substituted. Check the network, API availability or browser access and retry.';
+      } finally {
+        if (requestId === natureOccurrenceRequestId) {
+          var activeButton = el('nature-gbif-btn');
+          if (activeButton && currentProvince === selection && currentTab === 'nature') activeButton.disabled = false;
+        }
+      }
+    });
+
+    var powerButton = el('nature-power-btn');
+    if (powerButton) powerButton.addEventListener('click', async function () {
+      var api = window.BackToNatureAPI;
+      var point = geometryCentroid(selection.feature);
+      if (!point) {
+        naturePowerStatusBySelection[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
+        setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'error');
+        return;
+      }
+      if (!api || !api.fetchNasaPowerMonthly) {
+        setLiveStatus('nature-power-status', 'The NASA POWER connector is unavailable. Reload the page and retry.', 'error');
+        return;
+      }
+      var requestId = ++naturePowerRequestId;
+      powerButton.disabled = true;
+      naturePowerStatusBySelection[key] = { type:'pending', message:'Requesting NASA POWER monthly data…' };
+      setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'pending');
+      try {
+        var result = await api.fetchNasaPowerMonthly(point.latitude, point.longitude, 5);
+        if (requestId !== naturePowerRequestId || currentProvince !== selection || currentTab !== 'nature') return;
+        naturePowerDataBySelection[key] = result;
+        naturePowerStatusBySelection[key] = {
+          type:'success',
+          message:'Monthly averages across ' + result.startYear + '–' + result.endYear + ' loaded from NASA POWER.'
+        };
+        setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'success');
+        var results = el('nature-power-results');
+        if (results) results.innerHTML = renderNasaPowerMonthCards(result);
+      } catch (error) {
+        if (requestId !== naturePowerRequestId || currentProvince !== selection || currentTab !== 'nature') return;
+        naturePowerStatusBySelection[key] = { type:'error', message:error && error.message ? error.message : 'NASA POWER query failed.' };
+        setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'error');
+        var failedResults = el('nature-power-results');
+        if (failedResults) failedResults.textContent = 'No fallback values were substituted. Check the network, API availability or browser access and retry.';
+      } finally {
+        if (requestId === naturePowerRequestId) {
+          var activeButton = el('nature-power-btn');
+          if (activeButton && currentProvince === selection && currentTab === 'nature') activeButton.disabled = false;
+        }
+      }
+    });
+  }
+
   function renderTab(tab) {
     if (!currentProvince) return;
     var profile = profileFor(currentProvince.name);
@@ -1018,8 +1183,10 @@
       tab === 'crops' ? renderCrops(profile) :
       tab === 'climate' ? renderClimateAndPlanting(profile) :
       tab === 'farming' ? renderFarming(profile) :
-      tab === 'technology' ? renderTechnology(profile) : renderSources(profile);
+      tab === 'technology' ? renderTechnology(profile) :
+      tab === 'nature' ? renderNatureExplorer(profile) : renderSources(profile);
     if (tab === 'sources') wireSourceControls(profile);
+    if (tab === 'nature') wireNatureControls();
     if (tab === 'crops') wireCropLab(profile);
     if (tab === 'climate') wireClimateControls();
     if (tab === 'overview') { wireClimatePreview(); updateClimatePreview(); }
@@ -1364,7 +1531,8 @@
     {id:'climate',label:'04 CLIMATE & PLANTING',icon:'🌦️'},
     {id:'farming',label:'05 FARMING GUIDE',icon:'🚜'},
     {id:'technology',label:'06 TECHNOLOGY',icon:'🛠️'},
-    {id:'sources',label:'07 SOURCES',icon:'📚'}
+    {id:'sources',label:'07 SOURCES',icon:'📚'},
+    {id:'nature',label:'08 NATURE DATA',icon:'🦋'}
   ];
   el('modal-tabs').innerHTML = tabs.map(function (t) {
     return '<button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="' + t.id + '">' + t.icon + ' ' + t.label + '</button>';

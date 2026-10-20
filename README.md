@@ -71,6 +71,19 @@ GBIF vernacular records are uneven across species and countries. The app therefo
 API documentation: https://techdocs.gbif.org/en/openapi/v1/species
 Vernacular name model and available fields (language, country, source): https://gbif.github.io/gbif-api/apidocs/org/gbif/api/model/checklistbank/VernacularName.html
 
+
+### GBIF Occurrence Explorer — nearby biodiversity records
+The **Nature Data** tab can request public GBIF occurrence records around the representative point of the selected administrative unit. The browser requests georeferenced records, filters the rectangular search results to a circular radius, sorts by distance, and displays up to 12 source-linked records. A representative point is only a discovery proxy; broad regions and islands can contain very different ecosystems. Observation counts reflect reporting effort, not total biodiversity or population size.
+
+API documentation: https://techdocs.gbif.org/en/openapi/v1/occurrence
+
+### NASA POWER — monthly climate cross-check
+The **Nature Data** tab can request monthly NASA POWER agriculture-community parameters for temperature, precipitation rate and solar radiation, then average each calendar month across five complete calendar years. Precipitation is explicitly displayed as a daily rate (mm/day), not misrepresented as a monthly rainfall total. POWER is a gridded estimate and should be compared with the existing Open-Meteo summary, national meteorological data and field conditions.
+
+API documentation: https://power.larc.nasa.gov/docs/services/api/temporal/monthly/
+
+Both connectors load only after the user presses a button, use an in-memory page-session cache, and report failures rather than silently replacing missing data with examples. The APIs are accessed directly from the browser; source availability and CORS behavior can differ by environment.
+
 ### Wikimedia Commons — reference plant photos
 The Crop & Soil Lab queries the Wikimedia Commons MediaWiki API for reference photos. When usable media is returned, the card links to the original file page and shows the available author/credit and license metadata. Image search may return the wrong growth stage, cultivar, or even a misleadingly similar image; always check the original file page and its license. Photo lookup is limited to the top four crop matches per search to reduce the number of requests.
 
@@ -97,9 +110,9 @@ The mini-player uses the repository audio file `music/allicante-cozy-game-beats.
 ## Files
 
 - `index.html` — page shell and retro game-inspired styles.
-- `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary and Translate menu behavior.
-- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF English/local/scientific plant name lookups, Wikimedia Commons photos, and historical climate/planting-window functions.
-- `tests/crop-api.test.js` — offline smoke tests for crop screening, GBIF taxonomy and country-aware vernacular names, Commons image metadata mapping, historical weather aggregation and seasonal windows.
+- `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary, live Nature Data tab and Translate menu behavior.
+- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF taxonomy and nearby occurrence lookup, NASA POWER monthly climate summaries, Wikimedia Commons photos, and historical climate/planting-window functions.
+- `tests/crop-api.test.js` — offline smoke tests for crop screening, GBIF taxonomy and nearby occurrence records, country-aware vernacular names, Commons image metadata mapping, historical weather aggregation, NASA POWER monthly aggregation and seasonal windows.
 
 ## Try it
 
