@@ -622,9 +622,11 @@
       // Assess the current local calendar month against every establishment window
       // that includes it. This remains a historical climate screen, not a field calendar.
       var currentMonthIndex = new Date().getMonth();
+      // The recommendation asks whether the user should START planting now.
+      // Score only the establishment window that begins this month; do not mark a
+      // crop "suitable now" just because this month falls inside a window that began earlier.
       var currentMonthWindows = windows.filter(function (window) {
-        var offset = (currentMonthIndex - window.monthIndex + 12) % 12;
-        return offset < rule.months;
+        return window.monthIndex === currentMonthIndex;
       }).sort(function (a, b) {
         return b.score - a.score || (a.windWarning === b.windWarning ? 0 : (a.windWarning ? 1 : -1));
       });

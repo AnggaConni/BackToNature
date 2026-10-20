@@ -16,7 +16,7 @@
 
   // Optional ESA WorldCover land-cover overlay. It is off by default so the
   // basemap stays legible and no extra map tiles are requested until enabled.
-  var esaWorldCover2021Layer = L.tileLayer.wms('https://titiler.terrascope.be/wms', {
+  var esaWorldCover2021Layer = L.tileLayer.wms('https://services.terrascope.be/wms/v2', {
     layers:'WORLDCOVER_2021_MAP',
     format:'image/png',
     transparent:true,
@@ -1610,24 +1610,6 @@
     var technologyCards = context.techList.slice(0,3).map(function (technology, index) {
       return '<article class="region-summary-tech"><div class="region-summary-tech-title"><span>' + esc(technology.icon || '🛠️') + '</span><h4>' + esc(technology.title) + '</h4></div><p><b>Can help with:</b> ' + esc(technology.problem) + '</p><p>' + esc(technology.action) + '</p></article>';
     }).join('');
-    var climateMarkup = '';
-    if (climateResult) {
-      var climate = climateResult.climate;
-      var best = climateResult.recommendations || [];
-      climateMarkup = '<div class="region-summary-climate-metrics">' +
-        '<span><b>' + esc(numberOrDash(averageClimateValue(climate.monthly.map(function (month) { return month.temperatureMean; })),' °C')) + '</b><small>mean temperature</small></span>' +
-        '<span><b>' + esc(numberOrDash(climate.monthly.reduce(function (sum, month) { return sum + (Number(month.precipitationMm) || 0); },0),' mm')) + '</b><small>estimated annual rainfall</small></span>' +
-        '<span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>historical weather</small></span></div>' +
-        '<div class="region-summary-climate-crops">' + best.slice(0,3).map(function (crop) {
-          var window = crop.bestWindow || {};
-          return '<article><span class="mini-code">CLIMATE SCREEN</span><h4>' + esc(crop.name) + '</h4><p><b>Try planting window:</b> ' + esc(window.month || '—') + '</p><span class="crop-score">' + esc(window.score == null ? '—' : window.score) + '/100</span></article>';
-        }).join('') + '</div>';
-    } else if (climateStatus && climateStatus.state === 'error') {
-      climateMarkup = '<p class="region-summary-climate-status is-error">' + esc(climateStatus.message) + ' Open the detailed climate tab to retry or review the source information.</p>';
-    } else {
-      climateMarkup = '<div class="region-summary-climate-loading"><span class="region-summary-spinner">🌦️</span><span><b>Checking the local climate pattern…</b><small>Historical temperature, rain and wind data are being summarized for a representative point in this region.</small></span></div>';
-    }
-
     return '<div class="region-summary-hero">' +
       '<div class="mini-code">YOUR LAND / QUICK RECOMMENDATION</div>' +
       '<h2>What could grow here? 🌱</h2>' +
@@ -1640,9 +1622,6 @@
       '</section>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🛠️</span><div><div class="mini-code">LOW-REGRET PRACTICES</div><h3>Technologies to consider</h3></div></div>' +
       '<div class="region-summary-tech-grid">' + technologyCards + '</div></section>' +
-      '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌦️</span><div><div class="mini-code">SEASONS / RAIN / WIND</div><h3>Climate-based planting hints</h3></div></div>' +
-      '<p>Seasonal candidates use historical climate at a representative map point. Treat this as a screening clue, not a forecast or guaranteed planting instruction.</p>' +
-      climateMarkup + '</section>' +
       '<section class="region-summary-note"><span>📌</span><p><b>Before investing:</b> confirm actual soil conditions and water access, then check local planting calendars, seed availability, weather warnings, market access and advice from local agricultural extension services.</p></section>';
   }
 
