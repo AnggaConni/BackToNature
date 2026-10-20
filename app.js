@@ -1082,18 +1082,60 @@
       'mangga':['mango'],'mango':['mango'],'nanas':['pineapple'],'pineapple':['pineapple'],
       'sagu':['sago'],'sago':['sago'],'vetiver':['vetiver'],'akar wangi':['vetiver'],
       'jambu mete':['cashew'],'jambu monyet':['cashew'],'cashew':['cashew'],
-      'asam':['tamarind'],'asam jawa':['tamarind'],'tamarind':['tamarind']
+      'asam':['tamarind'],'asam jawa':['tamarind'],'tamarind':['tamarind'],
+      'bawang merah':['shallot'],'shallot':['shallot'],
+      'cengkeh':['clove'],'clove':['clove'],
+      'durian':['durian'],
+      'karet':['rubber'],'rubber':['rubber'],
+      'kayu manis':['cinnamon'],'cinnamon':['cinnamon'],
+      'lada':['black-pepper'],'black pepper':['black-pepper'],
+      'pala':['nutmeg'],'nutmeg':['nutmeg'],
+      'kelapa sawit':['oil-palm'],'oil palm':['oil-palm'],
+      'tebu':['sugarcane'],'sugarcane':['sugarcane'],
+      'teh':['tea'],'tea':['tea'],
+      'pinang':['areca-palm'],'areca palm':['areca-palm'],
+      'salak':['salak'],'snake fruit':['salak'],
+      'tembakau':['tobacco'],'tobacco':['tobacco'],
+      'kopi liberika':['coffee-liberica'],'liberica coffee':['coffee-liberica']
     };
     (profile.crops || []).forEach(function (cropName) {
       var keyName = norm(cropName);
       var ids = aliases[keyName];
+      // Regional crop labels often contain a qualifier like "on suitable land".
       if (!ids && /padi|beras/.test(keyName)) ids = ['rice'];
       if (!ids && /jambu mete|jambu monyet/.test(keyName)) ids = ['cashew'];
       if (!ids && /asam( jawa)?/.test(keyName)) ids = ['tamarind'];
       if (!ids && /kacang hijau/.test(keyName)) ids = ['mung-bean'];
+      if (!ids && /kacang tanah/.test(keyName)) ids = ['peanut'];
       if (!ids && /kacang kacangan|legumes/.test(keyName)) ids = ['mung-bean','peanut','soybean'];
-      if (!ids && /buah buahan|fruit|tree crops/.test(keyName)) ids = ['mango','banana','cashew'];
+      if (!ids && /buah buahan|buah lokal|buah tropis|fruit|tree crops/.test(keyName)) ids = ['mango','banana','cashew'];
       if (!ids && /umbi lokal|ubi ubian lokal|root crops/.test(keyName)) ids = ['cassava','sweet-potato'];
+      if (!ids && /kopi arabika|kopi dataran tinggi|arabica/.test(keyName)) ids = ['coffee-arabica'];
+      if (!ids && /kopi robusta|robusta/.test(keyName)) ids = ['coffee-robusta'];
+      if (!ids && /kopi liberika|liberica/.test(keyName)) ids = ['coffee-liberica'];
+      if (!ids && /kopi/.test(keyName)) ids = ['coffee-arabica','coffee-robusta'];
+      if (!ids && /kelapa sawit/.test(keyName)) ids = ['oil-palm'];
+      if (!ids && /kelapa/.test(keyName)) ids = ['coconut'];
+      if (!ids && /kakao|cacao|cocoa/.test(keyName)) ids = ['cacao'];
+      if (!ids && /cengkeh/.test(keyName)) ids = ['clove'];
+      if (!ids && /durian/.test(keyName)) ids = ['durian'];
+      if (!ids && /karet/.test(keyName)) ids = ['rubber'];
+      if (!ids && /kayu manis/.test(keyName)) ids = ['cinnamon'];
+      if (!ids && /lada/.test(keyName)) ids = ['black-pepper'];
+      if (!ids && /pala/.test(keyName)) ids = ['nutmeg'];
+      if (!ids && /tebu/.test(keyName)) ids = ['sugarcane'];
+      if (!ids && /teh/.test(keyName)) ids = ['tea'];
+      if (!ids && /pinang/.test(keyName)) ids = ['areca-palm'];
+      if (!ids && /salak/.test(keyName)) ids = ['salak'];
+      if (!ids && /tembakau/.test(keyName)) ids = ['tobacco'];
+      if (!ids && /sagu/.test(keyName)) ids = ['sago'];
+      if (!ids && /nanas/.test(keyName)) ids = ['pineapple'];
+      if (!ids && /jagung/.test(keyName)) ids = ['maize'];
+      if (!ids && /sorgum/.test(keyName)) ids = ['sorghum'];
+      if (!ids && /singkong|ubi kayu/.test(keyName)) ids = ['cassava'];
+      if (!ids && /ubi jalar/.test(keyName)) ids = ['sweet-potato'];
+      if (!ids && /sayuran|herbs|microgreens|hortikultura/.test(keyName)) ids = ['leafy-greens','tomato','chili'];
+      if (!ids && /palawija/.test(keyName)) ids = ['maize','sorghum','mung-bean','soybean'];
       if (ids) ids.forEach(addId);
     });
 
