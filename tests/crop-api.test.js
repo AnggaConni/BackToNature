@@ -405,8 +405,39 @@ async function main() {
   assert.equal(wbSnapshot.indicators.find((item)=>item.id==='AG.YLD.CREL.KG').value,5320,'World Bank cereal yield is mapped');
   assert.ok(wbCalls.every((url)=>url.includes('/country/IDN/indicator/')),'World Bank API queries are scoped to the selected ISO-3 country');
 
+  // FAO FPMA is a public no-key API; check selected-country filtering and price trend mapping.
+  const fpmaCalls = [];
+  global.fetch = async function (url, options) {
+    const urlText = String(url);
+    fpmaCalls.push({url:urlText,headers:options && options.headers || {}});
+    if (urlText.includes('/FpmaSeriePrice/')) {
+      return {
+        ok:true,status:200,
+        text:async function(){return JSON.stringify({results:[{uuid:'series-rice',datapoints:[
+          {date:'2024-01-01',price_value:100,price_value_dollar:0.7},
+          {date:'2024-02-01',price_value:110,price_value_dollar:0.75},
+          {date:'2024-04-01',price_value:125,price_value_dollar:0.82}
+        ]}]});}
+      };
+    }
+    return {
+      ok:true,status:200,
+      text:async function(){return JSON.stringify({count:1,next:null,results:[{
+        uuid:'series-rice',iso3_country_code:'IDN',commodity:'Rice',price_type:'RETAIL',
+        currency:'IDR',measure_unit_label:'kg',periodicity:[{period:'monthly'}]
+      }]});}
+    };
+  };
+  const fpma = await api.fetchFaoFoodPrices('IDN','rice');
+  assert.equal(fpma.series.length,1,'FAO FPMA connector maps one matching country/commodity series');
+  assert.equal(fpma.series[0].commodity,'Rice','FAO FPMA commodity metadata is preserved');
+  assert.equal(fpma.series[0].latest.value,125,'FAO FPMA latest price point is selected');
+  assert.ok(fpma.series[0].changePct90d > 0,'FAO FPMA computes a descriptive 90-day price change');
+  assert.ok(fpmaCalls.every((call)=>call.url.includes('iso3_country_codes=IDN') || call.url.includes('/FpmaSeriePrice/')),'FAO FPMA metadata request is country-filtered');
+  assert.ok(fpmaCalls.every((call)=>!/apikey|authorization|token/i.test(call.url+' '+JSON.stringify(call.headers))),'FAO FPMA uses no API key or authorization header');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog, country-specific API registry, World Bank agriculture snapshot and Pl@ntNet validation smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog, country-specific API registry, World Bank agriculture snapshot, keyless FAO FPMA food-price API and Pl@ntNet validation smoke tests passed.');
 }
 
 main().catch((error) => {
