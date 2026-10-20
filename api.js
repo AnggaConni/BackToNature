@@ -829,14 +829,13 @@
         if (/^[A-Za-z]{2,3}$/.test(text)) countryCode = text.toUpperCase();
         else countryTitle = text;
       }
+      var expectedCountryNames = pref.countryNames.concat([countryName || ''])
+        .map(function (item) { return String(item || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); })
+        .filter(Boolean);
+      var normalizedRecordCountry = String(countryTitle || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
       var countryMatches = !!(
         (pref.iso2 && countryCode && (countryCode === pref.iso2 || countryCode === iso3)) ||
-        [countryTitle].concat(pref.countryNames).some(function (item) {
-          return item && pref.countryNames.concat([countryName || '']).some(function (candidate) {
-            return candidate && String(item).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim() ===
-              String(candidate).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-          });
-        })
+        (normalizedRecordCountry && expectedCountryNames.indexOf(normalizedRecordCountry) >= 0)
       );
       var langIndex = pref.languages.indexOf(language);
       return {
