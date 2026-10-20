@@ -1174,6 +1174,82 @@
     return promise;
   }
 
+
+  var waporMapsetCatalogCache = null;
+  var waporMapsetCatalogPromise = null;
+  var WAPOR_V3_CATALOG_URL = 'https://data.apps.fao.org/gismgr/api/v2/catalog/workspaces/WAPOR-3/mapsets?overview=false&paged=false';
+
+  async function fetchWaporMapsets(forceRefresh) {
+    if (forceRefresh === true) {
+      waporMapsetCatalogCache = null;
+      waporMapsetCatalogPromise = null;
+    }
+    if (waporMapsetCatalogCache) return waporMapsetCatalogCache;
+    if (waporMapsetCatalogPromise) return waporMapsetCatalogPromise;
+
+    waporMapsetCatalogPromise = (async function () {
+      var pageUrl = WAPOR_V3_CATALOG_URL;
+      var rawItems = [];
+      var visited = {};
+      // The mapset catalogue is small. Follow a bounded number of official pagination
+      // links so a schema or paging regression cannot create an unbounded browser loop.
+      for (var page = 0; page < 5 && pageUrl; page++) {
+        if (visited[pageUrl]) break;
+        visited[pageUrl] = true;
+        var payload = await requestJSON(pageUrl);
+        var envelope = payload && payload.response ? payload.response : payload;
+        var items = envelope && Array.isArray(envelope.items) ? envelope.items : [];
+        rawItems = rawItems.concat(items);
+        var links = envelope && Array.isArray(envelope.links) ? envelope.links :
+          (payload && Array.isArray(payload.links) ? payload.links : []);
+        var next = links.find(function (link) { return link && link.rel === 'next' && link.href; });
+        pageUrl = next && next.href ? new URL(next.href, pageUrl).href : '';
+      }
+      var allowed = {
+        'L1-AETI-D':true,'L1-AETI-M':true,
+        'L1-RET-D':true,'L1-RET-M':true,'L1-RET-E':true,
+        'L1-RSM-D':true,'L1-NPP-D':true,
+        'L1-PCP-D':true,'L1-PCP-M':true
+      };
+      var records = rawItems.map(function (item) {
+        var code = String(item.code || item.mapsetCode || '');
+        var caption = String(item.caption || item.title || item.description || code);
+        if (!code) return null;
+        return {
+          code:code,
+          caption:caption,
+          level:/^L1-/.test(code) ? 'Global / Level 1' : /^L2-/.test(code) ? 'National / Level 2' : 'Other level',
+          temporalResolution:/-[D]$/.test(code) ? 'Dekadal' : /-[M]$/.test(code) ? 'Monthly' : /-[E]$/.test(code) ? 'Daily' : /-[A]$/.test(code) ? 'Annual' : 'See metadata',
+          resolutionNote:/RET/.test(code) ? 'Approximately 30 km' : /PCP/.test(code) ? 'Approximately 5 km' : /^L1-/.test(code) ? 'Approximately 300 m' : 'See official mapset metadata',
+          apiUrl:'https://data.apps.fao.org/gismgr/api/v2/catalog/workspaces/WAPOR-3/mapsets/' + encodeURIComponent(code) + '/rasters?overview=false&paged=false',
+          portalUrl:'https://data.apps.fao.org/?lang=en',
+          source:'FAO WaPOR v3 GISMGR API'
+        };
+      }).filter(function (item) { return item && allowed[item.code]; });
+      records.sort(function (a, b) { return a.code.localeCompare(b.code); });
+      if (!records.length) {
+        throw new Error('WaPOR responded, but none of the expected global water/vegetation mapsets were present in the catalogue.');
+      }
+      return {
+        records:records,
+        mapsetCount:rawItems.length,
+        retrievedAt:new Date().toISOString(),
+        source:'FAO WaPOR v3 GISMGR API',
+        sourceUrl:WAPOR_V3_CATALOG_URL,
+        note:'This is live dataset metadata, not a raster value sampled at the selected point.'
+      };
+    })().then(function (result) {
+      waporMapsetCatalogCache = result;
+      return result;
+    }).catch(function (error) {
+      waporMapsetCatalogCache = null;
+      throw error;
+    }).finally(function () {
+      waporMapsetCatalogPromise = null;
+    });
+    return waporMapsetCatalogPromise;
+  }
+
   async function fetchOpenMeteoAgroOutlook(latitude, longitude, forceRefresh) {
     var point = validateNatureCoordinates(latitude, longitude);
     var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3);
@@ -1397,6 +1473,7 @@
     fetchNasaPowerMonthly: fetchNasaPowerMonthly,
     fetchINaturalistPlantObservations: fetchINaturalistPlantObservations,
     fetchOpenMeteoAgroOutlook: fetchOpenMeteoAgroOutlook,
-    identifyPlantWithPlantNet: identifyPlantWithPlantNet
+    identifyPlantWithPlantNet: identifyPlantWithPlantNet,
+    fetchWaporMapsets: fetchWaporMapsets
   };
 })();
