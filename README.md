@@ -63,6 +63,14 @@ Source documentation: https://open-meteo.com/en/docs/historical-weather-api
 ### Crop & Soil Lab — local screening library
 The Crops tab includes a curated screening library for common staple crops, vegetables, perennials and soil-cover options. It compares the user's stated soil group, optional pH test, drainage, water pattern, climate group and crop purpose. Each result lists why it scored well and what still needs checking. The score is a rule-based screening indicator, not a statistical probability, yield prediction, or scientifically validated global crop-suitability model. Crop profiles and ranges are broad starting points and should be improved with locally validated sources and extension recommendations.
 
+### GBIF Species API — English, local and scientific crop names
+The quick region brief uses a curated crop candidate list, then enriches exact species names through GBIF's public Species API. The view shows the app's English/common crop label, a vernacular name when a GBIF record is associated with the selected country or a preferred local language, and the accepted scientific name when GBIF matches the species. Country-to-language preferences are curated defaults for common languages and are not a complete map of multilingual or Indigenous language use.
+
+GBIF vernacular records are uneven across species and countries. The app therefore marks a missing local name rather than translating or inventing one; a fallback name is clearly identified as a BackToNature-curated Indonesian common name. Broad groups such as “leafy vegetables” do not get a fabricated species-level Latin name. Each crop card links to the GBIF taxon record or search page where available.
+
+API documentation: https://techdocs.gbif.org/en/openapi/v1/species
+Vernacular name model and available fields (language, country, source): https://gbif.github.io/gbif-api/apidocs/org/gbif/api/model/checklistbank/VernacularName.html
+
 ### Wikimedia Commons — reference plant photos
 The Crop & Soil Lab queries the Wikimedia Commons MediaWiki API for reference photos. When usable media is returned, the card links to the original file page and shows the available author/credit and license metadata. Image search may return the wrong growth stage, cultivar, or even a misleadingly similar image; always check the original file page and its license. Photo lookup is limited to the top four crop matches per search to reduce the number of requests.
 
@@ -90,8 +98,8 @@ The mini-player uses the repository audio file `music/allicante-cozy-game-beats.
 
 - `index.html` — page shell and retro game-inspired styles.
 - `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary and Translate menu behavior.
-- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, Wikimedia Commons plant photo search, and historical climate/planting-window functions.
-- `tests/crop-api.test.js` — offline smoke tests for crop screening, Commons image metadata mapping, historical weather aggregation and seasonal windows.
+- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF English/local/scientific plant name lookups, Wikimedia Commons photos, and historical climate/planting-window functions.
+- `tests/crop-api.test.js` — offline smoke tests for crop screening, GBIF taxonomy and country-aware vernacular names, Commons image metadata mapping, historical weather aggregation and seasonal windows.
 
 ## Try it
 
