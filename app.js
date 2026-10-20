@@ -54,6 +54,9 @@
   var climateResultsBySelection = {};
   var climateStatusBySelection = {};
   var climatePromisesBySelection = {};
+  var fieldBriefOutlookBySelection = {};
+  var fieldBriefOutlookStatusBySelection = {};
+  var fieldBriefOutlookPromisesBySelection = {};
   var climatePhotoRequestId = 0;
   var climatePhotosLoadedBySelection = {};
   var summarySelection = null;
@@ -677,6 +680,16 @@
       '. A missing 90-day change means comparable observations were unavailable. Compare currency, unit, market level and reporting dates before drawing conclusions.</p>';
   }
 
+  function renderWaporPublicApiPanel() {
+    return '<section class="live-connectors wapor-public-api-panel"><div class="section-title"><span class="mini-code">FAO WAPOR V3 / PUBLIC API · NO LOGIN</span><h3>Water use & vegetation data catalog</h3></div>' +
+      '<p class="live-explainer">Fetch the official WaPOR v3 mapset catalog for actual evapotranspiration, reference evapotranspiration, relative soil moisture, precipitation and vegetation productivity. This request returns dataset metadata and download links—not a measured value for this region.</p>' +
+      '<button id="wapor-source-fetch-btn" class="pixel-btn green" type="button">FETCH WAPOR DATA CATALOG</button>' +
+      '<div id="wapor-source-status" class="live-status" aria-live="polite">Not queried yet · no API key or account required</div>' +
+      '<div id="wapor-source-results" class="live-results">No catalog metadata loaded.</div>' +
+      '<p class="nature-method-note">FAO states WaPOR v3 API access requires no token or credentials. Geographic coverage, resolution and time range differ by layer.</p>' +
+      '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Official FAO WaPOR data access guide ↗</a></section>';
+  }
+
   function renderWorldBankIndicatorPanel(countryIso3, countryName) {
     return '<section class="live-connectors country-worldbank-panel"><div class="section-title"><span class="mini-code">GLOBAL API / COUNTRY-FILTERED</span><h3>Agriculture snapshot · ' + esc(countryName || countryIso3) + '</h3></div>' +
       '<p class="live-explainer">Fetch recent country-level agricultural indicators from the free World Bank API (no API key). Coverage and latest year differ by indicator. These are national indicators, not province, district or farm measurements.</p>' +
@@ -1036,6 +1049,7 @@
       {t:'Open-Meteo weather and agricultural variables',d:'Public forecast and historical weather endpoints used elsewhere in BackToNature, including rainfall and reference evapotranspiration. Free use is limited to non-commercial fair use and requires attribution.',u:'https://open-meteo.com/en/docs',tag:'WEATHER API · NO LOGIN'},
       {t:'NASA POWER Data Access Viewer / API',d:'Public gridded meteorological and solar data used for monthly climate context. The app labels precipitation units explicitly and does not treat gridded estimates as farm measurements.',u:'https://power.larc.nasa.gov/docs/services/api/',tag:'CLIMATE API · NO LOGIN'},
       {t:'World Bank Indicators API',d:'Public country-level time series for agriculture, land use, cereal yield and economic context. The live country snapshot above uses this keyless API.',u:'https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api',tag:'GLOBAL INDICATORS · NO LOGIN'},
+      {t:'FAO WaPOR v3 API — water and vegetation indicators',d:'Public API for official WaPOR mapset metadata and raster download links covering evapotranspiration, relative soil moisture, precipitation and vegetation productivity. Access requires no token; raster values still need a separate spatial extraction.',u:'https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en',tag:'AGRICULTURE / WATER API · NO LOGIN'},
       {t:'geoBoundaries administrative data',d:'Administrative boundary provenance. The represented year and license differ by country and administrative level.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
     ];
 
@@ -1051,7 +1065,7 @@
       '. <b>Boundary license:</b> ' + esc(boundaryLicense) + '</p></section>';
 
     return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open the official sources to verify date, methodology, geography, license and units. National indicators are context—not parcel-level measurements.</p></div>' +
-      countrySourceMarkup + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + indonesiaLiveTerminal +
+      countrySourceMarkup + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + renderWaporPublicApiPanel() + indonesiaLiveTerminal +
       '<div class="source-list">' + globalSources.map(function (source, index) {
         return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' + wocatBox + integrity;
@@ -1061,6 +1075,29 @@
     var api = window.BackToNatureAPI;
     var currentSourceIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
     var currentSourceCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[currentSourceIso3] && countryByISO3[currentSourceIso3].name) || currentSourceIso3;
+    var waporSourceBtn = el('wapor-source-fetch-btn');
+    if (waporSourceBtn) waporSourceBtn.addEventListener('click', async function () {
+      if (!api || !api.fetchWaporMapsets) {
+        setLiveStatus('wapor-source-status', 'WaPOR connector is unavailable. Reload the page.', 'error');
+        return;
+      }
+      waporSourceBtn.disabled = true;
+      setLiveStatus('wapor-source-status', 'Requesting official WaPOR v3 catalog metadata…', 'pending');
+      var resultNode = el('wapor-source-results');
+      if (resultNode) resultNode.textContent = 'Loading public metadata. No raster values or example data are being substituted.';
+      try {
+        var result = await api.fetchWaporMapsets(true);
+        if (resultNode) resultNode.innerHTML = renderWaporMapsetCatalog(result);
+        setLiveStatus('wapor-source-status', 'PUBLIC LIVE CATALOG · ' + result.records.length + ' mapsets returned', 'success');
+      } catch (error) {
+        setLiveStatus('wapor-source-status', 'WaPOR catalog request failed', 'error');
+        if (resultNode) resultNode.textContent = (error && error.message ? error.message : 'Unknown API error') +
+          ' The endpoint may be temporarily unavailable or blocked by browser network policy. No sample layers were inserted.';
+      } finally {
+        waporSourceBtn.disabled = false;
+      }
+    });
+
     var countryWbBtn = el('country-wb-fetch-btn');
     if (countryWbBtn) countryWbBtn.addEventListener('click', async function () {
       if (!api || !api.fetchWorldBankAgricultureSnapshot) {
@@ -1830,6 +1867,109 @@
   }
 
 
+  async function loadFieldBriefOutlook(selection, forceRefresh) {
+    if (!selection) return null;
+    var key = climateSelectionKey(selection);
+    if (forceRefresh === true) {
+      delete fieldBriefOutlookBySelection[key];
+      delete fieldBriefOutlookStatusBySelection[key];
+      delete fieldBriefOutlookPromisesBySelection[key];
+    }
+    if (fieldBriefOutlookBySelection[key]) return fieldBriefOutlookBySelection[key];
+    if (fieldBriefOutlookPromisesBySelection[key]) return fieldBriefOutlookPromisesBySelection[key];
+
+    var point = geometryCentroid(selection.feature);
+    var api = window.BackToNatureAPI;
+    if (!point) {
+      fieldBriefOutlookStatusBySelection[key] = {state:'error',message:'The map boundary has no representative coordinate for a forecast.'};
+      if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
+      return null;
+    }
+    if (!api || !api.fetchOpenMeteoAgroOutlook) {
+      fieldBriefOutlookStatusBySelection[key] = {state:'error',message:'The Open-Meteo outlook connector is unavailable. Reload the page and retry.'};
+      if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
+      return null;
+    }
+
+    fieldBriefOutlookStatusBySelection[key] = {state:'loading'};
+    if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
+    var promise = api.fetchOpenMeteoAgroOutlook(point.latitude,point.longitude,forceRefresh === true)
+      .then(function (data) {
+        fieldBriefOutlookBySelection[key] = data;
+        fieldBriefOutlookStatusBySelection[key] = {state:'ready'};
+        return data;
+      })
+      .catch(function (error) {
+        fieldBriefOutlookStatusBySelection[key] = {
+          state:'error',
+          message:error && error.message ? error.message : 'The public weather API could not be reached.'
+        };
+        return null;
+      })
+      .finally(function () {
+        delete fieldBriefOutlookPromisesBySelection[key];
+        if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
+      });
+    fieldBriefOutlookPromisesBySelection[key] = promise;
+    return promise;
+  }
+
+  function renderFieldBriefOutlook(selection) {
+    var key = climateSelectionKey(selection);
+    var status = fieldBriefOutlookStatusBySelection[key];
+    var data = fieldBriefOutlookBySelection[key];
+    var refreshButton = '<button id="field-brief-outlook-refresh" class="pixel-btn" type="button">REFRESH 7-DAY OUTLOOK</button>';
+    var heading = '<section class="region-summary-section field-brief-outlook"><div class="region-summary-section-heading"><span>🌦️</span><div><div class="mini-code">LIVE WEATHER API · NO KEY</div><h3>What might the next week look like?</h3></div></div>';
+
+    if (!status || status.state === 'loading') {
+      return heading + '<p>Checking the latest seven-day forecast for a reference point in this region. This is a model forecast, not a field sensor reading.</p><div class="live-status pending">Loading Open-Meteo forecast…</div></section>';
+    }
+    if (status.state === 'error' || !data || !Array.isArray(data.days) || !data.days.length) {
+      return heading + '<p>We could not load a forecast just now, so this brief is using only the historical seasonal screen. No weather values have been invented.</p><p class="field-brief-error">' + esc(status.message || 'No forecast values were returned.') + '</p>' + refreshButton +
+        '<p class="nature-method-note">Open-Meteo is a free public API for non-commercial use; attribution is required. The request can still fail because of network or service availability.</p></section>';
+    }
+
+    var days = data.days.slice(0,7);
+    var rainDays = days.filter(function (day) { return day.precipitationMm != null && Number.isFinite(Number(day.precipitationMm)); });
+    var tempDays = days.filter(function (day) { return day.temperatureMean != null && Number.isFinite(Number(day.temperatureMean)); });
+    var etDays = days.filter(function (day) { return day.referenceEt0Mm != null && Number.isFinite(Number(day.referenceEt0Mm)); });
+    var totalRain = rainDays.length ? rainDays.reduce(function (sum,day) { return sum + Number(day.precipitationMm); },0) : null;
+    var meanTemp = tempDays.length ? tempDays.reduce(function (sum,day) { return sum + Number(day.temperatureMean); },0) / tempDays.length : null;
+    var pairedDays = days.filter(function (day) { return day.precipitationMm != null && day.referenceEt0Mm != null &&
+      Number.isFinite(Number(day.precipitationMm)) && Number.isFinite(Number(day.referenceEt0Mm)); });
+    var rainMinusEt0 = pairedDays.length ? pairedDays.reduce(function (sum,day) {
+      return sum + Number(day.precipitationMm) - Number(day.referenceEt0Mm);
+    },0) : null;
+    var metrics = '<div class="field-brief-weather-metrics">' +
+      '<div class="field-brief-weather-metric"><span>Forecast rain · 7 days</span><b>' + esc(numberOrDash(totalRain,' mm')) + '</b></div>' +
+      '<div class="field-brief-weather-metric"><span>Average temperature</span><b>' + esc(numberOrDash(meanTemp,' °C')) + '</b></div>' +
+      '<div class="field-brief-weather-metric"><span>Rain − reference ET₀</span><b class="' + (rainMinusEt0 != null && rainMinusEt0 < 0 ? 'water-deficit' : '') + '">' + esc(numberOrDash(rainMinusEt0,' mm')) + '</b></div></div>';
+    var daily = '<div class="field-brief-weather-days">' + days.map(function (day) {
+      return '<article class="field-brief-weather-day"><b>' + esc(day.date) + '</b><span>Rain <strong>' + esc(numberOrDash(day.precipitationMm,' mm')) + '</strong></span><span>Mean <strong>' + esc(numberOrDash(day.temperatureMean,' °C')) + '</strong></span></article>';
+    }).join('') + '</div>';
+    var meaning = rainMinusEt0 == null ? 'Some forecast variables are missing. Check the national weather service before fieldwork.' :
+      rainMinusEt0 < 0
+        ? 'The forecast shows less rain than reference atmospheric water demand across this period. Check actual soil moisture, stored water and irrigation; this is not proof that the plot is drought-stressed.'
+        : 'Forecast rain is at or above reference atmospheric water demand across this period. That does not prove a field is saturated: actual rainfall, soil drainage and irrigation can differ.';
+    return heading + metrics + '<p class="field-brief-weather-meaning">' + esc(meaning) + '</p>' + daily + refreshButton +
+      '<p class="nature-method-note">Forecast fetched ' + esc(new Date(data.retrievedAt || Date.now()).toLocaleString()) +
+      ' for a representative point near ' + esc(numberOrDash(data.latitude,'°')) + ', ' + esc(numberOrDash(data.longitude,'°')) +
+      '. Open-Meteo forecast models can change. Rain − ET₀ is a rough planning cue, not a complete farm water balance.</p></section>';
+  }
+
+  function renderFieldBriefExplanation(profile, selection) {
+    var isPeat = /peat|wetland/i.test(String(profile.kind || '') + ' ' + String(profile.zone || ''));
+    var landMessage = isPeat
+      ? 'This region may contain both peat and mineral soils. A crop that can grow on mineral soil is not automatically suitable for peat. Do not drain peat to fit a crop; protect the water table, prevent fire and check land-use safeguards first.'
+      : 'The brief has not measured your plot’s soil, pH, drainage, elevation, salinity, irrigation supply, pest pressure or access to buyers. Those can change the answer even when the climate timing looks good.';
+    return '<section class="region-summary-section field-brief-explainer"><div class="region-summary-section-heading"><span>🧭</span><div><div class="mini-code">HOW TO READ THIS</div><h3>What does the recommendation actually mean?</h3></div></div>' +
+      '<div class="field-brief-explainer-grid">' +
+      '<article class="field-brief-explainer-card"><h4>1 · It is a shortlist, not an instruction</h4><p>The crop appears because it is a regional idea or matches broad seasonal temperature and rainfall patterns. It does not mean “plant this now” or guarantee a harvest.</p></article>' +
+      '<article class="field-brief-explainer-card"><h4>2 · Why be cautious?</h4><p>' + esc(landMessage) + '</p></article>' +
+      '<article class="field-brief-explainer-card"><h4>3 · What should I do next?</h4><p>Check a soil test, water and drainage, the current forecast, a locally recommended variety, planting calendar, pests, input costs and likely buyers. Start small and ask local agricultural extension before investing heavily.</p></article>' +
+      '</div><p class="field-brief-method-note">The seasonal badge uses five complete years of monthly weather at one representative map point. It does not use a farm survey or check every field inside the selected region.</p></section>';
+  }
+
   function renderRegionSummary() {
     if (!summarySelection) return '';
     var selection = summarySelection;
@@ -1845,18 +1985,20 @@
       var status = rankedCrop && rankedCrop.currentMonthStatus || 'unknown';
       var best = rankedCrop && rankedCrop.bestWindow || null;
       var statusClass = status === 'suitable' ? 'is-open' : status === 'caution' ? 'is-caution' : status === 'wait' ? 'is-wait' : 'is-unknown';
-      var statusLabel = status === 'suitable' ? 'CLIMATE WINDOW OPEN' :
-        status === 'caution' ? 'CHECK CONDITIONS FIRST' :
-        status === 'wait' ? 'NOT RECOMMENDED THIS MONTH' : 'SEASON NOT VERIFIED';
+      var statusLabel = status === 'suitable' ? 'TIMING LOOKS PROMISING' :
+        status === 'caution' ? 'CHECK BEFORE PLANTING' :
+        status === 'wait' ? 'BETTER TO WAIT' : 'NOT ENOUGH SEASON DATA';
       var statusMessage = status === 'suitable'
-        ? 'The historical climate screen supports starting in ' + currentMonthLabel + '.'
+        ? 'The last five years of monthly weather look broadly supportive for starting in ' + currentMonthLabel + '. This checks timing only, not soil suitability.'
         : status === 'caution'
-          ? 'This month is borderline or has a weather caution. Check water, drainage and local advice first.'
+          ? 'Weather conditions are near the screening limits or a caution was flagged. Check this week’s forecast, water supply and drainage before planting.'
           : status === 'wait'
-            ? 'Better climate window: ' + (best && best.month ? best.month : 'see Detailed Fieldbook') + '.'
+            ? 'This does not mean the crop cannot grow here. The historical pattern points to ' + (best && best.month ? best.month : 'another month') + ' as a better start window; confirm with the local calendar and actual weather.'
             : climateStatus && climateStatus.state === 'error'
-              ? 'Season data unavailable. Open Detailed Fieldbook for source status.'
-              : 'Checking the local seasonal pattern…';
+              ? 'A reliable seasonal result could not be retrieved. Treat this as an idea to investigate, not a planting recommendation.'
+              : climateStatus && climateStatus.state === 'ready'
+                ? 'The available seasonal data did not confirm a clear start window for this crop. Check the crop and local conditions in the Detailed Fieldbook.'
+                : 'Checking the historical seasonal pattern…';
       var icon = /rice|padi/i.test(crop.name) ? '🌾' :
         /coffee|cacao|cocoa|coconut|mango|banana|cashew|tamarind|tree/i.test(crop.name) ? '🌳' :
         /vegetable|greens|chili|potato|tomato/i.test(crop.name) ? '🥬' :
@@ -1882,6 +2024,8 @@
       '<p>Shortlist only: the seasonal screen checks whether this is a sensible month to start, separately from soil suitability. Open the Detailed Fieldbook for names, reasons and source data.</p>' +
       '<div class="region-summary-crops">' + cropCards + '</div>' +
       '</section>' +
+      renderFieldBriefOutlook(selection) +
+      renderFieldBriefExplanation(profile, selection) +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🛠️</span><div><div class="mini-code">LOW-REGRET PRACTICES</div><h3>Technologies to consider</h3></div></div>' +
       '<div class="region-summary-tech-grid">' + technologyCards + '</div></section>' +
       '<section class="region-summary-note"><span>📌</span><p><b>Before investing:</b> confirm actual soil conditions and water access, then check local planting calendars, seed availability, weather warnings, market access and advice from local agricultural extension services.</p></section>';
@@ -1952,6 +2096,10 @@
     if (!backdrop || !content || !backdrop.classList.contains('open') || !summarySelection) return;
     content.innerHTML = renderRegionSummary();
     updateRegionSummaryDistrictButton();
+    var forecastRefreshButton = el('field-brief-outlook-refresh');
+    if (forecastRefreshButton) forecastRefreshButton.addEventListener('click', function () {
+      if (summarySelection) loadFieldBriefOutlook(summarySelection, true);
+    });
   }
 
   function closeRegionSummary(clearSelection) {
@@ -1984,6 +2132,7 @@
     document.body.classList.add('modal-open');
     updateRegionSummary();
     loadClimateForSelection(summary);
+    loadFieldBriefOutlook(summary);
     var button = el('region-summary-details');
     if (button) button.focus();
   }
