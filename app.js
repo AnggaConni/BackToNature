@@ -114,6 +114,19 @@
     node.textContent = value;
   }
 
+  // Live data panels use a distinct visual status style from the global HUD.
+  // This helper is used by Sources/Nature controls and must remain available
+  // before those handlers are invoked.
+  function setLiveStatus(id, value, type) {
+    var node = el(id);
+    if (!node) return;
+    var normalizedType = type === 'success' || type === 'error' ? type : 'pending';
+    node.className = 'live-status ' + normalizedType;
+    node.setAttribute('role', 'status');
+    node.setAttribute('aria-live', 'polite');
+    node.textContent = value == null ? '' : String(value);
+  }
+
   function dataField(row, names) {
     var keys = Object.keys(row || {});
     for (var i = 0; i < names.length; i++) {
