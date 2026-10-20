@@ -115,7 +115,7 @@ The mini-player uses the repository audio file `music/allicante-cozy-game-beats.
 
 - `index.html` — page shell and retro game-inspired styles.
 - `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary, live Nature Data tab and Translate menu behavior.
-- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF taxonomy and nearby occurrence lookup, NASA POWER monthly climate summaries, Wikimedia Commons photos, and historical climate/planting-window functions.
+- `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF taxonomy and nearby occurrence lookup, NASA POWER monthly climate summaries, Wikimedia Commons photos, and historical climate/planting-window functions with reference ET₀, Open-Meteo seven-day outlook, iNaturalist observations and optional Pl@ntNet photo identification.
 - `tests/crop-api.test.js` — offline smoke tests for crop screening, GBIF taxonomy and nearby occurrence records, country-aware vernacular names, Commons image metadata mapping, historical weather aggregation, NASA POWER monthly aggregation and seasonal windows.
 
 ## Try it
@@ -130,3 +130,16 @@ The mini-player uses the repository audio file `music/allicante-cozy-game-beats.
 
 ### District navigation in the Quick Field Brief
 The Quick Field Brief footer now offers a direct **View Districts / View Kabupaten & Cities** action when ADM2 boundaries are available for the selected country. The Detailed Fieldbook retains the same drill-down action. The direct action closes the brief and opens the district map, avoiding the need to discover the button in a second modal.
+
+
+### Seasonal crop advice: concise decision, detailed explanation
+The Quick Field Brief keeps crop cards compact. Each card displays a current-month status from the historical monthly climate screening: **climate window open**, **check conditions**, **not recommended this month**, or **season not verified**. When the month is not recommended, it shows the best climate-screen window. Soil suitability and planting timing are separate questions; this screening is not a crop-specific agronomic calendar and must be checked against local varieties, observed soil/water conditions and extension guidance. Explanations, weather context, and data sources remain in the Detailed Fieldbook.
+
+### Additional no-cost data connectors
+- **Open-Meteo ET₀ + water balance:** historical daily reference evapotranspiration is aggregated by month; the detailed climate tab now shows monthly rain minus reference ET₀. The detailed Nature Data tab also offers a seven-day rain-minus-ET₀ outlook. ET₀ describes a well-watered reference surface, not the water requirement of every crop.
+- **iNaturalist API v1:** research-grade, photo-backed plant observations within a selected radius. The app deduplicates the returned observations by taxon and retains observation links. It supplements GBIF; it does not establish species abundance or crop suitability.
+- **ESA WorldCover 2021 WMS:** optional map overlay, disabled by default. It is a 10 m global land-cover product from 2021, not a present-day parcel survey. Source/attribution: https://esa-worldcover.org/en/data-access
+- **Pl@ntNet API:** optional photo identification, requiring the user's own key. The key and selected photos are sent only when the user presses the identification button; the app does not persist the key. The free API quota is up to 500 identifications per day and has its own account/attribution conditions: https://my.plantnet.org/terms_of_use
+- **FAO WaPOR v3:** linked as an additional water-productivity source. Availability, product level, spatial resolution and temporal coverage should be checked for the selected location before interpreting an observation.
+
+All live responses are optional and may be blocked by network/CORS limits or provider availability. Failure states do not fabricate fallback observations or measurements.

@@ -91,6 +91,7 @@ async function main() {
   assert.ok(plantingWindows.length > 0 && plantingWindows.length <= 8, 'ranks a bounded list of climate candidates');
   assert.ok(plantingWindows.every((crop) => crop.bestWindow && crop.bestWindow.month && crop.bestWindow.score >= 0 && crop.bestWindow.score <= 100), 'each climate candidate contains a scored planting window');
   assert.ok(plantingWindows.every((crop, i) => i === 0 || plantingWindows[i - 1].climateScore >= crop.climateScore), 'climate candidates are ranked by score');
+  assert.ok(plantingWindows.every((crop) => ['suitable','caution','wait','unknown'].includes(crop.currentMonthStatus)), 'every crop exposes a current-month season assessment');
 
   // Test the historical archive response mapper without calling any external API.
   const dates = [];
@@ -110,7 +111,8 @@ async function main() {
       wind_speed_10m_mean: values(12),
       wind_speed_10m_max: values(26),
       wind_gusts_10m_max: values(35),
-      wind_direction_10m_dominant: values(90)
+      wind_direction_10m_dominant: values(90),
+      et0_fao_evapotranspiration: values(3)
     };
     return {
       ok:true,
@@ -124,6 +126,8 @@ async function main() {
   assert.equal(climate.monthly[0].temperatureMean,26,'monthly temperature is aggregated');
   assert.ok(climate.monthly[0].precipitationMm >= 140 && climate.monthly[0].precipitationMm <= 160,'daily precipitation is aggregated into monthly rainfall');
   assert.equal(climate.monthly[0].windDirection,'E','wind direction is translated to compass direction');
+  assert.equal(climate.monthly[0].referenceEt0Mm,93,'daily reference ET0 is aggregated to a monthly total');
+  assert.equal(climate.monthly[0].waterBalanceMm,62,'monthly rain-minus-ET0 balance is calculated from averaged rain and ET0 totals');
   assert.match(climateRequestUrl,/archive-api\.open-meteo\.com\/v1\/archive/,'uses the Open-Meteo Historical Weather API');
   const climateParams = new URL(climateRequestUrl).searchParams;
   assert.ok(climateParams.get('daily').includes('wind_gusts_10m_max'),'asks for wind gust information');
@@ -276,8 +280,63 @@ async function main() {
   await api.fetchGbifOccurrences(-6.2,106.8,25,20,{plantOnly:true,forceRefresh:true});
   assert.equal(plantCalls.length,2,'forceRefresh bypasses the session cache');
 
+
+  // Test the public iNaturalist plant-observation mapper and taxon de-duplication.
+  const inatCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    inatCalls.push(parsed);
+    return {
+      ok:true,status:200,
+      text:async function () {
+        return JSON.stringify({
+          total_results:3,
+          results:[
+            {id:801,observed_on:'2025-06-01',place_guess:'Sample place',quality_grade:'research',user:{login:'observer1'},latitude:'-6.21',longitude:'106.81',taxon:{id:991,name:'Piper betle',preferred_common_name:'Betel',rank:'species'}},
+            {id:802,observed_on:'2024-05-01',place_guess:'Sample place',quality_grade:'research',latitude:'-6.22',longitude:'106.82',taxon:{id:991,name:'Piper betle',preferred_common_name:'Betel',rank:'species'}},
+            {id:803,observed_on:'2025-01-01',latitude:'-6.23',longitude:'106.83',taxon:{id:992,name:'Cocos nucifera',preferred_common_name:'Coconut',rank:'species'}}
+          ]
+        });
+      }
+    };
+  };
+  const inat = await api.fetchINaturalistPlantObservations(-6.2,106.8,25,8,false);
+  assert.equal(inat.records.length,2,'iNaturalist returns distinct plant taxa rather than repeated observations');
+  assert.equal(inat.records[0].scientificName,'Piper betle','iNaturalist plant scientific name is mapped');
+  assert.equal(inat.records[0].observer,'observer1','observer credit is retained');
+  assert.equal(inatCalls[0].searchParams.get('taxon_id'),'47126','iNaturalist query filters to Plantae');
+  assert.equal(inatCalls[0].searchParams.get('quality_grade'),'research','iNaturalist query requests research-grade observations');
+  await api.fetchINaturalistPlantObservations(-6.2,106.8,25,8,true);
+  assert.equal(inatCalls.length,2,'iNaturalist supports explicit refresh around the page cache');
+
+  // Test the keyless Open-Meteo seven-day agricultural forecast mapper.
+  let outlookRequestUrl='';
+  global.fetch = async function (url) {
+    outlookRequestUrl=String(url);
+    return {ok:true,status:200,text:async function(){return JSON.stringify({
+      timezone:'Asia/Jakarta',
+      daily:{
+        time:['2026-10-21','2026-10-22'],
+        temperature_2m_mean:[28,29],
+        temperature_2m_min:[24,25],
+        temperature_2m_max:[32,33],
+        precipitation_sum:[6,1],
+        et0_fao_evapotranspiration:[4,5]
+      }
+    });}};
+  };
+  const outlook = await api.fetchOpenMeteoAgroOutlook(-6.2,106.8,true);
+  assert.equal(outlook.days.length,2,'Open-Meteo outlook maps daily forecast rows');
+  assert.equal(outlook.days[0].waterBalanceMm,2,'forecast rain-minus-ET0 balance is explicit');
+  assert.match(outlookRequestUrl,/api\.open-meteo\.com\/v1\/forecast/,'Open-Meteo forecast endpoint is used');
+  assert.ok(new URL(outlookRequestUrl).searchParams.get('daily').includes('et0_fao_evapotranspiration'),'outlook asks for reference ET0');
+
+  // Pl@ntNet must reject missing user credentials before attempting any network request.
+  await assert.rejects(() => api.identifyPlantWithPlantNet([], '', 'auto'), /API key/i, 'Pl@ntNet never uses a hard-coded shared key');
+  await assert.rejects(() => api.identifyPlantWithPlantNet([], 'user-key', 'auto'), /1–5 photos/i, 'Pl@ntNet requires one to five plant photos');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species and NASA POWER smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0 and Pl@ntNet validation smoke tests passed.');
 }
 
 main().catch((error) => {

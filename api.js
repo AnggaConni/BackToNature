@@ -430,7 +430,8 @@
           'wind_speed_10m_mean',
           'wind_speed_10m_max',
           'wind_gusts_10m_max',
-          'wind_direction_10m_dominant'
+          'wind_direction_10m_dominant',
+          'et0_fao_evapotranspiration'
         ].join(','),
         timezone:'auto',
         temperature_unit:'celsius',
@@ -446,7 +447,7 @@
       var variables = [
         'temperature_2m_mean','temperature_2m_min','temperature_2m_max',
         'precipitation_sum','wind_speed_10m_mean','wind_speed_10m_max',
-        'wind_gusts_10m_max','wind_direction_10m_dominant'
+        'wind_gusts_10m_max','wind_direction_10m_dominant','et0_fao_evapotranspiration'
       ];
       var yearly = {};
       daily.time.forEach(function (date, index) {
@@ -457,7 +458,7 @@
         if (!yearly[key]) {
           yearly[key] = {
             year:year, month:month, days:0, temperatures:[], minima:[], maxima:[],
-            precipitation:0, rainyDays:0, windMeans:[], windMaxima:[], gustMaxima:[],
+            precipitation:0, rainyDays:0, et0Values:[], windMeans:[], windMaxima:[], gustMaxima:[],
             directionSin:0, directionCos:0, directionCount:0
           };
         }
@@ -479,6 +480,7 @@
         if (values.wind_speed_10m_mean != null) bucket.windMeans.push(values.wind_speed_10m_mean);
         if (values.wind_speed_10m_max != null) bucket.windMaxima.push(values.wind_speed_10m_max);
         if (values.wind_gusts_10m_max != null) bucket.gustMaxima.push(values.wind_gusts_10m_max);
+        if (values.et0_fao_evapotranspiration != null) bucket.et0Values.push(values.et0_fao_evapotranspiration);
         if (values.wind_direction_10m_dominant != null) {
           var radians = values.wind_direction_10m_dominant * Math.PI / 180;
           bucket.directionSin += Math.sin(radians);
@@ -492,6 +494,7 @@
         var buckets = Object.keys(yearly).map(function (key) { return yearly[key]; })
           .filter(function (bucket) { return bucket.month === monthIndex && bucket.days >= 20; });
         var rainfall = buckets.map(function (bucket) { return bucket.precipitation; });
+        var monthlyEt0 = buckets.map(function (bucket) { return bucket.et0Values.reduce(function (sum, value) { return sum + value; }, 0); });
         var rainDays = buckets.map(function (bucket) { return bucket.rainyDays; });
         var tempMeans = buckets.map(function (bucket) { return mean(bucket.temperatures); });
         var tempMins = buckets.map(function (bucket) { return mean(bucket.minima); });
@@ -510,6 +513,8 @@
           temperatureMin:round(mean(tempMins),1),
           temperatureMax:round(mean(tempMaxs),1),
           precipitationMm:round(mean(rainfall),0),
+          referenceEt0Mm:round(mean(monthlyEt0),0),
+          waterBalanceMm:(mean(rainfall) != null && mean(monthlyEt0) != null) ? round(mean(rainfall)-mean(monthlyEt0),0) : null,
           rainyDays:round(mean(rainDays),1),
           windMeanKmh:round(mean(windMeans),1),
           windDailyMaxMeanKmh:round(mean(windMaxima),1),
@@ -613,11 +618,29 @@
         if (spaced) selectedWindows.push(window);
       });
       if (!selectedWindows.length) selectedWindows = windows.slice(0,3);
+
+      // Assess the current local calendar month against every establishment window
+      // that includes it. This remains a historical climate screen, not a field calendar.
+      var currentMonthIndex = new Date().getMonth();
+      var currentMonthWindows = windows.filter(function (window) {
+        var offset = (currentMonthIndex - window.monthIndex + 12) % 12;
+        return offset < rule.months;
+      }).sort(function (a, b) {
+        return b.score - a.score || (a.windWarning === b.windWarning ? 0 : (a.windWarning ? 1 : -1));
+      });
+      var currentMonthWindow = currentMonthWindows[0] || null;
+      var currentMonthStatus = !currentMonthWindow ? 'unknown' :
+        (currentMonthWindow.score === 100 && !currentMonthWindow.windWarning ? 'suitable' :
+          (currentMonthWindow.score >= 78 ? 'caution' : 'wait'));
+
       return Object.assign({}, crop, {
         climateRule:rule,
         bestWindows:selectedWindows,
         bestWindow:selectedWindows[0] || null,
         climateScore:selectedWindows.length ? selectedWindows[0].score : 0,
+        currentMonthIndex:currentMonthIndex,
+        currentMonthStatus:currentMonthStatus,
+        currentMonthWindow:currentMonthWindow,
         climateProfile:'provisional temperature and rainfall window'
       });
     }).filter(Boolean).sort(function (a, b) {
@@ -949,6 +972,8 @@
 
   // Lightweight live nature and climate connectors. Results are cached for this page session.
   var occurrenceRequestCache = {};
+  var iNaturalistRequestCache = {};
+  var openMeteoOutlookCache = {};
   var nasaMonthlyRequestCache = {};
   var NASA_POWER_BASE = 'https://power.larc.nasa.gov/api/temporal/monthly/point';
   var GBIF_OCCURRENCE_BASE = 'https://api.gbif.org/v1/occurrence/search';
@@ -1066,6 +1091,215 @@
     return promise;
   }
 
+
+  async function fetchINaturalistPlantObservations(latitude, longitude, requestedRadiusKm, requestedLimit, forceRefresh) {
+    var point = validateNatureCoordinates(latitude, longitude);
+    var radiusKm = Math.max(1, Math.min(100, Number(requestedRadiusKm) || 25));
+    var limit = Math.max(1, Math.min(20, Math.round(Number(requestedLimit) || 8)));
+    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3) + ':' + radiusKm + ':' + limit;
+    if (forceRefresh === true) delete iNaturalistRequestCache[cacheKey];
+    if (iNaturalistRequestCache[cacheKey]) return iNaturalistRequestCache[cacheKey];
+
+    var promise = (async function () {
+      var params = new URLSearchParams({
+        lat:point.latitude.toFixed(5),
+        lng:point.longitude.toFixed(5),
+        radius:String(radiusKm),
+        taxon_id:'47126',
+        per_page:'100',
+        order_by:'observed_on',
+        order:'desc',
+        quality_grade:'research'
+      });
+      params.append('has[]','geo');
+      params.append('has[]','photos');
+      var payload = await requestJSON('https://api.inaturalist.org/v1/observations?' + params.toString());
+      var raw = Array.isArray(payload.results) ? payload.results : [];
+      var seen = {};
+      var records = [];
+      raw.forEach(function (record) {
+        var taxon = record && record.taxon || {};
+        var lat = record && record.geojson && Array.isArray(record.geojson.coordinates)
+          ? Number(record.geojson.coordinates[1])
+          : Number(record && record.latitude);
+        var lon = record && record.geojson && Array.isArray(record.geojson.coordinates)
+          ? Number(record.geojson.coordinates[0])
+          : Number(record && record.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        var distanceKm = natureDistanceKm(point.latitude, point.longitude, lat, lon);
+        if (distanceKm > radiusKm) return;
+        var taxonId = taxon.id != null ? String(taxon.id) : '';
+        var scientificName = String(taxon.name || record.species_guess || 'Unidentified plant');
+        var uniqueTaxon = taxonId || scientificName.toLowerCase();
+        if (!uniqueTaxon || seen[uniqueTaxon]) return;
+        seen[uniqueTaxon] = true;
+        var observationId = record.id != null ? String(record.id) : '';
+        var uri = record.uri || (observationId ? 'https://www.inaturalist.org/observations/' + encodeURIComponent(observationId) : 'https://www.inaturalist.org/observations');
+        records.push({
+          id:observationId,
+          taxonId:taxonId,
+          scientificName:scientificName,
+          commonName:String(taxon.preferred_common_name || record.species_guess || ''),
+          rank:String(taxon.rank || ''),
+          observedOn:String(record.observed_on || ''),
+          place:String(record.place_guess || ''),
+          qualityGrade:String(record.quality_grade || ''),
+          observer:String(record.user && record.user.login || ''),
+          latitude:lat,
+          longitude:lon,
+          distanceKm:Math.round(distanceKm * 10) / 10,
+          sourceUrl:uri,
+          taxonUrl:taxonId ? 'https://www.inaturalist.org/taxa/' + encodeURIComponent(taxonId) : 'https://www.inaturalist.org/observations'
+        });
+      });
+      records.sort(function (a, b) {
+        if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+        return String(b.observedOn).localeCompare(String(a.observedOn));
+      });
+      return {
+        latitude:point.latitude,
+        longitude:point.longitude,
+        radiusKm:radiusKm,
+        searchedAt:new Date().toISOString(),
+        totalReturned:Number(payload.total_results) || raw.length,
+        records:records.slice(0,limit),
+        source:'iNaturalist API v1',
+        sourceUrl:'https://www.inaturalist.org/observations'
+      };
+    })().catch(function (error) {
+      delete iNaturalistRequestCache[cacheKey];
+      throw error;
+    });
+    iNaturalistRequestCache[cacheKey] = promise;
+    return promise;
+  }
+
+  async function fetchOpenMeteoAgroOutlook(latitude, longitude, forceRefresh) {
+    var point = validateNatureCoordinates(latitude, longitude);
+    var cacheKey = point.latitude.toFixed(3) + ',' + point.longitude.toFixed(3);
+    if (forceRefresh === true) delete openMeteoOutlookCache[cacheKey];
+    if (openMeteoOutlookCache[cacheKey]) return openMeteoOutlookCache[cacheKey];
+
+    var promise = (async function () {
+      var params = new URLSearchParams({
+        latitude:point.latitude.toFixed(5),
+        longitude:point.longitude.toFixed(5),
+        daily:'temperature_2m_mean,temperature_2m_min,temperature_2m_max,precipitation_sum,et0_fao_evapotranspiration',
+        forecast_days:'7',
+        timezone:'auto',
+        temperature_unit:'celsius',
+        precipitation_unit:'mm',
+        wind_speed_unit:'kmh'
+      });
+      var payload = await requestJSON('https://api.open-meteo.com/v1/forecast?' + params.toString());
+      var daily = payload && payload.daily;
+      if (!daily || !Array.isArray(daily.time) || !daily.time.length) {
+        throw new Error('Open-Meteo returned no daily outlook for this point.');
+      }
+      var days = daily.time.map(function (date, index) {
+        var rain = daily.precipitation_sum && daily.precipitation_sum[index] != null ? Number(daily.precipitation_sum[index]) : null;
+        var et0 = daily.et0_fao_evapotranspiration && daily.et0_fao_evapotranspiration[index] != null ? Number(daily.et0_fao_evapotranspiration[index]) : null;
+        return {
+          date:String(date),
+          temperatureMean:daily.temperature_2m_mean && daily.temperature_2m_mean[index] != null ? Number(daily.temperature_2m_mean[index]) : null,
+          temperatureMin:daily.temperature_2m_min && daily.temperature_2m_min[index] != null ? Number(daily.temperature_2m_min[index]) : null,
+          temperatureMax:daily.temperature_2m_max && daily.temperature_2m_max[index] != null ? Number(daily.temperature_2m_max[index]) : null,
+          precipitationMm:rain != null && Number.isFinite(rain) ? rain : null,
+          referenceEt0Mm:et0 != null && Number.isFinite(et0) ? et0 : null,
+          waterBalanceMm:rain != null && et0 != null && Number.isFinite(rain) && Number.isFinite(et0) ? Math.round((rain-et0)*10)/10 : null
+        };
+      });
+      return {
+        latitude:point.latitude,
+        longitude:point.longitude,
+        timezone:String(payload.timezone || ''),
+        days:days,
+        source:'Open-Meteo Forecast API',
+        sourceUrl:'https://open-meteo.com/en/docs'
+      };
+    })().catch(function (error) {
+      delete openMeteoOutlookCache[cacheKey];
+      throw error;
+    });
+    openMeteoOutlookCache[cacheKey] = promise;
+    return promise;
+  }
+
+  async function identifyPlantWithPlantNet(files, apiKey, organ) {
+    var key = String(apiKey || '').trim();
+    if (!key) throw new Error('Enter your own Pl@ntNet API key to use the optional image-identification service.');
+    if (!files || !files.length || files.length > 5) throw new Error('Choose 1–5 photos of the same plant.');
+    var totalBytes = 0;
+    var imageFiles = [];
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      if (!file || !/^image\/(jpeg|png)$/i.test(String(file.type || ''))) {
+        throw new Error('Pl@ntNet accepts JPEG or PNG photos only.');
+      }
+      totalBytes += Number(file.size) || 0;
+      imageFiles.push(file);
+    }
+    if (totalBytes > 50 * 1024 * 1024) throw new Error('Combined photo size must not exceed 50 MB.');
+    var allowedOrgans = ['auto','leaf','flower','fruit','bark'];
+    var selectedOrgan = allowedOrgans.indexOf(String(organ || 'auto')) >= 0 ? String(organ || 'auto') : 'auto';
+    var form = new FormData();
+    imageFiles.forEach(function (file) {
+      form.append('images',file,file.name || 'plant-photo.jpg');
+      form.append('organs',selectedOrgan);
+    });
+    var params = new URLSearchParams({
+      'api-key':key,
+      lang:'en',
+      'include-related-images':'false',
+      'no-reject':'false',
+      'nb-results':'5'
+    });
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 30000);
+    try {
+      var response = await fetch('https://my-api.plantnet.org/v2/identify/all?' + params.toString(), {
+        method:'POST',
+        body:form,
+        signal:controller.signal,
+        cache:'no-store'
+      });
+      var responseText = await response.text();
+      var payload;
+      try { payload = JSON.parse(responseText); }
+      catch (_) { throw new Error('Pl@ntNet returned a non-JSON response (HTTP ' + response.status + ').'); }
+      if (!response.ok) {
+        var detail = payload && (payload.message || payload.error || payload.detail);
+        throw new Error('Pl@ntNet HTTP ' + response.status + (detail ? ': ' + detail : '') + '. Check the key and daily quota.');
+      }
+      var results = Array.isArray(payload.results) ? payload.results : [];
+      return {
+        bestMatch:String(payload.bestMatch || ''),
+        version:String(payload.version || ''),
+        remainingIdentificationRequests:payload.remainingIdentificationRequests == null ? null : Number(payload.remainingIdentificationRequests),
+        queriedAt:new Date().toISOString(),
+        results:results.slice(0,5).map(function (item) {
+          var species = item && item.species || {};
+          var commonNames = Array.isArray(species.commonNames) ? species.commonNames : [];
+          return {
+            scientificName:String(species.scientificNameWithoutAuthor || species.scientificName || payload.bestMatch || 'Unresolved plant'),
+            authorship:String(species.scientificNameAuthorship || ''),
+            commonName:String(commonNames[0] || ''),
+            family:String(species.family && (species.family.scientificNameWithoutAuthor || species.family.scientificName) || ''),
+            score:Number.isFinite(Number(item.score)) ? Number(item.score) : null
+          };
+        }),
+        source:'Pl@ntNet recognition API',
+        sourceUrl:'https://my.plantnet.org/'
+      };
+    } catch (error) {
+      if (error && error.name === 'AbortError') throw new Error('Pl@ntNet identification exceeded the 30-second timeout.');
+      if (error instanceof TypeError) throw new Error('Browser network/CORS access to Pl@ntNet failed. Check your connection and retry.');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function fetchNasaPowerMonthly(latitude, longitude, requestedYears, forceRefresh) {
     var point = validateNatureCoordinates(latitude, longitude);
     var years = Math.max(3, Math.min(10, Math.round(Number(requestedYears) || 5)));
@@ -1160,6 +1394,9 @@
     getCountryLanguagePreference: getCountryLanguagePreference,
     fetchCropTaxonomy: fetchCropTaxonomy,
     fetchGbifOccurrences: fetchGbifOccurrences,
-    fetchNasaPowerMonthly: fetchNasaPowerMonthly
+    fetchNasaPowerMonthly: fetchNasaPowerMonthly,
+    fetchINaturalistPlantObservations: fetchINaturalistPlantObservations,
+    fetchOpenMeteoAgroOutlook: fetchOpenMeteoAgroOutlook,
+    identifyPlantWithPlantNet: identifyPlantWithPlantNet
   };
 })();
