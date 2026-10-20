@@ -376,8 +376,37 @@ async function main() {
   assert.ok(!/token|authorization/i.test(waporRequestUrl),'WaPOR v3 catalog request does not attach credentials');
   assert.match(wapor.records[0].apiUrl,/\/rasters\?overview=false&paged=false/,'each mapset exposes the official raster metadata link');
 
+
+  // Country-specific source registry keeps Indonesian national sources scoped to Indonesia.
+  const idnSources = api.getCountrySourceCatalog('IDN','Indonesia');
+  assert.ok(idnSources.some((source)=>/BPS/.test(source.title)),'Indonesia registry includes BPS');
+  assert.ok(idnSources.some((source)=>/Kementerian Pertanian/.test(source.title)),'Indonesia registry includes Kementan');
+  assert.ok(!api.getCountrySourceCatalog('USA','United States').some((source)=>/BPS|Kementerian Pertanian/.test(source.title)),'Indonesia-only institutions are absent for the US');
+  const canadaSources = api.getCountrySourceCatalog('CAN','Canada');
+  assert.ok(canadaSources.some((source)=>/Statistics Canada Web Data Service/.test(source.title)&&/no API key/i.test(source.access)),'Canada receives a reviewed public Statistics Canada API');
+  const germanySources = api.getCountrySourceCatalog('DEU','Germany');
+  assert.ok(germanySources.some((source)=>/Eurostat/.test(source.title)&&source.apiUrl.includes('geo=DE')),'EU countries receive a country-filtered Eurostat API URL');
+  assert.equal(api.getCountrySourceCatalog('XYZ','Example').length,0,'unreviewed countries do not receive fabricated national API records');
+
+  // World Bank API data are requested for the selected ISO-3 country and can return partial series.
+  const wbCalls = [];
+  global.fetch = async function (url) {
+    wbCalls.push(String(url));
+    const match=String(url).match(/indicator\/([^?]+)/);
+    const code=match?decodeURIComponent(match[1]):'';
+    const valueMap={'AG.LND.AGRI.ZS':48.1,'AG.YLD.CREL.KG':5320,'AG.PRD.CROP.XD':121.4,'NV.AGR.TOTL.ZS':12.3};
+    return {
+      ok:true,status:200,
+      text:async function(){return JSON.stringify([{page:1},[{date:'2024',value:valueMap[code],indicator:{id:code},country:{id:'IDN'}}]]);}
+    };
+  };
+  const wbSnapshot = await api.fetchWorldBankAgricultureSnapshot('IDN',true);
+  assert.equal(wbSnapshot.indicators.length,4,'World Bank snapshot requests four agriculture indicator series');
+  assert.equal(wbSnapshot.indicators.find((item)=>item.id==='AG.YLD.CREL.KG').value,5320,'World Bank cereal yield is mapped');
+  assert.ok(wbCalls.every((url)=>url.includes('/country/IDN/indicator/')),'World Bank API queries are scoped to the selected ISO-3 country');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog and Pl@ntNet validation smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog, country-specific API registry, World Bank agriculture snapshot and Pl@ntNet validation smoke tests passed.');
 }
 
 main().catch((error) => {
