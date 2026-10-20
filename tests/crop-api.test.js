@@ -130,8 +130,62 @@ async function main() {
   assert.equal(climateParams.get('start_date'),(new Date().getFullYear()-5)+'-01-01','uses five complete calendar years');
   assert.equal(climateParams.get('end_date'),(new Date().getFullYear()-1)+'-12-31','ends at the last complete calendar year');
 
+  // Test country/language-aware plant names against a mocked GBIF response.
+  const gbifCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    gbifCalls.push(parsed.href);
+    if (parsed.pathname === '/v1/species/match') {
+      return {
+        ok:true,status:200,
+        text:async function () {
+          return JSON.stringify({
+            usageKey:2705644,
+            key:2705644,
+            rank:'SPECIES',
+            canonicalName:'Zea mays',
+            scientificName:'Zea mays',
+            matchType:'EXACT'
+          });
+        }
+      };
+    }
+    if (parsed.pathname === '/v1/species/2705644/vernacularNames') {
+      return {
+        ok:true,status:200,
+        text:async function () {
+          return JSON.stringify({
+            results:[
+              {vernacularName:'Jagung',language:'id',country:{code:'ID',title:'Indonesia'},source:'Local flora list'},
+              {vernacularName:'Corn',language:'en',country:{code:'US',title:'United States'},source:'Checklist'},
+              {vernacularName:'Batar',language:'tet',country:{code:'TL',title:'Timor-Leste'},source:'Regional flora'}
+            ],
+            endOfRecords:true
+          });
+        }
+      };
+    }
+    return {ok:false,status:404,text:async function(){return JSON.stringify({detail:'Unexpected mocked URL'});}};
+  };
+  const catalogue = api.getCropCatalog();
+  assert.ok(catalogue.some((item) => item.id === 'cashew' && item.scientific === 'Anacardium occidentale'), 'catalogue includes crop species for regional aliases');
+
+  const indonesianMaize = await api.fetchCropTaxonomy('maize','IDN','Indonesia');
+  assert.equal(indonesianMaize.englishName,'Maize / Corn','English/common name is retained from crop catalogue');
+  assert.equal(indonesianMaize.localName,'Jagung','country and language matching chooses the Indonesian vernacular');
+  assert.equal(indonesianMaize.localLanguage,'Indonesian','local language label is exposed');
+  assert.equal(indonesianMaize.scientificName,'Zea mays','accepted scientific name is exposed');
+  assert.equal(indonesianMaize.status,'matched','GBIF taxon match status is explicit');
+  assert.match(indonesianMaize.sourceUrl,/gbif\.org\/species\/2705644/,'taxon source URL is provided');
+
+  const timorMaize = await api.fetchCropTaxonomy('maize','TLS','Timor-Leste');
+  assert.equal(timorMaize.localName,'Batar','Timor-Leste preference uses the Tetum vernacular where available');
+  assert.equal(timorMaize.localLanguage,'Tetum','the language of the returned vernacular is labelled');
+  assert.equal(gbifCalls.filter((url) => new URL(url).pathname === '/v1/species/match').length,1,'scientific matching is cached across selected countries');
+  assert.equal(gbifCalls.filter((url) => new URL(url).pathname.endsWith('/vernacularNames')).length,1,'vernacular records are cached across selected countries');
+
   global.fetch = originalFetch;
-  console.log('Crop, planting-window and historical climate API smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window and climate API smoke tests passed.');
 }
 
 main().catch((error) => {
