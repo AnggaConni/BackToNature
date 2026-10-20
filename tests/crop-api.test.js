@@ -324,14 +324,24 @@ async function main() {
         temperature_2m_max:[32,33],
         precipitation_sum:[6,1],
         et0_fao_evapotranspiration:[4,5]
+      },
+      hourly:{
+        time:['2026-10-21T00:00','2026-10-21T01:00','2026-10-22T00:00','2026-10-22T01:00'],
+        soil_moisture_0_to_7cm:[0.20,0.24,0.30,0.32],
+        soil_temperature_0_to_7cm:[25,27,26,28],
+        vapour_pressure_deficit:[0.8,1.0,0.5,0.7]
       }
     });}};
   };
   const outlook = await api.fetchOpenMeteoAgroOutlook(-6.2,106.8,true);
   assert.equal(outlook.days.length,2,'Open-Meteo outlook maps daily forecast rows');
   assert.equal(outlook.days[0].waterBalanceMm,2,'forecast rain-minus-ET0 balance is explicit');
+  assert.equal(outlook.days[0].soilMoistureTopM3M3,0.22,'hourly soil moisture is averaged by local forecast day');
+  assert.equal(outlook.days[0].soilTemperatureTopC,26,'hourly topsoil temperature is averaged by day');
+  assert.equal(outlook.days[0].vapourPressureDeficitKpa,0.9,'hourly vapour pressure deficit is averaged by day');
   assert.match(outlookRequestUrl,/api\.open-meteo\.com\/v1\/forecast/,'Open-Meteo forecast endpoint is used');
   assert.ok(new URL(outlookRequestUrl).searchParams.get('daily').includes('et0_fao_evapotranspiration'),'outlook asks for reference ET0');
+  assert.ok(new URL(outlookRequestUrl).searchParams.get('hourly').includes('soil_moisture_0_to_7cm'),'outlook asks for modelled topsoil moisture');
 
   // Pl@ntNet must reject missing user credentials before attempting any network request.
   await assert.rejects(() => api.identifyPlantWithPlantNet([], '', 'auto'), /API key/i, 'Pl@ntNet never uses a hard-coded shared key');
