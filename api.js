@@ -887,8 +887,11 @@
       }
       return score(b)-score(a) || a.vernacularName.localeCompare(b.vernacularName);
     });
-    var preferred = candidates.find(function (item) { return item.countryMatches; }) ||
+    // Prefer an actual country + preferred-language record first, then a vernacular
+    // in the selected country's expected language, and only then country-only records.
+    var preferred = candidates.find(function (item) { return item.countryMatches && item.languageMatches; }) ||
       candidates.find(function (item) { return item.languageMatches; }) ||
+      candidates.find(function (item) { return item.countryMatches; }) ||
       candidates.find(function (item) { return item.language === 'en'; }) ||
       candidates[0] || null;
     var localName = preferred ? preferred.vernacularName : '';
