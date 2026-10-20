@@ -16,6 +16,12 @@ async function main() {
   assert.ok(appSource.includes("node.className = 'live-status ' + normalizedType"), 'live status helper uses the live-status style classes');
   assert.ok((appSource.match(/setLiveStatus\s*\(/g) || []).length > 1, 'live API handlers can call the helper');
   assert.equal(typeof api.listCropRecommendations, 'function', 'crop screener is exported');
+  assert.ok(appSource.includes('function loadFieldBriefOutlook(selection, forceRefresh)'), 'Quick Field Brief has a live seven-day outlook loader');
+  assert.ok(appSource.includes('What does the recommendation actually mean?'), 'Quick Field Brief explains recommendations in plain language');
+  assert.ok(appSource.includes('Do not drain peat to fit a crop'), 'Quick Field Brief includes a peat and fire safeguard');
+  assert.ok(appSource.includes('function renderWaporPublicApiPanel()'), 'Sources has a live public WaPOR v3 catalog panel');
+  assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
+  assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
   assert.equal(typeof api.searchPlantImages, 'function', 'Commons image search is exported');
 
   const recommendations = api.listCropRecommendations({
