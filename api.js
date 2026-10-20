@@ -1002,6 +1002,7 @@
       var payload = await requestJSON(GBIF_OCCURRENCE_BASE + '?' + params.toString());
       var raw = Array.isArray(payload.results) ? payload.results : [];
       var records = raw.map(function (record) {
+        if (record.decimalLatitude == null || record.decimalLongitude == null) return null;
         var lat = Number(record.decimalLatitude);
         var lon = Number(record.decimalLongitude);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
