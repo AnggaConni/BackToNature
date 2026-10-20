@@ -143,3 +143,11 @@ The Quick Field Brief keeps crop cards compact. Each card displays a current-mon
 - **FAO WaPOR v3:** linked as an additional water-productivity source. Availability, product level, spatial resolution and temporal coverage should be checked for the selected location before interpreting an observation.
 
 All live responses are optional and may be blocked by network/CORS limits or provider availability. Failure states do not fabricate fallback observations or measurements.
+
+
+### WaPOR v3 live catalogue
+The Detailed Fieldbook's Nature Data tab queries the public FAO GISMGR v2 catalogue at `/catalog/workspaces/WAPOR-3/mapsets` without credentials. It lists the global mapsets used for actual evapotranspiration/interception (AETI), reference evapotranspiration (RET), relative soil moisture (RSM), precipitation (PCP), and net primary production (NPP), with time-step and resolution labels plus official raster-catalog links. This is a real metadata/API connector; it does not yet extract a per-coordinate raster value, and opening a raster link may list or download GeoTIFF sources. FAO's WaPOR v3 documentation states no API key or token is required. The global Level 1 datasets cover the globe, but resolution differs by variable (for example AETI vs RET), and regional Level 2 coverage is not global.
+
+Official references:
+- https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en
+- https://data.apps.fao.org/gismgr/shared/docs/api-reference/index.html
