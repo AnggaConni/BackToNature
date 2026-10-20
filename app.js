@@ -64,9 +64,12 @@
   var natureINaturalistStatusBySelection = {};
   var natureOutlookDataBySelection = {};
   var natureOutlookStatusBySelection = {};
+  var natureWaporDataBySelection = {};
+  var natureWaporStatusBySelection = {};
   var natureOccurrenceRequestId = 0;
   var natureINaturalistRequestId = 0;
   var natureOutlookRequestId = 0;
+  var natureWaporRequestId = 0;
   var plantNetRequestId = 0;
   var naturePowerRequestId = 0;
 
@@ -1127,6 +1130,27 @@
     }).join('') + '</div>';
   }
 
+
+  function renderWaporMapsetCatalog(data) {
+    var records = data && Array.isArray(data.records) ? data.records : [];
+    if (!records.length) return '<p>No WaPOR mapsets were returned from the official catalog.</p>';
+    return '<div class="wapor-mapset-grid">' + records.map(function (record) {
+      var keyText = /AETI/.test(record.code) ? 'Actual evapotranspiration' :
+        /RET/.test(record.code) ? 'Reference evapotranspiration' :
+        /RSM/.test(record.code) ? 'Relative soil moisture' :
+        /NPP/.test(record.code) ? 'Vegetation productivity' :
+        /PCP/.test(record.code) ? 'Precipitation' : 'Water / land indicator';
+      return '<article class="wapor-mapset-card">' +
+        '<div class="wapor-mapset-heading"><span class="mini-code">' + esc(record.code) + '</span><span class="wapor-level-tag">' + esc(record.level) + '</span></div>' +
+        '<h4>' + esc(record.caption) + '</h4>' +
+        '<div class="wapor-mapset-meta"><span>' + esc(record.temporalResolution) + '</span><span>' + esc(record.resolutionNote) + '</span></div>' +
+        '<p>' + esc(keyText) + '. Time-step and spatial resolution matter when comparing this dataset with local field measurements.</p>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open raster catalog ↗</a>' +
+        '</article>';
+    }).join('') + '</div>' +
+    '<p class="nature-method-note">Catalog metadata loaded at ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. The links list source raster metadata; this panel does not claim to have extracted a value for this point.</p>';
+  }
+
   function renderNatureExplorer(profile) {
     var key = climateSelectionKey(currentProvince);
     var occurrenceData = natureOccurrenceDataBySelection[key];
@@ -1137,6 +1161,8 @@
     var powerStatus = naturePowerStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
     var outlookData = natureOutlookDataBySelection[key];
     var outlookStatus = natureOutlookStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
+    var waporData = natureWaporDataBySelection[key];
+    var waporStatus = natureWaporStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
     var region = currentProvince && currentProvince.name || profile.name;
     var point = currentProvince && geometryCentroid(currentProvince.feature);
     var pointText = point ? (Number(point.latitude).toFixed(4) + ', ' + Number(point.longitude).toFixed(4)) : 'representative point unavailable';
@@ -1179,6 +1205,13 @@
       '<div id="plantnet-results" class="live-results">No image has been submitted. Photos are sent to Pl@ntNet only after you press Identify Plant.</div>' +
       '<a href="https://my.plantnet.org/" target="_blank" rel="noopener noreferrer" aria-label="Powered by Pl@ntNet"><img class="plantnet-powered-logo" src="https://my.plantnet.org/images/powered-by-plantnet-light.png" alt="Powered by Pl@ntNet" loading="lazy"></a>' +
       '<p class="nature-method-note">Identification is a model suggestion, not a definitive expert determination. <a target="_blank" rel="noopener noreferrer" href="https://my.plantnet.org/terms_of_use">Free-use conditions ↗</a></p></section>' +
+
+      '<section class="live-connectors wapor-panel"><div class="section-title"><span class="mini-code">FAO / WAPOR VERSION 3</span><h3>Global water and vegetation data catalogue</h3></div>' +
+      '<p class="live-explainer">Load the public WaPOR v3 catalogue without an API key. It lists global datasets for actual evapotranspiration, reference evapotranspiration, relative soil moisture, precipitation and vegetation productivity. This is a metadata browser—not yet a sampled value for the selected point. Available spatial resolution differs by variable.</p>' +
+      '<button id="nature-wapor-btn" class="pixel-btn green" type="button">↻ LOAD / REFRESH WAPOR CATALOG</button>' +
+      '<div id="nature-wapor-status" class="live-status ' + esc(waporStatus.type) + '" aria-live="polite">' + esc(waporStatus.message) + '</div>' +
+      '<div id="nature-wapor-results" class="live-results">' + (waporData ? renderWaporMapsetCatalog(waporData) : 'Opening this tab loads the WaPOR catalogue. No raster values are fabricated.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">FAO WaPOR v3 data access ↗</a> · <a target="_blank" rel="noopener noreferrer" href="https://data.apps.fao.org/gismgr/shared/docs/api-reference/index.html">GISMGR API documentation ↗</a></p></section>' +
       '<section class="climate-method-note"><b>How to interpret these sources</b><p>GBIF and iNaturalist describe reported observations, not population size. NASA POWER and Open-Meteo are gridded weather products, not a measurement from the selected farm. The ESA WorldCover 2021 land-cover layer can be toggled from the map layer control. Verify soil, water and the actual planting calendar locally.</p>' +
       '<p><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Open FAO WaPOR data portal ↗</a> (global reference-water/actual evapotranspiration layers; investigate the available spatial and temporal level before using for a local decision).</p></section>';
   }
@@ -1194,7 +1227,7 @@
       var button = el(config.buttonId);
       if (!button) return;
       button.addEventListener('click', async function () {
-        if (!point) {
+        if (!point && config.requiresPoint !== false) {
           config.statusStore[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
           setLiveStatus(config.statusId, config.statusStore[key].message, 'error');
           return;
@@ -1279,6 +1312,18 @@
       successMessage:function(d){return 'Seven-day outlook loaded'+(d.timezone?' · '+d.timezone:'')+'.';},
       failureMessage:'Open-Meteo forecast query failed.',
       render:renderOpenMeteoOutlook
+    });
+    updateAsyncConnector({
+      buttonId:'nature-wapor-btn', statusId:'nature-wapor-status', resultsId:'nature-wapor-results',
+      statusStore:natureWaporStatusBySelection, dataStore:natureWaporDataBySelection,
+      requestCounter:{ get value(){ return natureWaporRequestId; }, set value(v){ natureWaporRequestId=v; } },
+      method:'fetchWaporMapsets',
+      requiresPoint:false,
+      args:function(p,refresh){return [refresh];},
+      loadingMessage:'Loading public WaPOR v3 dataset metadata…',
+      successMessage:function(d){return (d.records||[]).length+' global WaPOR mapsets returned from the official catalog.';},
+      failureMessage:'WaPOR catalogue request failed.',
+      render:renderWaporMapsetCatalog
     });
 
     var identifyButton = el('plantnet-identify-btn');
