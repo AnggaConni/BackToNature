@@ -335,8 +335,37 @@ async function main() {
   await assert.rejects(() => api.identifyPlantWithPlantNet([], '', 'auto'), /API key/i, 'Pl@ntNet never uses a hard-coded shared key');
   await assert.rejects(() => api.identifyPlantWithPlantNet([], 'user-key', 'auto'), /1–5 photos/i, 'Pl@ntNet requires one to five plant photos');
 
+
+  // WaPOR v3 catalog is a public metadata API; no token is attached and only useful global mapsets are presented.
+  let waporRequestUrl='';
+  global.fetch = async function (url) {
+    waporRequestUrl=String(url);
+    return {
+      ok:true,status:200,
+      text:async function(){return JSON.stringify({
+        response:{
+          items:[
+            {code:'L1-AETI-D',caption:'Actual EvapoTranspiration and Interception (Global - Dekadal - 300m)'},
+            {code:'L1-RET-M',caption:'Reference Evapotranspiration (Global - Monthly - 30km)'},
+            {code:'L1-RSM-D',caption:'Relative Soil Moisture (Global - Dekadal - 300m)'},
+            {code:'L2-AETI-D',caption:'National AETI (regional availability)'},
+            {caption:'Record without a code'}
+          ],
+          links:[]
+        }
+      });}
+    };
+  };
+  const wapor=await api.fetchWaporMapsets(true);
+  assert.equal(wapor.records.length,3,'WaPOR catalogue keeps only curated global water/productivity mapsets');
+  assert.ok(wapor.records.some((item)=>item.code==='L1-AETI-D'&&item.resolutionNote==='Approximately 300 m'),'AETI global resolution metadata is retained');
+  assert.ok(wapor.records.some((item)=>item.code==='L1-RET-M'&&item.resolutionNote==='Approximately 30 km'),'RET resolution is described separately');
+  assert.match(waporRequestUrl,/data\.apps\.fao\.org\/gismgr\/api\/v2\/catalog\/workspaces\/WAPOR-3\/mapsets/,'public WaPOR v3 catalog endpoint is used');
+  assert.ok(!/token|authorization/i.test(waporRequestUrl),'WaPOR v3 catalog request does not attach credentials');
+  assert.match(wapor.records[0].apiUrl,/\/rasters\?overview=false&paged=false/,'each mapset exposes the official raster metadata link');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0 and Pl@ntNet validation smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog and Pl@ntNet validation smoke tests passed.');
 }
 
 main().catch((error) => {
