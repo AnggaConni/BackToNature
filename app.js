@@ -14,6 +14,20 @@
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  // Optional ESA WorldCover land-cover overlay. It is off by default so the
+  // basemap stays legible and no extra map tiles are requested until enabled.
+  var esaWorldCover2021Layer = L.tileLayer.wms('https://titiler.terrascope.be/wms', {
+    layers:'WORLDCOVER_2021_MAP',
+    format:'image/png',
+    transparent:true,
+    version:'1.1.1',
+    opacity:0.76,
+    attribution:'&copy; ESA WorldCover 2021 / Contains modified Copernicus Sentinel data'
+  });
+  L.control.layers(null, {
+    'ESA WorldCover 2021 · land cover':esaWorldCover2021Layer
+  }, { collapsed:true, position:'topright' }).addTo(map);
+
   var worldLayer = null;
   var provinceLayer = null;
   var provincesGeoJSON = null;
@@ -46,10 +60,14 @@
   var natureOccurrenceStatusBySelection = {};
   var naturePowerDataBySelection = {};
   var naturePowerStatusBySelection = {};
-  var nearbyPlantDataBySelection = {};
-  var nearbyPlantStatusBySelection = {};
-  var nearbyPlantPromisesBySelection = {};
+  var natureINaturalistDataBySelection = {};
+  var natureINaturalistStatusBySelection = {};
+  var natureOutlookDataBySelection = {};
+  var natureOutlookStatusBySelection = {};
   var natureOccurrenceRequestId = 0;
+  var natureINaturalistRequestId = 0;
+  var natureOutlookRequestId = 0;
+  var plantNetRequestId = 0;
   var naturePowerRequestId = 0;
 
   function norm(value) {
@@ -441,6 +459,8 @@
         '<div class="climate-month-metrics"><span>Mean temp</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
         '<span>Typical low–high</span><b>' + esc(numberOrDash(month.temperatureMin,'–') + numberOrDash(month.temperatureMax,' °C')) + '</b>' +
         '<span>Rain days / month</span><b>' + esc(numberOrDash(month.rainyDays,' days')) + '</b>' +
+        '<span>Reference ET₀</span><b>' + esc(numberOrDash(month.referenceEt0Mm,' mm')) + '</b>' +
+        '<span>Rain − ET₀</span><b class="' + (month.waterBalanceMm != null && Number(month.waterBalanceMm) < 0 ? 'water-deficit' : '') + '">' + esc(numberOrDash(month.waterBalanceMm,' mm')) + '</b>' +
         '<span>Mean wind</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windMeanKmh,' km/h')) + '</b>' +
         '<span>Monthly peak gust</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windGustMaxMeanKmh,' km/h')) + '</b>' +
         '<span>Dominant wind</span><b>' + esc(month.windDirection || '—') + '</b></div>' +
@@ -456,7 +476,8 @@
         '<div id="climate-photo-' + esc(crop.id) + '" class="climate-crop-photo"><div class="crop-image-placeholder"><span>🌱</span><b>Plant reference</b><small>Image loads from Wikimedia Commons</small></div></div>' +
         '<div class="climate-crop-body"><div class="climate-crop-heading"><span class="data-tag green">CLIMATE PICK ' + String(index + 1).padStart(2,'0') + '</span><span class="crop-score">' + esc(best.score == null ? '—' : best.score) + '/100</span></div>' +
         '<h3>' + esc(crop.name) + '</h3><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
-        '<p class="climate-start-month"><strong>Try planting window:</strong> ' + esc(best.month || '—') + ' · establishment screen ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' months</p>' +
+        '<p class="climate-start-month"><strong>Best climate window:</strong> ' + esc(best.month || '—') + ' · establishment screen ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' months</p>' +
+        '<p class="climate-current-month ' + esc(crop.currentMonthStatus === 'suitable' ? 'is-open' : crop.currentMonthStatus === 'caution' ? 'is-caution' : crop.currentMonthStatus === 'wait' ? 'is-wait' : 'is-unknown') + '"><strong>Current month (' + esc(['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()]) + '):</strong> ' + esc(crop.currentMonthStatus === 'suitable' ? 'climate window open' : crop.currentMonthStatus === 'caution' ? 'possible with cautions' : crop.currentMonthStatus === 'wait' ? 'not recommended by this climate screen' : 'not verified') + '</p>' +
         '<p>' + esc(crop.note) + '</p>' +
         '<div class="climate-crop-meta"><span>Temperature screen ' + esc(crop.climateRule.tempMin) + '–' + esc(crop.climateRule.tempMax) + ' °C</span><span>Window rainfall ' + esc(numberOrDash(best.totalRainMm,' mm')) + '</span><span>Mean wind ' + esc(numberOrDash(best.avgWindKmh,' km/h')) + '</span></div>' +
         (reasons ? '<div class="crop-reason"><b>Why the climate matched</b><ul>' + reasons + '</ul></div>' : '') +
@@ -867,6 +888,10 @@
       {t:'BPS — provincial rice statistics',d:'Official harvested area, productivity and production table. Open the source table and select the relevant year.',u:'https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html',tag:'OFFICIAL STATISTICS'},
       {t:'Kementerian Pertanian — soil and agricultural geodata',d:'Explore available soil and land-resource layers. Coverage, scale and licensing must be checked for each layer.',u:'https://geoportal.pertanian.go.id/',tag:'SOIL / GIS'},
       {t:'FAO Hand-in-Hand',d:'Spatial datasets and context for land, water, climate and agricultural systems.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL'},
+      {t:'ESA WorldCover 2021',d:'A freely accessible 10 m global land-cover product; the map layer can be toggled from the Leaflet layer control. It is not a parcel survey and is not current-year land cover.',u:'https://esa-worldcover.org/en/data-access',tag:'LAND COVER / WMS'},
+      {t:'FAO WaPOR v3',d:'Open water-productivity and evapotranspiration datasets. Check level/resolution and time coverage for the selected point before interpreting values.',u:'https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en',tag:'WATER / ET DATA'},
+      {t:'iNaturalist API',d:'Research-grade community plant observations used as an independent cross-check against GBIF.',u:'https://www.inaturalist.org/pages/developers',tag:'BIODIVERSITY'},
+      {t:'Pl@ntNet API',d:'Optional personal-key image identification. Free quota is up to 500 queries/day; account and attribution terms apply.',u:'https://my.plantnet.org/terms_of_use',tag:'PHOTO IDENTIFICATION'},
       {t:'FAOSTAT',d:'Country-level agricultural indicators and land-use statistics. These are not provincial measurements.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL INDICATORS'},
       {t:'WOCAT QCAT',d:'Documented sustainable land management approaches and technologies. API access may require a token.',u:'https://qcat.wocat.net/en/wocat/list/',tag:'RESTORATION METHODS'},
       {t:'FAO AGROVOC',d:'Multilingual agricultural vocabulary and concept relationships for structured discovery.',u:'https://agrovoc.fao.org/browse/agrovoc/en/',tag:'TAXONOMY'},
@@ -1056,136 +1081,257 @@
     }).join('') + '</div>';
   }
 
+
+  function renderINaturalistPlantRecords(data) {
+    var records = data && Array.isArray(data.records) ? data.records : [];
+    if (!records.length) return '<p>No research-grade plant observations were returned in the nearby search. This is not proof that the area has no plants.</p>';
+    return '<div class="nature-observation-grid">' + records.map(function (record) {
+      return '<article class="field-card nature-observation-card">' +
+        '<div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">' + esc(numberOrDash(record.distanceKm,' km away')) + '</span></div>' +
+        '<h3>' + esc(record.commonName || record.scientificName) + '</h3>' +
+        '<p><i>' + esc(record.scientificName) + '</i></p>' +
+        (record.observedOn ? '<p><b>Observed:</b> ' + esc(record.observedOn) + '</p>' : '') +
+        (record.place ? '<p>' + esc(record.place) + '</p>' : '') +
+        (record.observer ? '<p><b>Observer:</b> ' + esc(record.observer) + '</p>' : '') +
+        '<div class="nature-record-links"><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.taxonUrl)) + '">Open taxon ↗</a> ' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Source observation ↗</a></div>' +
+        '</article>';
+    }).join('') + '</div>';
+  }
+
+  function renderOpenMeteoOutlook(data) {
+    var days = data && Array.isArray(data.days) ? data.days : [];
+    if (!days.length) return '<p>No seven-day outlook was returned for this location.</p>';
+    return '<div class="outlook-day-grid">' + days.map(function (day) {
+      return '<article class="outlook-day-card">' +
+        '<b>' + esc(day.date) + '</b>' +
+        '<span class="outlook-temperature">' + esc(numberOrDash(day.temperatureMean,' °C')) + '</span>' +
+        '<span>Rain <b>' + esc(numberOrDash(day.precipitationMm,' mm')) + '</b></span>' +
+        '<span>ET₀ <b>' + esc(numberOrDash(day.referenceEt0Mm,' mm')) + '</b></span>' +
+        '<span class="' + (day.waterBalanceMm != null && day.waterBalanceMm < 0 ? 'water-deficit' : '') + '">Rain − ET₀ <b>' + esc(numberOrDash(day.waterBalanceMm,' mm')) + '</b></span>' +
+        '</article>';
+    }).join('') + '</div>';
+  }
+
+  function renderPlantNetResults(data) {
+    var records = data && Array.isArray(data.results) ? data.results : [];
+    if (!records.length) return '<p>No candidate species were returned. Try a sharper photo of the leaf, flower or fruit.</p>';
+    return '<div class="plantnet-result-list">' + records.map(function (record, index) {
+      return '<article class="plantnet-result-card">' +
+        '<div class="plantnet-result-rank">0' + String(index+1) + '</div><div class="plantnet-result-copy">' +
+        '<h4>' + esc(record.commonName || record.scientificName) + '</h4>' +
+        '<p><i>' + esc(record.scientificName) + (record.authorship ? ' ' + esc(record.authorship) : '') + '</i></p>' +
+        (record.family ? '<p>Family: ' + esc(record.family) + '</p>' : '') +
+        '<p><b>Model confidence:</b> ' + esc(record.score == null ? '—' : (record.score*100).toFixed(1) + '%') + '</p>' +
+        '</div></article>';
+    }).join('') + '</div>';
+  }
+
   function renderNatureExplorer(profile) {
     var key = climateSelectionKey(currentProvince);
     var occurrenceData = natureOccurrenceDataBySelection[key];
     var occurrenceStatus = natureOccurrenceStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
+    var iNatData = natureINaturalistDataBySelection[key];
+    var iNatStatus = natureINaturalistStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
     var powerData = naturePowerDataBySelection[key];
     var powerStatus = naturePowerStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
+    var outlookData = natureOutlookDataBySelection[key];
+    var outlookStatus = natureOutlookStatusBySelection[key] || { type:'neutral', message:'Not queried yet' };
     var region = currentProvince && currentProvince.name || profile.name;
     var point = currentProvince && geometryCentroid(currentProvince.feature);
     var pointText = point ? (Number(point.latitude).toFixed(4) + ', ' + Number(point.longitude).toFixed(4)) : 'representative point unavailable';
     return '<div class="tab-intro"><div class="eyebrow">NATURE & CLIMATE / LIVE DATA</div>' +
       '<h2>Explore nearby life and climate 🌿</h2>' +
-      '<p>Use public source data around <b>' + esc(region) + '</b>. Both queries use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p></div>' +
+      '<p>Detailed evidence for <b>' + esc(region) + '</b>. Live searches use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p></div>' +
       '<div class="tile-grid nature-connectors-grid">' +
-      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🦋</span><span class="mini-code">GBIF / OCCURRENCES</span></div>' +
-      '<h3>Species observations nearby</h3><p>Retrieve coordinate-backed biodiversity records from GBIF, then keep only records inside a configurable nearby radius. A record shows that an observation was reported—not population size or complete biodiversity.</p>' +
-      '<button id="nature-gbif-btn" class="pixel-btn green" type="button">↻ REFRESH NEARBY SPECIES</button>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌱</span><span class="mini-code">GBIF / PLANT OCCURRENCES</span></div>' +
+      '<h3>Plant species recorded nearby</h3><p>Species-level, georeferenced plant records from GBIF within 25 km. Records document reported occurrence, not crop suitability or abundance.</p>' +
+      '<button id="nature-gbif-btn" class="pixel-btn green" type="button">↻ REFRESH GBIF PLANTS</button>' +
       '<div id="nature-gbif-status" class="live-status ' + esc(occurrenceStatus.type) + '" aria-live="polite">' + esc(occurrenceStatus.message) + '</div>' +
-      '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Press the button to request live records. No sample observations are fabricated.') + '</div>' +
+      '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Opening this tab loads nearby GBIF plant observations.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://techdocs.gbif.org/en/openapi/v1/occurrence">GBIF Occurrence API ↗</a></p></article>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">iNATURALIST / PLANTS</span></div>' +
+      '<h3>Independent observation cross-check</h3><p>Research-grade plant observations from another community source. Its records may overlap with GBIF or be concentrated where people observe nature.</p>' +
+      '<button id="nature-inat-btn" class="pixel-btn green" type="button">↻ REFRESH INAT OBSERVATIONS</button>' +
+      '<div id="nature-inat-status" class="live-status ' + esc(iNatStatus.type) + '" aria-live="polite">' + esc(iNatStatus.message) + '</div>' +
+      '<div id="nature-inat-results" class="live-results">' + (iNatData ? renderINaturalistPlantRecords(iNatData) : 'Opening this tab loads nearby plant observations.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.inaturalist.org/pages/developers">iNaturalist API ↗</a></p></article>' +
       '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">☀️</span><span class="mini-code">NASA POWER / MONTHLY</span></div>' +
-      '<h3>Climate cross-check</h3><p>Compare monthly average temperature, daily precipitation rate and solar radiation across five completed calendar years. This is a gridded regional estimate, not a farm station or forecast.</p>' +
-      '<button id="nature-power-btn" class="pixel-btn green" type="button">↻ REFRESH NASA POWER DATA</button>' +
+      '<h3>Climate cross-check</h3><p>Monthly averages for temperature, precipitation rate and solar radiation over five complete calendar years.</p>' +
+      '<button id="nature-power-btn" class="pixel-btn green" type="button">↻ REFRESH NASA POWER</button>' +
       '<div id="nature-power-status" class="live-status ' + esc(powerStatus.type) + '" aria-live="polite">' + esc(powerStatus.message) + '</div>' +
-      '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'Press the button to retrieve a historical climate summary. No example values are shown as live data.') + '</div>' +
-      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER Monthly API ↗</a></p></article>' +
+      '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'Opening this tab loads the historical climate cross-check.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER API ↗</a></p></article>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">💧</span><span class="mini-code">OPEN-METEO / NEXT 7 DAYS</span></div>' +
+      '<h3>Rain versus reference water demand</h3><p>Forecast precipitation minus FAO reference evapotranspiration (ET₀) is a rough weather-context signal, not crop-specific irrigation advice.</p>' +
+      '<button id="nature-outlook-btn" class="pixel-btn green" type="button">↻ REFRESH 7-DAY OUTLOOK</button>' +
+      '<div id="nature-outlook-status" class="live-status ' + esc(outlookStatus.type) + '" aria-live="polite">' + esc(outlookStatus.message) + '</div>' +
+      '<div id="nature-outlook-results" class="live-results">' + (outlookData ? renderOpenMeteoOutlook(outlookData) : 'Opening this tab loads the next seven days.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs">Open-Meteo API ↗</a></p></article>' +
       '</div>' +
-      '<section class="climate-method-note"><b>How to interpret this panel</b><p>Administrative-area centroids are only a convenient starting point. Large regions, islands and high-relief areas can have very different conditions. GBIF observation density depends on reporting effort. NASA POWER is a separate data source and should be compared with Open-Meteo, local meteorological records and field observations rather than treated as exact ground truth.</p></section>';
+      '<section class="live-connectors plantnet-panel"><div class="section-title"><span class="mini-code">OPTIONAL PHOTO TOOL / PL@NTNET</span><h3>Identify a plant from your photo 📷</h3></div>' +
+      '<p class="live-explainer">Use your own Pl@ntNet API key (free quota: up to 500 identification requests per day). The key is used for this request only and is not saved in the app. Do not paste a shared organisation secret into a public browser app. Upload 1–5 JPEG/PNG photos of the same plant, ideally showing a clear leaf, flower or fruit.</p>' +
+      '<div class="plantnet-controls"><label for="plantnet-api-key">Your Pl@ntNet API key</label><input id="plantnet-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your personal key for this request">' +
+      '<label for="plantnet-photos">Plant photos (1–5)</label><input id="plantnet-photos" type="file" accept="image/jpeg,image/png" multiple>' +
+      '<label for="plantnet-organ">Photo organ</label><select id="plantnet-organ"><option value="auto">Detect automatically</option><option value="leaf">Leaf</option><option value="flower">Flower</option><option value="fruit">Fruit</option><option value="bark">Bark</option></select>' +
+      '<button id="plantnet-identify-btn" class="pixel-btn green" type="button">IDENTIFY PLANT</button></div>' +
+      '<div id="plantnet-status" class="live-status" aria-live="polite">Optional service · API key not supplied</div>' +
+      '<div id="plantnet-results" class="live-results">No image has been submitted. Photos are sent to Pl@ntNet only after you press Identify Plant.</div>' +
+      '<a href="https://my.plantnet.org/" target="_blank" rel="noopener noreferrer" aria-label="Powered by Pl@ntNet"><img class="plantnet-powered-logo" src="https://my.plantnet.org/images/powered-by-plantnet-light.png" alt="Powered by Pl@ntNet" loading="lazy"></a>' +
+      '<p class="nature-method-note">Identification is a model suggestion, not a definitive expert determination. <a target="_blank" rel="noopener noreferrer" href="https://my.plantnet.org/terms_of_use">Free-use conditions ↗</a></p></section>' +
+      '<section class="climate-method-note"><b>How to interpret these sources</b><p>GBIF and iNaturalist describe reported observations, not population size. NASA POWER and Open-Meteo are gridded weather products, not a measurement from the selected farm. The ESA WorldCover 2021 land-cover layer can be toggled from the map layer control. Verify soil, water and the actual planting calendar locally.</p>' +
+      '<p><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Open FAO WaPOR data portal ↗</a> (global reference-water/actual evapotranspiration layers; investigate the available spatial and temporal level before using for a local decision).</p></section>';
   }
+
 
   function wireNatureControls() {
     var selection = currentProvince;
     if (!selection) return;
     var key = climateSelectionKey(selection);
-    var occurrenceButton = el('nature-gbif-btn');
-    if (occurrenceButton) occurrenceButton.addEventListener('click', async function () {
-      var api = window.BackToNatureAPI;
-      var point = geometryCentroid(selection.feature);
-      if (!point) {
-        natureOccurrenceStatusBySelection[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
-        setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'error');
-        return;
-      }
-      if (!api || !api.fetchGbifOccurrences) {
-        setLiveStatus('nature-gbif-status', 'The GBIF connector is unavailable. Reload the page and retry.', 'error');
-        return;
-      }
-      var requestId = ++natureOccurrenceRequestId;
-      occurrenceButton.disabled = true;
-      natureOccurrenceStatusBySelection[key] = { type:'pending', message:'Searching GBIF for nearby coordinate records…' };
-      setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'pending');
-      try {
-        var result = await api.fetchGbifOccurrences(point.latitude, point.longitude, 25, 12, { forceRefresh:true });
-        if (requestId !== natureOccurrenceRequestId || currentProvince !== selection) return;
-        natureOccurrenceDataBySelection[key] = result;
-        var count = (result.records || []).length;
-        natureOccurrenceStatusBySelection[key] = {
-          type:count ? 'success' : 'neutral',
-          message:count + ' nearby record' + (count === 1 ? '' : 's') + ' returned from GBIF; maximum display is 12.'
-        };
-        if (currentTab === 'nature') {
-          setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, natureOccurrenceStatusBySelection[key].type);
-          var results = el('nature-gbif-results');
-          if (results) results.innerHTML = renderNatureOccurrenceCards(result);
+    var point = geometryCentroid(selection.feature);
+
+    function updateAsyncConnector(config) {
+      var button = el(config.buttonId);
+      if (!button) return;
+      button.addEventListener('click', async function () {
+        if (!point) {
+          config.statusStore[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
+          setLiveStatus(config.statusId, config.statusStore[key].message, 'error');
+          return;
         }
-      } catch (error) {
-        if (requestId !== natureOccurrenceRequestId || currentProvince !== selection) return;
-        natureOccurrenceStatusBySelection[key] = { type:'error', message:error && error.message ? error.message : 'GBIF query failed.' };
-        if (currentTab === 'nature') {
-          setLiveStatus('nature-gbif-status', natureOccurrenceStatusBySelection[key].message, 'error');
-          var failedResults = el('nature-gbif-results');
-          if (failedResults) failedResults.textContent = 'No fallback observations were substituted. Check the network, API availability or browser access and retry.';
+        var api = window.BackToNatureAPI;
+        if (!api || typeof api[config.method] !== 'function') {
+          setLiveStatus(config.statusId, 'Connector unavailable. Reload the page and retry.', 'error');
+          return;
         }
-      } finally {
-        if (requestId === natureOccurrenceRequestId) {
-          var activeButton = el('nature-gbif-btn');
-          if (activeButton && currentProvince === selection && currentTab === 'nature') activeButton.disabled = false;
+        var requestId = ++config.requestCounter.value;
+        button.disabled = true;
+        config.statusStore[key] = { type:'pending', message:config.loadingMessage };
+        setLiveStatus(config.statusId, config.statusStore[key].message, 'pending');
+        try {
+          var result = await api[config.method].apply(api, config.args(point, true));
+          if (requestId !== config.requestCounter.value || currentProvince !== selection) return;
+          config.dataStore[key] = result;
+          config.statusStore[key] = { type:'success', message:config.successMessage(result) };
+          if (currentTab === 'nature') {
+            setLiveStatus(config.statusId, config.statusStore[key].message, 'success');
+            var results = el(config.resultsId);
+            if (results) results.innerHTML = config.render(result);
+          }
+        } catch (error) {
+          if (requestId !== config.requestCounter.value || currentProvince !== selection) return;
+          config.statusStore[key] = { type:'error', message:error && error.message ? error.message : config.failureMessage };
+          if (currentTab === 'nature') {
+            setLiveStatus(config.statusId, config.statusStore[key].message, 'error');
+            var failedResults = el(config.resultsId);
+            if (failedResults) failedResults.textContent = 'No sample data was substituted. Check the network/source and retry.';
+          }
+        } finally {
+          if (requestId === config.requestCounter.value) {
+            var activeButton = el(config.buttonId);
+            if (activeButton && currentProvince === selection && currentTab === 'nature') activeButton.disabled = false;
+          }
         }
-      }
+      });
+      if (!config.statusStore[key]) button.click();
+    }
+
+    updateAsyncConnector({
+      buttonId:'nature-gbif-btn', statusId:'nature-gbif-status', resultsId:'nature-gbif-results',
+      statusStore:natureOccurrenceStatusBySelection, dataStore:natureOccurrenceDataBySelection,
+      requestCounter:{ get value(){ return natureOccurrenceRequestId; }, set value(v){ natureOccurrenceRequestId=v; } },
+      method:'fetchGbifOccurrences',
+      args:function(p,refresh){return [p.latitude,p.longitude,25,12,{plantOnly:true,forceRefresh:refresh}];},
+      loadingMessage:'Searching GBIF for plant species records…',
+      successMessage:function(d){return (d.records||[]).length+' distinct nearby plant taxa returned by GBIF.';},
+      failureMessage:'GBIF plant search failed.',
+      render:renderNatureOccurrenceCards
+    });
+    updateAsyncConnector({
+      buttonId:'nature-inat-btn', statusId:'nature-inat-status', resultsId:'nature-inat-results',
+      statusStore:natureINaturalistStatusBySelection, dataStore:natureINaturalistDataBySelection,
+      requestCounter:{ get value(){ return natureINaturalistRequestId; }, set value(v){ natureINaturalistRequestId=v; } },
+      method:'fetchINaturalistPlantObservations',
+      args:function(p,refresh){return [p.latitude,p.longitude,25,8,refresh];},
+      loadingMessage:'Searching iNaturalist for recent research-grade plant observations…',
+      successMessage:function(d){return (d.records||[]).length+' distinct nearby plant taxa returned by iNaturalist.';},
+      failureMessage:'iNaturalist search failed.',
+      render:renderINaturalistPlantRecords
+    });
+    updateAsyncConnector({
+      buttonId:'nature-power-btn', statusId:'nature-power-status', resultsId:'nature-power-results',
+      statusStore:naturePowerStatusBySelection, dataStore:naturePowerDataBySelection,
+      requestCounter:{ get value(){ return naturePowerRequestId; }, set value(v){ naturePowerRequestId=v; } },
+      method:'fetchNasaPowerMonthly',
+      args:function(p,refresh){return [p.latitude,p.longitude,5,refresh];},
+      loadingMessage:'Requesting NASA POWER monthly data…',
+      successMessage:function(d){return 'Monthly averages across '+d.startYear+'–'+d.endYear+' loaded from NASA POWER.';},
+      failureMessage:'NASA POWER query failed.',
+      render:renderNasaPowerMonthCards
+    });
+    updateAsyncConnector({
+      buttonId:'nature-outlook-btn', statusId:'nature-outlook-status', resultsId:'nature-outlook-results',
+      statusStore:natureOutlookStatusBySelection, dataStore:natureOutlookDataBySelection,
+      requestCounter:{ get value(){ return natureOutlookRequestId; }, set value(v){ natureOutlookRequestId=v; } },
+      method:'fetchOpenMeteoAgroOutlook',
+      args:function(p,refresh){return [p.latitude,p.longitude,refresh];},
+      loadingMessage:'Requesting the Open-Meteo seven-day rain/ET₀ outlook…',
+      successMessage:function(d){return 'Seven-day outlook loaded'+(d.timezone?' · '+d.timezone:'')+'.';},
+      failureMessage:'Open-Meteo forecast query failed.',
+      render:renderOpenMeteoOutlook
     });
 
-    var powerButton = el('nature-power-btn');
-    if (powerButton) powerButton.addEventListener('click', async function () {
+    var identifyButton = el('plantnet-identify-btn');
+    if (identifyButton) identifyButton.addEventListener('click', async function () {
       var api = window.BackToNatureAPI;
-      var point = geometryCentroid(selection.feature);
-      if (!point) {
-        naturePowerStatusBySelection[key] = { type:'error', message:'No representative coordinate is available for this boundary.' };
-        setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'error');
+      var keyInput = el('plantnet-api-key');
+      var photoInput = el('plantnet-photos');
+      var organInput = el('plantnet-organ');
+      var statusId = 'plantnet-status';
+      var resultsId = 'plantnet-results';
+      var suppliedKey = keyInput ? keyInput.value.trim() : '';
+      var files = photoInput && photoInput.files ? photoInput.files : [];
+      if (!api || typeof api.identifyPlantWithPlantNet !== 'function') {
+        setLiveStatus(statusId,'Pl@ntNet connector unavailable. Reload the page and retry.','error');
         return;
       }
-      if (!api || !api.fetchNasaPowerMonthly) {
-        setLiveStatus('nature-power-status', 'The NASA POWER connector is unavailable. Reload the page and retry.', 'error');
+      if (!suppliedKey) {
+        setLiveStatus(statusId,'Enter your own personal Pl@ntNet API key. It is not saved by this app.','error');
+        if (keyInput) keyInput.focus();
         return;
       }
-      var requestId = ++naturePowerRequestId;
-      powerButton.disabled = true;
-      naturePowerStatusBySelection[key] = { type:'pending', message:'Requesting NASA POWER monthly data…' };
-      setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'pending');
+      if (!files.length || files.length > 5) {
+        setLiveStatus(statusId,'Choose 1–5 JPEG/PNG photos of the same plant.','error');
+        if (photoInput) photoInput.focus();
+        return;
+      }
+      var totalBytes=0;
+      for (var i=0;i<files.length;i++) totalBytes+=Number(files[i].size)||0;
+      if (totalBytes>50*1024*1024) {
+        setLiveStatus(statusId,'Combined photo size must not exceed 50 MB.','error');
+        return;
+      }
+      var requestId=++plantNetRequestId;
+      identifyButton.disabled=true;
+      setLiveStatus(statusId,'Sending the selected photos to Pl@ntNet for identification…','pending');
+      var resultNode=el(resultsId);
+      if(resultNode) resultNode.textContent='Waiting for the identification result…';
       try {
-        var result = await api.fetchNasaPowerMonthly(point.latitude, point.longitude, 5, true);
-        if (requestId !== naturePowerRequestId || currentProvince !== selection) return;
-        naturePowerDataBySelection[key] = result;
-        naturePowerStatusBySelection[key] = {
-          type:'success',
-          message:'Monthly averages across ' + result.startYear + '–' + result.endYear + ' loaded from NASA POWER.'
-        };
-        if (currentTab === 'nature') {
-          setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'success');
-          var results = el('nature-power-results');
-          if (results) results.innerHTML = renderNasaPowerMonthCards(result);
-        }
-      } catch (error) {
-        if (requestId !== naturePowerRequestId || currentProvince !== selection) return;
-        naturePowerStatusBySelection[key] = { type:'error', message:error && error.message ? error.message : 'NASA POWER query failed.' };
-        if (currentTab === 'nature') {
-          setLiveStatus('nature-power-status', naturePowerStatusBySelection[key].message, 'error');
-          var failedResults = el('nature-power-results');
-          if (failedResults) failedResults.textContent = 'No fallback values were substituted. Check the network, API availability or browser access and retry.';
-        }
+        var result=await api.identifyPlantWithPlantNet(files,suppliedKey,organInput?organInput.value:'auto');
+        if(requestId!==plantNetRequestId || currentProvince!==selection) return;
+        if(resultNode) resultNode.innerHTML=renderPlantNetResults(result);
+        var quota=result.remainingIdentificationRequests==null?'':' · '+result.remainingIdentificationRequests+' daily request(s) remaining';
+        setLiveStatus(statusId,'Identification returned '+(result.results||[]).length+' candidate(s)'+quota+'. Review the confidence scores; this is not a definitive determination.','success');
+        if(keyInput) keyInput.value='';
+      } catch(error) {
+        if(requestId!==plantNetRequestId || currentProvince!==selection) return;
+        setLiveStatus(statusId,error&&error.message?error.message:'Pl@ntNet identification failed.','error');
+        if(resultNode) resultNode.textContent='No example identifications were substituted. Check the API key, quota, file format or network and retry.';
       } finally {
-        if (requestId === naturePowerRequestId) {
-          var activeButton = el('nature-power-btn');
-          if (activeButton && currentProvince === selection && currentTab === 'nature') activeButton.disabled = false;
-        }
+        if(requestId===plantNetRequestId && currentProvince===selection && currentTab==='nature') identifyButton.disabled=false;
+        if(keyInput) keyInput.value='';
       }
     });
-
-    // Auto-fetch on first entry for this region. Status maps prevent auto-refresh loops
-    // when the tab is revisited; the explicit buttons remain manual refresh controls.
-    if (occurrenceButton && !natureOccurrenceStatusBySelection[key]) occurrenceButton.click();
-    if (powerButton && !naturePowerStatusBySelection[key]) powerButton.click();
   }
 
   function renderTab(tab) {
@@ -1377,91 +1523,6 @@
   }
 
 
-  function renderSummaryNearbyPlantRecords(selection) {
-    var key = climateSelectionKey(selection);
-    var state = nearbyPlantStatusBySelection[key] || { state:'loading', message:'Searching for georeferenced plant observations near this region…' };
-    var data = nearbyPlantDataBySelection[key];
-    var records = data && Array.isArray(data.records) ? data.records : [];
-    var cards = records.map(function (record) {
-      var displayName = record.vernacularName || record.scientificName || 'Unidentified plant';
-      return '<article class="region-summary-nearby-plant">' +
-        '<div class="region-summary-nearby-plant-top"><span>🌿</span><span>' + esc(numberOrDash(record.distanceKm,' km away')) + '</span></div>' +
-        '<h4>' + esc(displayName) + '</h4>' +
-        '<p><i>' + esc(record.scientificName || 'Scientific name not supplied') + '</i></p>' +
-        (record.vernacularName ? '<p><b>Reported common name:</b> ' + esc(record.vernacularName) + '</p>' : '<p class="crop-name-note">No common name was supplied with this record.</p>') +
-        (record.eventDate ? '<p><b>Record date:</b> ' + esc(record.eventDate) + '</p>' : '') +
-        '<a class="crop-taxonomy-source" href="' + esc(safeHttps(record.sourceUrl)) + '" target="_blank" rel="noopener noreferrer">Open GBIF observation ↗</a>' +
-        '</article>';
-    }).join('');
-    var stateLabel = state.state === 'loading' ? 'Searching nearby plant records…' :
-      state.state === 'error' ? (state.message || 'The plant occurrence search failed.') :
-      state.state === 'empty' ? 'No coordinate-backed plant species were returned in this search. This is not proof that plants are absent.' :
-      state.state === 'ready' ? ((records.length || 0) + ' distinct plant species found in the returned nearby records.') :
-      (state.message || 'Waiting for the plant occurrence search.');
-    return '<section class="region-summary-nearby">' +
-      '<div class="region-summary-nearby-heading"><div><div class="mini-code">FIELD EVIDENCE / GBIF</div><h3>Plant species recorded nearby</h3></div>' +
-      '<button id="summary-plants-refresh" class="pixel-btn" type="button"' + (state.state === 'loading' ? ' disabled' : '') + '>↻ REFRESH</button></div>' +
-      '<p>These are plant species reported in georeferenced observations within 25 km of the region’s representative point. A record confirms a reported occurrence, not that the species is suitable for cultivation or guaranteed to thrive on every plot.</p>' +
-      '<div class="region-summary-nearby-status ' + (state.state === 'error' ? 'is-error' : '') + '" aria-live="polite">' + esc(stateLabel) + '</div>' +
-      (cards ? '<div class="region-summary-nearby-grid">' + cards + '</div>' : '') +
-      '<div class="region-summary-nearby-source">Source: <a href="https://techdocs.gbif.org/en/openapi/v1/occurrence" target="_blank" rel="noopener noreferrer">GBIF Occurrence API ↗</a>. Up to four distinct species are shown.</div>' +
-      '</section>';
-  }
-
-  function loadSummaryNearbyPlantRecords(selection, forceRefresh) {
-    if (!selection || !window.BackToNatureAPI || !window.BackToNatureAPI.fetchGbifOccurrences) return;
-    var key = climateSelectionKey(selection);
-    if (nearbyPlantPromisesBySelection[key]) return nearbyPlantPromisesBySelection[key];
-    if (!forceRefresh && (nearbyPlantDataBySelection[key] || nearbyPlantStatusBySelection[key])) return Promise.resolve(nearbyPlantDataBySelection[key] || null);
-
-    var point = geometryCentroid(selection.feature);
-    if (!point) {
-      nearbyPlantStatusBySelection[key] = { state:'error', message:'No representative map coordinate is available for this administrative boundary.' };
-      if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
-      return Promise.resolve(null);
-    }
-
-    var api = window.BackToNatureAPI;
-    nearbyPlantStatusBySelection[key] = { state:'loading', message:'Searching for plant observations nearby…' };
-    var promise = (async function () {
-      try {
-        var response = await api.fetchGbifOccurrences(point.latitude, point.longitude, 25, 20, {
-          plantOnly:true,
-          forceRefresh:!!forceRefresh
-        });
-        var records = (response.records || []).filter(function (record) {
-          return record.scientificName && record.scientificName !== 'Unidentified taxon';
-        });
-        nearbyPlantDataBySelection[key] = Object.assign({}, response, { records:records.slice(0,4) });
-        nearbyPlantStatusBySelection[key] = {
-          state:records.length ? 'ready' : 'empty',
-          message:records.length ? records.length + ' nearby plant species returned.' : 'No coordinate-backed plant species were returned in this search.'
-        };
-        return nearbyPlantDataBySelection[key];
-      } catch (error) {
-        nearbyPlantStatusBySelection[key] = {
-          state:'error',
-          message:error && error.message ? error.message : 'GBIF plant occurrence lookup failed.'
-        };
-        return null;
-      } finally {
-        delete nearbyPlantPromisesBySelection[key];
-        if (summarySelection && climateSelectionKey(summarySelection) === key) updateRegionSummary();
-      }
-    })();
-    nearbyPlantPromisesBySelection[key] = promise;
-    return promise;
-  }
-
-  function wireSummaryNearbyPlantControls() {
-    var button = el('summary-plants-refresh');
-    if (button) button.addEventListener('click', function () {
-      if (!summarySelection) return;
-      loadSummaryNearbyPlantRecords(summarySelection, true);
-      updateRegionSummary();
-    });
-  }
-
   function renderRegionSummary() {
     if (!summarySelection) return '';
     var selection = summarySelection;
@@ -1471,41 +1532,34 @@
     var climateResult = climateResultsBySelection[key];
     var climateStatus = climateStatusBySelection[key];
     var cropObjects = summaryCropCandidates(selection, profile, climateResult).slice(0,4);
-    var nameRecords = cropTaxonomyBySelection[key] || {};
-    var taxonomyStatus = cropTaxonomyStatusBySelection[key] || 'loading';
-    var countryIsoForNames = String(selection.countryIso3 || '').toUpperCase();
-    var languagePref = window.BackToNatureAPI && window.BackToNatureAPI.getCountryLanguagePreference
-      ? window.BackToNatureAPI.getCountryLanguagePreference(countryIsoForNames)
-      : { label:'local language for this country', languages:[] };
+    var currentMonthLabel = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()];
     var cropCards = cropObjects.map(function (crop, index) {
-      var taxonomy = nameRecords[crop.id] || null;
-      var english = taxonomy && taxonomy.englishName || crop.englishName || crop.name;
-      var localName = taxonomy && taxonomy.localName || '';
-      var localLanguage = taxonomy && taxonomy.localLanguage || languagePref.label || 'Local language';
-      var scientific = taxonomy && taxonomy.scientificName || crop.scientificName || crop.scientific || '';
-      var matchUrl = taxonomy && taxonomy.sourceUrl || 'https://www.gbif.org/species/search?q=' + encodeURIComponent(scientific);
-      var nameStatus = taxonomy && taxonomy.status === 'matched' ? 'GBIF TAXON MATCHED' :
-        taxonomy && taxonomy.status === 'broad-group' ? 'BROAD CROP GROUP' :
-        taxonomy && taxonomy.status === 'source-unavailable' ? 'TAXONOMY SOURCE UNAVAILABLE' :
-        taxonomy ? 'TAXON NOT CONFIRMED' : (taxonomyStatus === 'loading' ? 'LOOKING UP NAMES…' : 'VERNACULAR NAME NOT VERIFIED');
-      var icon = /rice|padi/i.test(english) ? '🌾' :
-        /coffee|cacao|cocoa|coconut|mango|banana|cashew|tamarind|tree/i.test(english) ? '🌳' :
-        /vegetable|greens|chili|potato|tomato/i.test(english) ? '🥬' :
-        /legume|bean|peanut|soy/i.test(english) ? '🫘' : '🌱';
-      var localMarkup = localName
-        ? '<p class="crop-name-local"><b>Local (' + esc(localLanguage) + '):</b> ' + esc(localName) + '</p>'
-        : '<p class="crop-name-missing"><b>Local (' + esc(localLanguage) + '):</b> No verified vernacular name found for this country in the current source.</p>';
-      var scientificMarkup = scientific
-        ? '<p class="crop-name-latin"><b>Scientific / Latin:</b> <i>' + esc(scientific) + '</i></p>'
-        : '<p class="crop-name-latin"><b>Scientific / Latin:</b> Species not resolved yet.</p>';
-      return '<article class="region-summary-crop"><span class="region-summary-crop-icon">' + icon + '</span><div class="region-summary-crop-copy">' +
+      var rankedCrop = climateResult && (climateResult.recommendations || []).find(function (item) { return item.id === crop.id; });
+      var status = rankedCrop && rankedCrop.currentMonthStatus || 'unknown';
+      var best = rankedCrop && rankedCrop.bestWindow || null;
+      var statusClass = status === 'suitable' ? 'is-open' : status === 'caution' ? 'is-caution' : status === 'wait' ? 'is-wait' : 'is-unknown';
+      var statusLabel = status === 'suitable' ? 'CLIMATE WINDOW OPEN' :
+        status === 'caution' ? 'CHECK CONDITIONS FIRST' :
+        status === 'wait' ? 'NOT RECOMMENDED THIS MONTH' : 'SEASON NOT VERIFIED';
+      var statusMessage = status === 'suitable'
+        ? 'The historical climate screen supports starting in ' + currentMonthLabel + '.'
+        : status === 'caution'
+          ? 'This month is borderline or has a weather caution. Check water, drainage and local advice first.'
+          : status === 'wait'
+            ? 'Better climate window: ' + (best && best.month ? best.month : 'see Detailed Fieldbook') + '.'
+            : climateStatus && climateStatus.state === 'error'
+              ? 'Season data unavailable. Open Detailed Fieldbook for source status.'
+              : 'Checking the local seasonal pattern…';
+      var icon = /rice|padi/i.test(crop.name) ? '🌾' :
+        /coffee|cacao|cocoa|coconut|mango|banana|cashew|tamarind|tree/i.test(crop.name) ? '🌳' :
+        /vegetable|greens|chili|potato|tomato/i.test(crop.name) ? '🥬' :
+        /legume|bean|peanut|soy/i.test(crop.name) ? '🫘' : '🌱';
+      return '<article class="region-summary-crop region-summary-crop-brief">' +
+        '<span class="region-summary-crop-icon">' + icon + '</span><div class="region-summary-crop-copy">' +
         '<span class="mini-code">STARTER IDEA ' + String(index+1).padStart(2,'0') + '</span>' +
-        '<h4>' + esc(english) + '</h4>' +
-        '<p class="crop-name-english"><b>English:</b> ' + esc(english) + '</p>' + localMarkup + scientificMarkup +
-        '<span class="crop-taxonomy-status">' + esc(nameStatus) + '</span>' +
-        '<p class="crop-name-note">' + esc(taxonomy && taxonomy.localNameSource || 'Local names may vary by region; confirm with local agricultural sources.') + '</p>' +
-        '<p class="crop-name-note">A candidate to investigate, not an automatic planting prescription.</p>' +
-        '<a class="crop-taxonomy-source" href="' + esc(matchUrl) + '" target="_blank" rel="noopener noreferrer">Check taxonomy / name source ↗</a>' +
+        '<h4>' + esc(crop.name || crop.englishName || crop.id) + '</h4>' +
+        '<span class="crop-season-pill ' + statusClass + '">' + esc(statusLabel) + '</span>' +
+        '<p class="crop-season-message">' + esc(statusMessage) + '</p>' +
         '</div></article>';
     }).join('');
     var technologyCards = context.techList.slice(0,3).map(function (technology, index) {
@@ -1536,9 +1590,9 @@
       '<div class="region-summary-tags"><span>' + esc(context.countryName) + '</span><span>' + esc(context.level) + '</span><span>' + esc(profile.zone) + '</span></div>' +
       '</div>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌾</span><div><div class="mini-code">START HERE</div><h3>Plants worth investigating</h3></div></div>' +
-      '<p>Each crop shows its English name, a country/language-based common name when GBIF records one, and the scientific name. Vernacular names are not available for every species or country. These are candidates to investigate, not a planting guarantee.</p>' +
+      '<p>Shortlist only: the seasonal screen checks whether this is a sensible month to start, separately from soil suitability. Open the Detailed Fieldbook for names, reasons and source data.</p>' +
       '<div class="region-summary-crops">' + cropCards + '</div>' +
-      renderSummaryNearbyPlantRecords(selection) + '</section>' +
+      '</section>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🛠️</span><div><div class="mini-code">LOW-REGRET PRACTICES</div><h3>Technologies to consider</h3></div></div>' +
       '<div class="region-summary-tech-grid">' + technologyCards + '</div></section>' +
       '<section class="region-summary-section"><div class="region-summary-section-heading"><span>🌦️</span><div><div class="mini-code">SEASONS / RAIN / WIND</div><h3>Climate-based planting hints</h3></div></div>' +
@@ -1612,9 +1666,6 @@
     if (!backdrop || !content || !backdrop.classList.contains('open') || !summarySelection) return;
     content.innerHTML = renderRegionSummary();
     updateRegionSummaryDistrictButton();
-    wireSummaryNearbyPlantControls();
-    loadRegionCropNames(summarySelection);
-    loadSummaryNearbyPlantRecords(summarySelection);
   }
 
   function closeRegionSummary(clearSelection) {
