@@ -450,8 +450,41 @@ async function main() {
   assert.ok(fpmaCalls.every((call)=>call.url.includes('iso3_country_codes=IDN') || call.url.includes('/FpmaSeriePrice/')),'FAO FPMA metadata request is country-filtered');
   assert.ok(fpmaCalls.every((call)=>!/apikey|authorization|token/i.test(call.url+' '+JSON.stringify(call.headers))),'FAO FPMA uses no API key or authorization header');
 
+
+  // Crossref's public REST API exposes publication metadata without an API key.
+  const crossrefCalls = [];
+  global.fetch = async function (url, options) {
+    const urlText = String(url);
+    crossrefCalls.push({url:urlText,headers:options && options.headers || {}});
+    return {
+      ok:true,status:200,
+      text:async function(){return JSON.stringify({message:{
+        'total-results':2,
+        items:[
+          {DOI:'10.1234/example.2026.1',title:['Community agroforestry and sustainable land management'],
+           author:[{given:'Amina',family:'Example'},{given:'Budi',family:'Researcher'}],
+           publisher:'Example Research Press','container-title':['Journal of Land Restoration'],
+           type:'journal-article','published-online':{'date-parts':[[2026,3,12]]},
+           URL:'https://doi.org/10.1234/example.2026.1'},
+          {title:['Soil conservation in tropical landscapes'],author:[],publisher:'Open Research Group',
+           type:'report',issued:{'date-parts':[[2024]]},URL:'https://example.org/report'}
+        ]
+      }});}
+    };
+  };
+  const crossref = await api.searchCrossrefWorks('Indonesia sustainable land management',8);
+  assert.equal(crossref.works.length,2,'Crossref search maps the returned publication records');
+  assert.equal(crossref.totalResults,2,'Crossref total result metadata is retained');
+  assert.equal(crossref.works[0].title,'Community agroforestry and sustainable land management','publication title is mapped');
+  assert.equal(crossref.works[0].year,'2026','publication year is extracted from date-parts');
+  assert.equal(crossref.works[0].authors[0],'Amina Example','author names are mapped');
+  assert.equal(crossref.works[0].url,'https://doi.org/10.1234/example.2026.1','DOI link is normalized');
+  assert.ok(crossrefCalls[0].url.startsWith('https://api.crossref.org/works?'),'uses the public Crossref works endpoint');
+  assert.equal(new URL(crossrefCalls[0].url).searchParams.get('query.bibliographic'),'Indonesia sustainable land management','encodes the user query as bibliographic terms');
+  assert.ok(crossrefCalls.every((call)=>!/apikey|authorization|token/i.test(call.url+' '+JSON.stringify(call.headers))),'Crossref connector sends no API key or authorization token');
+
   global.fetch = originalFetch;
-  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog, country-specific API registry, World Bank agriculture snapshot, keyless FAO FPMA food-price API and Pl@ntNet validation smoke tests passed.');
+  console.log('Crop, taxonomy, vernacular-name, planting-window, climate, GBIF occurrence, nearby plant species, iNaturalist, NASA POWER, Open-Meteo outlook, ET0, WaPOR catalog, country-specific API registry, World Bank agriculture snapshot, keyless FAO FPMA food-price API, Crossref research metadata finder and Pl@ntNet validation smoke tests passed.');
 }
 
 main().catch((error) => {
