@@ -1208,7 +1208,8 @@
       '<p><b>Administrative level:</b> ' + esc(currentProvince && Number(currentProvince.adminLevel) === 2 ? 'ADM2 · second-level local unit' : 'ADM1 · first-level region') +
       '. <b>Boundary license:</b> ' + esc(boundaryLicense) + '</p></section>';
 
-    return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open the official sources to verify date, methodology, geography, license and units. National indicators are context—not parcel-level measurements.</p></div>' +
+    return '<div class="tab-intro"><div class="eyebrow">DATA & RESEARCH / EVIDENCE SHELF</div><h2>Where does the information come from? 📚</h2><p>BackToNature checks a few free public sources when this tab opens. Each source answers a different question; no single number explains a whole farm.</p></div>' +
+      renderLearningGuide('A data source is where a number, map or research record comes from. The publisher and method help us check whether it is trustworthy for our question.','National statistics, research papers, satellite maps and field observations describe different things. Compare them only when location, date, units and methods make sense together.','Start with the plain-language explanation, open technical details when needed, and verify local decisions with field observations or an official local source.','Use the source, not just the number') +
       countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + renderWaporPublicApiPanel() + indonesiaLiveTerminal +
       '<div class="source-list">' + globalSources.map(function (source, index) {
         return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
@@ -1367,7 +1368,12 @@
           table += '<tr><td>' + esc(item) + '<br><small>' + esc(elName) + '</small></td><td>' + esc(year) + '</td><td>' + esc(Number.isFinite(Number(value)) ? Number(value).toLocaleString('en-US',{maximumFractionDigits:2}) : value) + '<br><small>' + esc(unit) + '</small></td></tr>';
         });
         table += '</tbody></table></div><p class="live-note">Indonesia · domain Land Use (RL) · request window ' + esc(response.startYear) + '–' + esc(response.endYear) + '. Values, units and years follow the source response. These are national context, not province-level results.</p>';
-        el('live-faostat-results').innerHTML = table;
+        el('live-faostat-results').innerHTML = renderLearningGuide(
+          'These figures describe land-use categories for Indonesia as a whole. Each row can measure a different thing and use a different unit.',
+          'National land-use trends can provide context, but they do not tell us how a specific province, village or farm is being used.',
+          'Look at the year and unit for each row. For a local decision, compare the national context with province-level data, recent maps and observations from the actual site.',
+          'What does the national land-use data mean?'
+        ) + '<details class="technical-details"><summary>See the land-use table and exact units</summary>' + table + '</details>';
         setLiveStatus('live-faostat-status', 'LIVE SOURCE · ' + rows.length + ' populated records', 'success');
       } catch (error) {
         setLiveStatus('live-faostat-status', 'Live request failed', 'error');
@@ -1391,10 +1397,15 @@
           el('live-fao-catalog-results').textContent = 'No matches were returned for this query. Try the official catalogue and broaden the search terms.';
           return;
         }
-        el('live-fao-catalog-results').innerHTML = '<ul class="live-record-list">' + records.map(function (record) {
+        el('live-fao-catalog-results').innerHTML = renderLearningGuide(
+          'These are catalogue entries describing available datasets. They are not measurements of this province or a farm by themselves.',
+          'A dataset can be useful only if its map area, date, resolution and method match the question you are asking.',
+          'Open the metadata and check coverage, collection date, units and scale before using a map or table for a field decision.',
+          'How do I choose a useful dataset?'
+        ) + '<ul class="live-record-list">' + records.map(function (record) {
           return '<li><b>' + esc(record.title) + '</b>' +
-            (record.summary ? '<p>' + esc(record.summary.slice(0,240)) + (record.summary.length > 240 ? '…' : '') + '</p>' : '') +
-            '<a target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.url)) + '">Open metadata ↗</a></li>';
+            (record.summary ? '<details class="mini-explanation"><summary>What does this dataset describe?</summary><p>' + esc(record.summary.slice(0,500)) + (record.summary.length > 500 ? '…' : '') + '</p></details>' : '') +
+            '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.url)) + '">Open dataset metadata ↗</a></li>';
         }).join('') + '</ul>';
         setLiveStatus('live-fao-catalog-status', 'LIVE CATALOGUE · ' + records.length + ' records', 'success');
       } catch (error) {
