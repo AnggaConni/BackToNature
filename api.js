@@ -1772,7 +1772,7 @@
   // Crossref public REST API: bibliographic metadata only, no API key required.
   // Cache identical searches briefly to reduce repeated requests.
   async function searchCrossrefWorks(query, limit) {
-    var term = String(query || '').replace(/\\s+/g, ' ').trim();
+    var term = String(query || '').replace(/\s+/g, ' ').trim();
     if (term.length < 3) throw new Error('Enter at least three characters to search publication metadata.');
     if (term.length > 180) throw new Error('Keep the search phrase to 180 characters or fewer.');
     var rows = Math.min(12, Math.max(3, Number(limit) || 8));
@@ -1793,10 +1793,10 @@
     var works = message.items.map(function (item) {
       item = item || {};
       var rawDoi = String(item.DOI || '').trim();
-      var doi = rawDoi.replace(/^https?:\\/\\/(?:dx\\.)?doi\\.org\\//i, '');
-      var doiUrl = /^10\\.\\d{4,9}\\//.test(doi) ? 'https://doi.org/' + doi : '';
+      var doi = rawDoi.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '');
+      var doiUrl = /^10\.\d{4,9}\//.test(doi) ? 'https://doi.org/' + doi : '';
       var rawUrl = String(item.URL || '').trim();
-      var recordUrl = doiUrl || (/^https?:\\/\\//i.test(rawUrl) ? rawUrl : '');
+      var recordUrl = doiUrl || (/^https?:\/\//i.test(rawUrl) ? rawUrl : '');
       var dates = item['published-print'] || item['published-online'] || item.issued || {};
       var dateParts = dates && dates['date-parts'] && dates['date-parts'][0] ? dates['date-parts'][0] : [];
       var year = dateParts.length ? String(dateParts[0]) : '';
