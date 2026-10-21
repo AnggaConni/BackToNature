@@ -28,7 +28,7 @@ async function main() {
   assert.ok(appSource.includes('label:\'08 NATURE AROUND US\''), 'Nature tab uses plain-language navigation');
   assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
   assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
-  assert.ok(appSource.includes('How to see actual data for a place'), 'WaPOR catalog gives a beginner-friendly path to actual data');
+  assert.ok(appSource.includes('From dataset description to real numbers'), 'WaPOR explorer explains how to go from a dataset description to real values');
   assert.ok(appSource.includes('OPEN INTERACTIVE WAPOR MAP'), 'WaPOR has a direct route to its interactive map');
   assert.ok(appSource.includes('function explainWaporMapset(record)'), 'WaPOR codes are translated by a JavaScript explanation dictionary');
   assert.ok(appSource.includes('What question can it help answer?'), 'WaPOR cards connect layer meaning to a practical question');
@@ -466,6 +466,62 @@ async function main() {
   assert.ok(!/token|authorization/i.test(waporRequestUrl),'WaPOR v3 catalog request does not attach credentials');
   assert.match(wapor.records[0].apiUrl,/\/rasters\?overview=false&paged=false/,'each mapset exposes the official raster metadata link');
 
+  // Sample a deterministic fake pixel series to test scale conversion and same-season baseline calculation.
+  const waporRasterItems = [];
+  for (const year of [2024,2025,2026]) {
+    for (const month of [3,4,5,6]) {
+      for (const dekad of [1,2,3]) {
+        if (year !== 2026 && year === 2024 && month < 3) continue;
+        const code = 'WAPOR-3.L1-NPP-D.' + year + '-' + String(month).padStart(2,'0') + '-D' + dekad;
+        waporRasterItems.push({
+          code,
+          downloadUrl:'https://rasters.example.test/' + year + '-' + String(month).padStart(2,'0') + '-D' + dekad + '.tif'
+        });
+      }
+    }
+  }
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    if (parsed.pathname.endsWith('/mapsets/L1-NPP-D/rasters')) {
+      return {
+        ok:true,status:200,
+        text:async function(){return JSON.stringify({response:{items:waporRasterItems,links:[]}});}
+      };
+    }
+    throw new Error('Unexpected request in WaPOR raster test: ' + parsed.href);
+  };
+  global.window.GeoTIFF = {
+    fromUrl:async function (url) {
+      const match = String(url).match(/\/(\d{4})-(\d{2})-D([1-3])\.tif$/);
+      assert.ok(match,'WaPOR series reads dated raster URLs');
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const dekad = Number(match[3]);
+      const raw = (year === 2026 ? 1200 : year === 2025 ? 1000 : 900) + month * 10 + dekad;
+      return {
+        getImage:async function () {
+          return {
+            getBoundingBox:function(){return [-180,-90,180,90];},
+            getWidth:function(){return 360;},
+            getHeight:function(){return 180;},
+            getGDALNoData:function(){return null;},
+            readRasters:async function(){return new Uint16Array([raw]);}
+          };
+        }
+      };
+    }
+  };
+  const waporSeries = await api.fetchWaporPointSeries('L1-NPP-D',-7.5,125.5);
+  assert.equal(waporSeries.series.length,12,'the line chart includes the latest twelve dated periods');
+  assert.equal(waporSeries.sampledPeriods,12,'all twelve current points are sampled in the test');
+  assert.equal(waporSeries.unit,'gC/m²/day (average during each 10-day period)','NPP units are described for learners');
+  assert.ok(Number.isFinite(waporSeries.latest.value),'latest current pixel value is numeric');
+  assert.ok(Number.isFinite(waporSeries.baseline),'same-season historical reference is numeric');
+  assert.ok(waporSeries.latest.value > waporSeries.baseline,'current raster value can be compared with earlier matching seasons');
+  assert.ok(waporSeries.differencePercent > 0,'relative difference from baseline is calculated');
+  assert.equal(waporSeries.baselineSamples,2,'baseline uses the previous two matching calendar periods when available');
+  assert.match(waporSeries.baselineMethod,/same calendar month\/dekad\/day/i,'baseline method is disclosed');
+  assert.ok(waporSeries.sampledAt,'the result includes a retrieval timestamp');
 
   // Country-specific source registry keeps Indonesian national sources scoped to Indonesia.
   const idnSources = api.getCountrySourceCatalog('IDN','Indonesia');
