@@ -462,6 +462,16 @@
     }) + (suffix || '');
   }
 
+  function renderLearningGuide(meaning, connection, recommendation, heading) {
+    return '<section class="learning-guide">' +
+      '<div class="learning-guide-heading"><span aria-hidden="true">🧭</span><div><div class="mini-code">MAKE SENSE OF THE DATA</div><h3>' + esc(heading || 'What does this tell us?') + '</h3></div></div>' +
+      '<div class="learning-grid">' +
+      '<article class="learning-item"><span class="learning-step">1</span><h4>What does it mean?</h4><p>' + esc(meaning) + '</p></article>' +
+      '<article class="learning-item"><span class="learning-step">2</span><h4>How is it connected?</h4><p>' + esc(connection) + '</p></article>' +
+      '<article class="learning-item"><span class="learning-step">3</span><h4>What can I do next?</h4><p>' + esc(recommendation) + '</p></article>' +
+      '</div></section>';
+  }
+
   function renderClimateLoading(profile, status) {
     var message = status && status.state === 'error'
       ? status.message
@@ -481,7 +491,6 @@
     var result = climateResultsBySelection[key];
     var status = climateStatusBySelection[key];
     if (!result) return renderClimateLoading(profile, status);
-
     var climate = result.climate;
     var monthly = climate.monthly || [];
     var recommendations = result.recommendations || [];
@@ -491,23 +500,37 @@
     var avgWind = averageClimateValue(monthly.map(function (month) { return month.windMeanKmh; }));
     var peakGust = Math.max.apply(null, monthly.map(function (month) { return Number(month.windGustMaxMeanKmh) || 0; }));
     var region = currentProvince && currentProvince.name || profile.name;
-    var levelLabel = currentProvince && currentProvince.adminLevel === 2 ? 'ADM2 / district-level unit' : 'ADM1 / first-level region';
+    var levelLabel = currentProvince && currentProvince.adminLevel === 2 ? 'district / local area' : 'province / region';
+    var sortedRain = monthly.slice().sort(function (a,b) { return (Number(b.precipitationMm)||0)-(Number(a.precipitationMm)||0); });
+    var wettest = sortedRain[0], driest = sortedRain[sortedRain.length-1];
+    var dryBalanceMonths = monthly.filter(function (month) { return month.waterBalanceMm != null && Number(month.waterBalanceMm) < 0; }).length;
+    var climateMeaning = 'The long-term climate near ' + region + ' averages about ' +
+      (meanTemp == null ? 'an unreported temperature' : Number(meanTemp).toFixed(1) + ' °C') +
+      '. Monthly rain changes through the year, so the same planting plan may not work in every season.';
+    if (wettest && driest && wettest.label && driest.label) climateMeaning += ' The wetter part of the year is usually around ' + wettest.label + ', while ' + driest.label + ' is comparatively drier in this historical profile.';
+    var climateConnection = 'Temperature affects how plants grow, while rainfall affects water supply. Soil texture, slope, drainage and irrigation decide how much of that water stays available to the crop. A large province can contain different local climates.';
+    var climateAction = 'Use the planting windows as ideas to investigate, not orders to plant. Check this week’s forecast, inspect soil moisture and drainage, compare the local planting calendar, and ask agricultural extension before spending money on seed or fertiliser.';
+    if (dryBalanceMonths) climateAction += ' The model shows rain below reference atmospheric water demand in ' + dryBalanceMonths + ' month(s); check real soil and water conditions in those periods.';
+    var learnerGuide = renderLearningGuide(climateMeaning, climateConnection, climateAction, 'How should I read this season?');
+
     var monthCards = monthly.map(function (month) {
       var barWidth = Math.max(2, Math.min(100, ((Number(month.precipitationMm) || 0) / maxRain) * 100));
       var windCaution = Number(month.windMeanKmh) >= 25 || Number(month.windGustMaxMeanKmh) >= 50;
       return '<article class="climate-month-card">' +
-        '<div class="climate-month-top"><b>' + esc(month.label) + '</b><span>' + esc(numberOrDash(month.precipitationMm,' mm')) + '</span></div>' +
+        '<div class="climate-month-top"><b>' + esc(month.label) + '</b><span>Rain ' + esc(numberOrDash(month.precipitationMm,' mm')) + '</span></div>' +
         '<div class="climate-rain-track" aria-label="Rainfall relative to the wettest month"><span style="width:' + barWidth + '%"></span></div>' +
-        '<div class="climate-month-metrics"><span>Mean temp</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
+        '<p class="month-plain-note">' + esc(Number(month.precipitationMm) >= annualRain / Math.max(1,monthly.length) ? 'Usually a wetter-than-average month in this profile.' : 'Usually a drier-than-average month in this profile.') + '</p>' +
+        '<details class="technical-details"><summary>See weather measurements</summary><div class="climate-month-metrics">' +
+        '<span>Mean temperature</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
         '<span>Typical low–high</span><b>' + esc(numberOrDash(month.temperatureMin,'–') + numberOrDash(month.temperatureMax,' °C')) + '</b>' +
-        '<span>Rain days / month</span><b>' + esc(numberOrDash(month.rainyDays,' days')) + '</b>' +
+        '<span>Rainy days / month</span><b>' + esc(numberOrDash(month.rainyDays,' days')) + '</b>' +
         '<span>Reference ET₀</span><b>' + esc(numberOrDash(month.referenceEt0Mm,' mm')) + '</b>' +
-        '<span>Rain − ET₀</span><b class="' + (month.waterBalanceMm != null && Number(month.waterBalanceMm) < 0 ? 'water-deficit' : '') + '">' + esc(numberOrDash(month.waterBalanceMm,' mm')) + '</b>' +
+        '<span>Rain − reference demand</span><b class="' + (month.waterBalanceMm != null && Number(month.waterBalanceMm) < 0 ? 'water-deficit' : '') + '">' + esc(numberOrDash(month.waterBalanceMm,' mm')) + '</b>' +
         '<span>Mean wind</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windMeanKmh,' km/h')) + '</b>' +
-        '<span>Monthly peak gust</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windGustMaxMeanKmh,' km/h')) + '</b>' +
-        '<span>Dominant wind</span><b>' + esc(month.windDirection || '—') + '</b></div>' +
+        '<span>Strongest typical gust</span><b class="' + (windCaution ? 'wind-warning' : '') + '">' + esc(numberOrDash(month.windGustMaxMeanKmh,' km/h')) + '</b>' +
+        '<span>Dominant wind direction</span><b>' + esc(month.windDirection || '—') + '</b></div>' +
         (windCaution ? '<p class="climate-wind-note">Wind exposure flag: consider local shelter and staking.</p>' : '') +
-        '</article>';
+        '</details></article>';
     }).join('');
 
     var cropCards = recommendations.slice(0,6).map(function (crop, index) {
@@ -516,14 +539,15 @@
       var cautions = (best.cautions || []).slice(0,2).map(function (caution) { return '<li>' + esc(caution) + '</li>'; }).join('');
       return '<article class="climate-crop-card">' +
         '<div id="climate-photo-' + esc(crop.id) + '" class="climate-crop-photo"><div class="crop-image-placeholder"><span>🌱</span><b>Plant reference</b><small>Image loads from Wikimedia Commons</small></div></div>' +
-        '<div class="climate-crop-body"><div class="climate-crop-heading"><span class="data-tag green">CLIMATE PICK ' + String(index + 1).padStart(2,'0') + '</span><span class="crop-score">' + esc(best.score == null ? '—' : best.score) + '/100</span></div>' +
+        '<div class="climate-crop-body"><div class="climate-crop-heading"><span class="data-tag green">SEASON SHORTLIST ' + String(index + 1).padStart(2,'0') + '</span></div>' +
         '<h3>' + esc(crop.name) + '</h3><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
-        '<p class="climate-start-month"><strong>Best climate window:</strong> ' + esc(best.month || '—') + ' · establishment screen ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' months</p>' +
-        '<p class="climate-current-month ' + esc(crop.currentMonthStatus === 'suitable' ? 'is-open' : crop.currentMonthStatus === 'caution' ? 'is-caution' : crop.currentMonthStatus === 'wait' ? 'is-wait' : 'is-unknown') + '"><strong>Current month (' + esc(['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()]) + '):</strong> ' + esc(crop.currentMonthStatus === 'suitable' ? 'climate window open' : crop.currentMonthStatus === 'caution' ? 'possible with cautions' : crop.currentMonthStatus === 'wait' ? 'not recommended by this climate screen' : 'not verified') + '</p>' +
+        '<p class="climate-start-month"><strong>Season to investigate:</strong> ' + esc(best.month || 'Not identified') + ' · about ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' month(s)</p>' +
+        '<p class="climate-current-month ' + esc(crop.currentMonthStatus === 'suitable' ? 'is-open' : crop.currentMonthStatus === 'caution' ? 'is-caution' : crop.currentMonthStatus === 'wait' ? 'is-wait' : 'is-unknown') + '"><strong>This month:</strong> ' + esc(crop.currentMonthStatus === 'suitable' ? 'historical climate looks broadly supportive' : crop.currentMonthStatus === 'caution' ? 'check conditions before planting' : crop.currentMonthStatus === 'wait' ? 'another month may be a better starting point' : 'season not verified') + '</p>' +
         '<p>' + esc(crop.note) + '</p>' +
-        '<div class="climate-crop-meta"><span>Temperature screen ' + esc(crop.climateRule.tempMin) + '–' + esc(crop.climateRule.tempMax) + ' °C</span><span>Window rainfall ' + esc(numberOrDash(best.totalRainMm,' mm')) + '</span><span>Mean wind ' + esc(numberOrDash(best.avgWindKmh,' km/h')) + '</span></div>' +
-        (reasons ? '<div class="crop-reason"><b>Why the climate matched</b><ul>' + reasons + '</ul></div>' : '') +
+        (reasons ? '<div class="crop-reason"><b>Why it appears on the list</b><ul>' + reasons + '</ul></div>' : '') +
         (cautions ? '<div class="crop-caution"><b>Check before planting</b><ul>' + cautions + '</ul></div>' : '') +
+        '<details class="technical-details"><summary>See the screening figures</summary><p>These are provisional climate-screening values, not a probability of success or a yield forecast.</p>' +
+        '<div class="climate-crop-meta"><span>Screening score ' + esc(best.score == null ? '—' : best.score) + '/100</span><span>Temperature range ' + esc(crop.climateRule.tempMin) + '–' + esc(crop.climateRule.tempMax) + ' °C</span><span>Window rainfall ' + esc(numberOrDash(best.totalRainMm,' mm')) + '</span><span>Mean wind ' + esc(numberOrDash(best.avgWindKmh,' km/h')) + '</span></div></details>' +
         '<p class="crop-photo-credit" id="climate-credit-' + esc(crop.id) + '">Reference photo source and license appear here when available.</p>' +
         '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search more crop photos ↗</a>' +
         '</div></article>';
@@ -532,26 +556,25 @@
     var methodWarnings = [];
     if (avgWind != null && avgWind >= 25) methodWarnings.push('Long-term average wind is high enough to merit checking windbreaks, lodging and exposed sites.');
     if (peakGust >= 50) methodWarnings.push('Monthly peak gust statistics show potentially damaging gust exposure in some months.');
-    if (!methodWarnings.length) methodWarnings.push('No generic high-wind flag was triggered by the monthly averages. This does not rule out storms, typhoons, squalls or field-level exposure.');
+    if (!methodWarnings.length) methodWarnings.push('The monthly averages did not trigger a generic high-wind flag. This does not rule out storms or local wind exposure.');
 
-    return '<div class="tab-intro"><div class="eyebrow">CLIMATE & PLANTING / SEASON SCOUT</div>' +
-      '<h2>What grows well, and when? 🌱</h2><p>Climate-based planting-window candidates for <b>' + esc(region) + '</b>. Month-by-month averages are calculated from daily observations for ' + esc(climate.startYear) + '–' + esc(climate.endYear) + ' at a representative point within the selected boundary.</p></div>' +
+    return '<div class="tab-intro"><div class="eyebrow">SEASONS & PLANTING / WEATHER GUIDE</div>' +
+      '<h2>When might planting work best? 🌱</h2><p>Here is the usual seasonal pattern around <b>' + esc(region) + '</b>. It is based on historical weather from ' + esc(climate.startYear) + '–' + esc(climate.endYear) + ', not a measurement of your own farm.</p></div>' +
+      learnerGuide +
       '<div class="climate-summary-grid">' +
-      '<article><span>HISTORICAL PROFILE</span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>five completed calendar years</small></article>' +
-      '<article><span>AVERAGE TEMPERATURE</span><b>' + esc(numberOrDash(meanTemp,' °C')) + '</b><small>mean of monthly averages</small></article>' +
-      '<article><span>AVERAGE ANNUAL RAIN</span><b>' + esc(numberOrDash(annualRain,' mm')) + '</b><small>sum of average monthly rainfall</small></article>' +
-      '<article><span>AVERAGE WIND</span><b>' + esc(numberOrDash(avgWind,' km/h')) + '</b><small>10 m above ground</small></article>' +
+      '<article><span>YEARS COMPARED</span><b>' + esc(climate.startYear + '–' + climate.endYear) + '</b><small>five completed calendar years</small></article>' +
+      '<article><span>AVERAGE TEMPERATURE</span><b>' + esc(numberOrDash(meanTemp,' °C')) + '</b><small>helps describe the growing climate</small></article>' +
+      '<article><span>AVERAGE RAIN PER YEAR</span><b>' + esc(numberOrDash(annualRain,' mm')) + '</b><small>sum of typical monthly rainfall</small></article>' +
+      '<article><span>AVERAGE WIND</span><b>' + esc(numberOrDash(avgWind,' km/h')) + '</b><small>local exposure still varies</small></article>' +
       '</div>' +
-      '<section class="climate-method-note"><b>Where is this climate measured?</b><p>' + esc(levelLabel) + ' · approximate point ' + esc(climate.latitude) + ', ' + esc(climate.longitude) +
-      '. Large or island-rich regions can contain very different microclimates. The selected point is a proxy, not a measurement for every farm in the region.</p></section>' +
-      '<div class="section-title"><span class="mini-code">MONTH-BY-MONTH PATTERN</span><h3>Temperature, rain and wind</h3></div>' +
+      '<details class="technical-details"><summary>Where did the weather sample come from?</summary><p>' + esc(levelLabel) + ' · approximate point ' + esc(climate.latitude) + ', ' + esc(climate.longitude) + '. Large or island-rich regions can contain very different microclimates.</p></details>' +
+      '<div class="section-title"><span class="mini-code">THE YEAR AT A GLANCE</span><h3>How rain changes by month</h3></div>' +
       '<div class="climate-month-grid">' + monthCards + '</div>' +
-      '<div class="section-title"><span class="mini-code">PLANTING WINDOW SCREEN</span><h3>Top climate candidates</h3></div>' +
-      '<p class="live-explainer">Rankings compare broad temperature and accumulated rainfall windows with provisional crop profiles. Soil type, soil pH, irrigation, variety, pests and local planting calendars can change the decision. Wind warnings are general exposure signals, not a crop-specific wind-tolerance model.</p>' +
+      '<div class="section-title"><span class="mini-code">PLANTS TO INVESTIGATE</span><h3>Seasonal crop ideas</h3></div>' +
+      '<p class="live-explainer">These are plants worth researching first because broad temperature and rainfall patterns may match their starter profiles. Soil, actual water supply, crop variety, pests, market access and local calendars can change the decision.</p>' +
       '<div class="climate-crop-grid">' + cropCards + '</div>' +
-      '<section class="climate-method-note"><b>Wind and storm check</b><ul>' + methodWarnings.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') + '</ul>' +
-      '<p>Wind speed and gust figures are historical reference values, not storm forecasts. For planting in the coming weeks, also consult the current national meteorological service and local agricultural extension.</p></section>' +
-      '<section class="climate-method-note"><b>Data provenance</b><p>Historical daily weather data via <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs/historical-weather-api">Open-Meteo Historical Weather API</a>. Crop temperature/rainfall bands are provisional screening rules in this app, not a verified global agronomic model. Confirm recommendations with local agricultural extension and soil tests before committing land, seed or money.</p></section>';
+      '<details class="technical-details"><summary>Wind and data methods</summary><ul>' + methodWarnings.map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') + '</ul>' +
+      '<p>Wind speed and gust figures are historical reference values, not storm forecasts. Historical weather source: <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs/historical-weather-api">Open-Meteo Historical Weather API</a>. Crop temperature/rainfall bands are provisional app rules, not a verified global agronomic model. Confirm with local extension and soil tests.</p></details>';
   }
 
   async function loadClimateCropPhotos(recommendations, selection) {
