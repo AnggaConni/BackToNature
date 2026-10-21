@@ -37,6 +37,7 @@ async function main() {
   assert.ok(appSource.includes('Aquaponics'), 'Farming Guide explains aquaponics');
   assert.ok(appSource.includes('not currently populated by a live WOCAT or technology API'), 'Technology tab documents its rule-based data provenance');
   assert.ok(appSource.includes('function initNatureInlineMap(selection, selectionKey, point)'), 'Plant reports include an embedded biodiversity map');
+  assert.ok(appSource.includes('natureInlineMarkerLayer = L.featureGroup().addTo(natureInlineMap)'), 'biodiversity marker layer supports getBounds for map auto-zoom');
   assert.ok(appSource.includes('Where were plants reported?'), 'Plant report map explains what its points mean');
   assert.ok(appSource.includes('function renderWaporPointSeries(data)'), 'WaPOR cards display actual values, a seasonal baseline and a trend chart');
   assert.ok(appSource.includes('function analyzeWaporTrend(data)'), 'WaPOR charts classify rising, falling and fluctuating trends');
