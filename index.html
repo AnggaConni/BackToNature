@@ -630,6 +630,54 @@
     @media(max-width:850px){.farming-system-grid{grid-template-columns:1fr}.tech-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media(max-width:560px){.tech-reference-grid{grid-template-columns:1fr}.farming-system-library{padding:9px}.farming-system-card{padding:9px}.wapor-mapset-code{text-align:left}}
 
+  
+    /* WaPOR point extraction: visible values, seasonal comparison, line chart and practical action prompts. */
+    .wapor-mapset-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+    .wapor-mapset-card{display:flex;flex-direction:column;gap:6px}
+    .wapor-mapset-heading{align-items:flex-start}
+    .wapor-mapset-card>h4{margin:4px 0 2px;font-size:17px}
+    .wapor-card-guidance{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:6px 0}
+    .wapor-card-guidance>article{padding:9px;background:#eaf0df;border:1px solid #ced9bd;border-left:3px solid #6e8a54;min-width:0}
+    .wapor-card-guidance>article:last-child{background:#f7edcf;border-left-color:#b18b48}
+    .wapor-card-guidance b{display:block;font-size:11px;line-height:1.4;color:#405a32}
+    .wapor-card-guidance p{font-size:12px;line-height:1.45;margin:5px 0 0}
+    .wapor-point-fetch{width:100%;margin-top:6px}
+    .wapor-point-status{padding:6px 7px;background:#f4efde;border:1px solid #ded0ae;font-size:11px;line-height:1.4;color:#655239;overflow-wrap:anywhere}
+    .wapor-point-results{min-width:0}
+    .wapor-point-result{margin-top:7px;padding:9px;background:#fffaf0;border:1px solid #d4c39a}
+    .wapor-result-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+    .wapor-result-grid>article{min-width:0;padding:8px;background:#eaf0e2;border:1px solid #d2ddc4}
+    .wapor-result-grid>article:nth-child(2){background:#f7efd9;border-color:#e1d0a9}
+    .wapor-result-grid>article:nth-child(3){background:#e8eef4;border-color:#c2d0df}
+    .wapor-result-grid span{display:block;font-size:10px;font-weight:800;line-height:1.35;color:#61503a}
+    .wapor-result-grid strong{display:block;margin:6px 0;font-size:17px;line-height:1.2;color:#2f552f;overflow-wrap:anywhere}
+    .wapor-result-grid small{display:block;font-size:10px;line-height:1.4;color:#66563e;overflow-wrap:anywhere}
+    .wapor-trend-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 4px}
+    .wapor-trend-heading h5{margin:0;color:#3e5835;font-size:15px}
+    .wapor-trend-heading span{font-size:10px;color:#68573d}
+    .wapor-chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin:5px 0;font-size:11px;color:#5e5038}
+    .wapor-chart-legend>span{display:flex;align-items:center;gap:5px}
+    .wapor-legend-current,.wapor-legend-baseline{display:inline-block;width:22px;height:0;border-top:3px solid #2d6c91}
+    .wapor-legend-baseline{border-top:3px dashed #b48a3b}
+    .wapor-line-chart{display:block;width:100%;height:auto;min-height:160px;background:#fffdf5;border:1px solid #e1d7bd;overflow:visible}
+    .wapor-result-advice{margin-top:8px;padding:9px;background:#e7edf0;border:1px solid #c0ceda}
+    .wapor-result-signal{display:inline-block;margin-bottom:5px;padding:4px 6px;background:#d7e6d2;color:#315a2d;border:1px solid #aec5a5;font-size:11px;font-weight:800}
+    .wapor-result-advice p{font-size:12px;line-height:1.5;margin:5px 0}
+    .wapor-chart-empty{font-size:12px;line-height:1.45;padding:8px;background:#f7f0df;border-left:3px solid #b18b48;color:#67543a}
+    .wapor-query-error{margin-top:7px;padding:10px;background:#fbebd7;border-left:4px solid #b87151}
+    .wapor-query-error b{color:#85412c;font-size:12px}
+    .wapor-query-error p{font-size:12px;line-height:1.45;margin:5px 0}
+    .wapor-point-selection{padding:8px;background:#e3ebd8;border-left:4px solid #6c8b52;font-size:12px}
+    @media(max-width:850px){
+      .wapor-mapset-grid{grid-template-columns:1fr}
+      .wapor-result-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:560px){
+      .wapor-card-guidance{grid-template-columns:1fr}
+      .wapor-point-result{padding:6px}
+      .wapor-result-grid strong{font-size:16px}
+    }
+
   </style>
 </head>
 <body>
@@ -760,7 +808,8 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261021-farming-wapor-plain-v4"></script>
-  <script src="./app.js?v=20261021-farming-wapor-plain-v4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <script src="./api.js?v=20261021-wapor-point-trend-v5"></script>
+  <script src="./app.js?v=20261021-wapor-point-trend-v5"></script>
 </body>
 </html>
