@@ -1313,7 +1313,6 @@
       {t:'Open-Meteo weather and agricultural variables',d:'Public forecast and historical weather endpoints used elsewhere in BackToNature, including rainfall and reference evapotranspiration. Free use is limited to non-commercial fair use and requires attribution.',u:'https://open-meteo.com/en/docs',tag:'WEATHER API · NO LOGIN'},
       {t:'NASA POWER Data Access Viewer / API',d:'Public gridded meteorological and solar data used for monthly climate context. The app labels precipitation units explicitly and does not treat gridded estimates as farm measurements.',u:'https://power.larc.nasa.gov/docs/services/api/',tag:'CLIMATE API · NO LOGIN'},
       {t:'World Bank Indicators API',d:'Public country-level time series for agriculture, land use, cereal yield and economic context. The live country snapshot above uses this keyless API.',u:'https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api',tag:'GLOBAL INDICATORS · NO LOGIN'},
-      {t:'FAO WaPOR v3 API — water and vegetation indicators',d:'Public API for official WaPOR mapset metadata and raster download links covering evapotranspiration, relative soil moisture, precipitation and vegetation productivity. Access requires no token; raster values still need a separate spatial extraction.',u:'https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en',tag:'AGRICULTURE / WATER API · NO LOGIN'},
       {t:'geoBoundaries administrative data',d:'Administrative boundary provenance. The represented year and license differ by country and administrative level.',u:boundaryMetadataUrl || 'https://www.geoboundaries.org/',tag:'BOUNDARY PROVENANCE'}
     ];
 
@@ -1330,7 +1329,7 @@
 
     return '<div class="tab-intro"><div class="eyebrow">DATA & RESEARCH / EVIDENCE SHELF</div><h2>Where does the information come from? 📚</h2><p>BackToNature checks a few free public sources when this tab opens. Each source answers a different question; no single number explains a whole farm.</p></div>' +
       renderLearningGuide('A data source is where a number, map or research record comes from. The publisher and method help us check whether it is trustworthy for our question.','National statistics, research papers, satellite maps and field observations describe different things. Compare them only when location, date, units and methods make sense together.','Start with the plain-language explanation, open technical details when needed, and verify local decisions with field observations or an official local source.','Use the source, not just the number') +
-      countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + renderWaporPublicApiPanel() + indonesiaLiveTerminal +
+      countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + indonesiaLiveTerminal +
       '<div class="source-list">' + globalSources.map(function (source, index) {
         return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' + wocatBox + integrity;
@@ -1537,7 +1536,7 @@
     // Start a small set of public, no-key data lookups as soon as Sources opens.
     // WOCAT and Pl@ntNet are excluded because they require user-provided credentials.
     window.setTimeout(function () {
-      ['crossref-search-btn','country-wb-fetch-btn','wapor-source-fetch-btn'].concat(
+      ['crossref-search-btn','country-wb-fetch-btn'].concat(
         currentSourceIso3 === 'IDN' ? ['live-faostat-btn'] : []
       ).forEach(function (buttonId, index) {
         window.setTimeout(function () {
@@ -1709,98 +1708,216 @@
 
   function explainWaporMapset(record) {
     var code = String(record && record.code || '').toUpperCase();
-    var variable = code.split('-')[1] || '';
-    var timeCode = code.split('-')[2] || '';
-    var levelCode = code.split('-')[0] || '';
+    var parts = code.split('-');
+    var variable = parts[1] || '';
+    var timeCode = parts[2] || '';
+    var levelCode = parts[0] || '';
     var dictionary = {
       AETI:{
-        title:'How much water actually leaves land and plants',
-        short:'A combined estimate of water evaporating from the ground, used by plants and evaporated from rain caught on leaves.',
-        question:'Is water leaving this landscape quickly or slowly over the selected period?',
-        caution:'This is not a direct instruction for how many litres to irrigate. The number depends on weather, vegetation and land cover.'
+        title:'Water leaving soil and plants',
+        short:'Combines water evaporating from the soil, water released by plants and rain caught on leaves that later evaporates.',
+        question:'How does water leaving the land and vegetation change through the season?',
+        caution:'More water loss does not automatically mean healthier crops. Plants may be actively growing, or the area may be losing water quickly.',
+        high:'Water loss is above the seasonal reference. Check crop stage, rainfall, soil moisture and whether irrigation timing is appropriate before adding or reducing water.',
+        low:'Water loss is below the seasonal reference. Check whether crops are dormant, vegetation is sparse or water is limited; compare rainfall and plant-growth data before deciding.',
+        steady:'The latest value is near this point’s seasonal reference. Keep observing the crop stage and soil conditions rather than changing irrigation based on this layer alone.'
       },
       E:{
-        title:'Water evaporating from soil or wet surfaces',
-        short:'An estimate of water that goes back to the air from soil, water or wet plant surfaces—not water taken up inside the plant.',
-        question:'Could evaporation be an important part of the local water loss?',
-        caution:'Do not treat this as total crop water use; plant transpiration is a different process.'
+        title:'Water evaporating from soil and wet surfaces',
+        short:'Estimates water that returns to the air from soil or wet surfaces, separate from water released by plants through their leaves.',
+        question:'Is evaporation from soil and surfaces changing compared with the same season?',
+        caution:'A high value can reflect wet exposed soil and weather, not necessarily healthy crop growth.',
+        high:'Evaporation is above the seasonal reference. Check whether bare or waterlogged soil is exposed; suitable soil cover or mulch may reduce avoidable evaporation.',
+        low:'Evaporation is below the seasonal reference. This may reflect drier surfaces or different weather. Check rainfall and soil moisture before assuming water is sufficient.',
+        steady:'Evaporation is near its seasonal reference. Maintain appropriate ground cover and compare it with rainfall and crop conditions.'
       },
       T:{
-        title:'Water used by plants and released through leaves',
-        short:'An estimate of water taken up by roots and released by plants into the air through transpiration.',
-        question:'How does water use by plant growth change over time?',
-        caution:'A satellite/model estimate is not a sensor reading from one individual plant.'
+        title:'Water released by growing plants',
+        short:'Estimates water absorbed by roots and released by plants through their leaves.',
+        question:'How does plant water use change over the season?',
+        caution:'More transpiration may mean active growth, but it can also mean more water is moving through the crop. This number alone does not diagnose plant health.',
+        high:'Plant water release is above the seasonal reference. Check crop growth stage, canopy condition and soil moisture; make sure the water supply matches the crop’s stage.',
+        low:'Plant water release is below the seasonal reference. Inspect crop vigour, soil moisture and whether the field is in a normal resting stage before assuming water stress.',
+        steady:'Plant water release is near its seasonal reference. Continue field observation and compare with the crop’s expected growth stage.'
       },
       I:{
-        title:'Rain intercepted by leaves and vegetation',
-        short:'An estimate of rain caught on leaves and other surfaces that may evaporate before reaching the ground.',
-        question:'How much rainfall might be caught by the vegetation canopy?',
-        caution:'It does not tell you directly how much water reached crop roots.'
+        title:'Rain caught by leaves and vegetation',
+        short:'Estimates rain intercepted by foliage that can evaporate before reaching the ground.',
+        question:'How much rain may be caught by the plant canopy in this season?',
+        caution:'This does not tell us how much water reached the roots. It is influenced by the amount and type of vegetation.',
+        high:'More rain interception than the seasonal reference may reflect a wet period or a developed canopy. Check soil moisture separately; do not treat this as water stored for roots.',
+        low:'Less interception than the seasonal reference may reflect less rainfall or a different canopy. Compare with precipitation and field observations.',
+        steady:'Interception is near its seasonal reference. Use rainfall and soil-moisture evidence to understand water available to roots.'
       },
       RET:{
-        title:'How strongly the weather could pull water from a reference surface',
-        short:'Reference evapotranspiration is a standard estimate of the atmosphere’s evaporative demand when water is not limiting.',
-        question:'Are conditions likely to create high or low evaporative demand?',
-        caution:'It is not the actual water use of your crop. Crop type and growth stage change water needs.'
+        title:'How strongly the weather draws water',
+        short:'Reference evapotranspiration estimates the atmosphere’s evaporative demand for a well-watered reference surface; it is not the actual water use of your crop.',
+        question:'Is the atmosphere likely to draw water faster or slower than usual for this season?',
+        caution:'High reference evapotranspiration can increase crop water demand, but the actual need depends on crop type, growth stage, soil and local conditions.',
+        high:'Atmospheric demand is above the seasonal reference. Check soil moisture more often and use locally recommended irrigation scheduling if irrigation is available.',
+        low:'Atmospheric demand is below the seasonal reference. Water demand may be lower than usual, but keep checking soil and crop conditions rather than following a fixed schedule.',
+        steady:'Atmospheric demand is near its seasonal reference. Use the normal locally recommended water plan and adjust only after checking field conditions.'
       },
       RSM:{
-        title:'How wet the soil is relative to its usual range',
-        short:'A model/satellite indicator of relative soil moisture in the mapped area.',
-        question:'Does the mapped area look relatively wetter or drier over time?',
-        caution:'Relative moisture is not the same as a soil sample or a calibrated sensor at root depth.'
+        title:'How wet the soil is, relative to its usual range',
+        short:'A model/satellite indicator of relative soil moisture—not a sensor reading at the crop’s root depth.',
+        question:'Does the mapped area look relatively wetter or drier than it usually does at this time of year?',
+        caution:'Very wet is not always better: some crops suffer when roots stay waterlogged. Relative moisture is not the same as a soil sample or calibrated probe.',
+        high:'The soil-moisture signal is above the seasonal reference. Check for waterlogging and whether drainage is safe and adequate; avoid extra irrigation until the field is checked.',
+        low:'The soil-moisture signal is below the seasonal reference. Check moisture at root depth and signs of stress. Consider locally approved water-saving measures or irrigation only if field evidence supports it.',
+        steady:'Relative soil moisture is near its seasonal reference. Keep monitoring the root zone; the satellite/model pixel can differ from the actual plot.'
       },
       PCP:{
-        title:'How much rain fell or is estimated to have fallen',
-        short:'A gridded rainfall estimate for a map cell over the selected time period.',
-        question:'Which periods or areas were wetter or drier?',
-        caution:'The estimate can differ from a rain gauge on your farm, especially during local storms.'
+        title:'Rainfall',
+        short:'A gridded estimate of rain for the map pixel and time period. It may differ from a rain gauge on the farm.',
+        question:'Was this period wetter or drier than the same period in previous years?',
+        caution:'More rain is not always better. Heavy rainfall may cause flooding, erosion or nutrient loss; a low total may be serious for water-sensitive crops.',
+        high:'Rainfall is above the seasonal reference. Check field drainage, flood risk, erosion and crop disease. Do not work wet soil or build drainage without local advice.',
+        low:'Rainfall is below the seasonal reference. Check field moisture and the local forecast; conserve moisture and review the water plan before sowing or applying inputs.',
+        steady:'Rainfall is near its seasonal reference. Continue to compare with a rain gauge or field observations—short storms can be missed by a coarse pixel.'
       },
       NPP:{
-        title:'How much new plant material is being produced',
-        short:'Net primary production is an estimate of new plant biomass after plants use some of their captured energy themselves.',
-        question:'Where does the landscape appear to be producing more or less plant growth over time?',
-        caution:'It is not harvested yield, food calories or crop profit. It can include natural vegetation.'
-      },
-      AGBP:{
-        title:'Estimated above-ground plant biomass',
-        short:'An estimate related to the mass of plant material above the soil surface.',
-        question:'How does the amount of standing vegetation vary across areas or dates?',
-        caution:'Biomass is not automatically edible harvest or farm income.'
-      },
-      GBWP:{
-        title:'How much biomass is produced per unit of water',
-        short:'A measure relating biomass production to water consumed or used in production.',
-        question:'How efficiently is plant material produced relative to water use?',
-        caution:'Check the units, method and crop/land cover before comparing two places.'
+        title:'New plant growth (not harvest yield)',
+        short:'Net primary production estimates the carbon plants turn into new organic matter after using some energy themselves. Natural vegetation may also contribute.',
+        question:'Is estimated plant growth higher or lower than in comparable periods?',
+        caution:'It is not tonnes harvested, food calories or farm profit. Season, crop type, natural vegetation and pixel size all affect interpretation.',
+        high:'Estimated plant productivity is above the seasonal reference. Check whether this matches the crop’s growth stage and field appearance; record the result, but do not assume the harvest will rise by the same amount.',
+        low:'Estimated plant productivity is below the seasonal reference. Inspect the crop, rainfall, root-zone moisture and growth stage. Seek soil-test or extension advice before adding fertilizer or pesticide.',
+        steady:'Estimated plant productivity is near its seasonal reference. Keep field notes and compare the same crop and growth stage where possible.'
       }
     };
     var explanation = dictionary[variable] || {
       title:String(record && record.caption || 'Environmental map layer'),
-      short:'A satellite/model dataset describing one part of water use, rainfall or vegetation.',
+      short:'A satellite/model dataset describing water, rainfall or vegetation.',
       question:'What pattern does this variable show across the map or over time?',
-      caution:'Open the dataset details and its unit before interpreting values.'
+      caution:'Open the dataset metadata and verify its unit before interpreting a number.',
+      high:'A higher value should be interpreted using the variable’s unit, time period and local field conditions.',
+      low:'A lower value should be interpreted using the variable’s unit, time period and local field conditions.',
+      steady:'Compare with field observations and the source methodology before changing farm practices.'
     };
-    var time = {
-      D:'Every 10 days (a “dekad”)',
-      M:'Monthly',
-      E:'Daily',
-      A:'Yearly'
-    }[timeCode] || String(record && record.temporalResolution || 'Time step not confirmed');
+    var time = {D:'Every 10 days (dekadal)',M:'Monthly',E:'Daily',A:'Annual'}[timeCode] ||
+      String(record && record.temporalResolution || 'Time step not confirmed');
     var level = levelCode === 'L1' ? 'Broad/global product' :
-      levelCode === 'L2' ? 'More local/national product where available' :
+      levelCode === 'L2' ? 'National/local product where available' :
       levelCode === 'L3' ? 'Area-specific product' : String(record && record.level || 'Coverage not confirmed');
     return {
-      code:code,
-      variable:variable,
-      time:time,
-      level:level,
-      title:explanation.title,
-      short:explanation.short,
-      question:explanation.question,
-      caution:explanation.caution,
+      code:code, variable:variable, time:time, level:level,
+      title:explanation.title, short:explanation.short, question:explanation.question,
+      caution:explanation.caution, highAction:explanation.high, lowAction:explanation.low,
+      steadyAction:explanation.steady,
       resolution:String(record && record.resolutionNote || 'Check the original layer details'),
       temporal:String(record && record.temporalResolution || time)
     };
+  }
+
+  function renderWaporPointChart(data) {
+    var points = data && Array.isArray(data.series) ? data.series : [];
+    var visible = points.filter(function (point) { return Number.isFinite(point.value); });
+    if (visible.length < 2) {
+      return '<p class="wapor-chart-empty">Only ' + visible.length + ' usable point value(s) were returned, so a trend line cannot yet be drawn.</p>';
+    }
+    var width = 680, height = 240;
+    var padL = 60, padR = 18, padT = 18, padB = 46;
+    var plotW = width - padL - padR, plotH = height - padT - padB;
+    var yValues = [];
+    visible.forEach(function (point) {
+      yValues.push(point.value);
+      if (Number.isFinite(point.baselineValue)) yValues.push(point.baselineValue);
+    });
+    var min = Math.min.apply(null,yValues);
+    var max = Math.max.apply(null,yValues);
+    var span = max - min || Math.max(Math.abs(max) * 0.2, 1);
+    min -= span * 0.12;
+    max += span * 0.12;
+    function x(index) { return padL + (index / Math.max(1,points.length - 1)) * plotW; }
+    function y(value) { return padT + (max - value) / (max - min) * plotH; }
+    function linePath(key) {
+      var path = '';
+      var started = false;
+      points.forEach(function (point,index) {
+        var value = point[key];
+        if (!Number.isFinite(value)) { started = false; return; }
+        path += (started ? ' L ' : ' M ') + x(index).toFixed(1) + ' ' + y(value).toFixed(1);
+        started = true;
+      });
+      return path;
+    }
+    var grid = '';
+    for (var tick = 0; tick <= 4; tick++) {
+      var value = min + (max - min) * tick / 4;
+      var yy = y(value);
+      grid += '<line x1="' + padL + '" y1="' + yy.toFixed(1) + '" x2="' + (width-padR) + '" y2="' + yy.toFixed(1) + '" stroke="#d8d1ba" stroke-width="1"/>' +
+        '<text x="' + (padL-8) + '" y="' + (yy+4).toFixed(1) + '" text-anchor="end" font-size="10" fill="#74654b">' + esc(value.toLocaleString('en-US',{maximumFractionDigits:2})) + '</text>';
+    }
+    var dots = points.map(function (point,index) {
+      if (!Number.isFinite(point.value)) return '';
+      return '<circle cx="' + x(index).toFixed(1) + '" cy="' + y(point.value).toFixed(1) + '" r="3.5" fill="#2d6c91"><title>' + esc(point.date) + ': ' + esc(point.value.toLocaleString('en-US',{maximumFractionDigits:3})) + ' ' + esc(data.unit) + '</title></circle>';
+    }).join('');
+    var labels = [0,Math.floor((points.length-1)/2),points.length-1].filter(function (v,i,a) { return a.indexOf(v) === i; }).map(function (idx) {
+      return '<text x="' + x(idx).toFixed(1) + '" y="' + (height-15) + '" text-anchor="' + (idx === 0 ? 'start' : idx === points.length-1 ? 'end' : 'middle') + '" font-size="10" fill="#65543b">' + esc(points[idx].date) + '</text>';
+    }).join('');
+    return '<div class="wapor-chart-legend"><span><i class="wapor-legend-current"></i> Actual pixel value</span><span><i class="wapor-legend-baseline"></i> Same season in earlier years</span></div>' +
+      '<svg class="wapor-line-chart" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Recent WaPOR values compared with historical seasonal baseline">' +
+      grid + '<path d="' + linePath('baselineValue') + '" fill="none" stroke="#b48a3b" stroke-width="2.5" stroke-dasharray="6 5"/>' +
+      '<path d="' + linePath('value') + '" fill="none" stroke="#2d6c91" stroke-width="3"/>' + dots + labels + '</svg>';
+  }
+
+  function renderWaporPointActions(data) {
+    var variable = String(data.mapset || '').split('-')[1] || '';
+    var change = data.differencePercent;
+    if (!Number.isFinite(change) || !Number.isFinite(data.baseline)) {
+      return '<div class="wapor-result-advice"><b>How to use the result</b><p>The current value is available, but there are not enough comparable historical pixels to calculate a seasonal baseline. Read the trend and check the source portal before judging the result.</p></div>';
+    }
+    var label = Math.abs(change) < 20 ? 'Near seasonal baseline' : change > 0 ? 'Higher than seasonal baseline' : 'Lower than seasonal baseline';
+    var description = Math.abs(change) < 20
+      ? 'The latest value is within 20% of this provisional seasonal reference. This is a learning flag, not an official FAO threshold.'
+      : 'The latest value differs by ' + Math.abs(change).toFixed(1) + '% from the provisional seasonal reference. A difference is a clue to investigate, not proof that a farm is good or bad.';
+    var action = Math.abs(change) < 20
+      ? (variable === 'NPP' ? 'Keep field notes on growth stage and visible plant condition; compare the same crop and season next time.' :
+        variable === 'PCP' ? 'Keep checking the local forecast and a rain gauge; seasonal similarity does not rule out local storms or dry spells.' :
+        variable === 'RSM' ? 'Keep monitoring actual root-zone moisture; the mapped pixel is not a soil probe.' :
+        variable === 'RET' ? 'Follow the locally advised water plan and adjust only after observing soil and crop conditions.' :
+        'Continue observation and check crop stage, rainfall and field moisture before changing farm practices.')
+      : (variable === 'PCP' && change > 0 ? 'Check flooding, erosion, waterlogged areas and crop-disease conditions. Avoid working wet soil or redesigning drainage without local advice.' :
+        variable === 'PCP' && change < 0 ? 'Check local rainfall and root-zone moisture; conserve moisture and review the crop water plan before sowing or applying inputs.' :
+        variable === 'RSM' && change > 0 ? 'Check whether the field is waterlogged and whether the crop tolerates wet roots; do not add irrigation based on this signal.' :
+        variable === 'RSM' && change < 0 ? 'Inspect root-zone moisture and signs of plant stress; consider safe water-saving or locally recommended irrigation only if field checks support it.' :
+        variable === 'RET' && change > 0 ? 'Atmospheric water demand is higher; monitor soil moisture more frequently and review local irrigation scheduling.' :
+        variable === 'RET' && change < 0 ? 'Atmospheric demand is lower than the seasonal reference; do not assume the crop needs the same amount of water as during hotter/drier periods.' :
+        variable === 'NPP' && change > 0 ? 'Estimated plant growth is higher; check whether the crop stage and field appearance support this. Do not treat it as a yield estimate.' :
+        variable === 'NPP' && change < 0 ? 'Inspect crop health, water availability, season and land cover. Confirm suspected nutrient issues with soil tests or extension advice before applying fertilizer.' :
+        variable === 'AETI' && change > 0 ? 'Water leaving soil and vegetation is higher. Compare with active growth, rainfall and soil moisture; do not automatically increase irrigation.' :
+        variable === 'AETI' && change < 0 ? 'Water loss is lower. Check for dormancy, sparse vegetation or water limitation, and compare with rainfall and plant-growth indicators.' :
+        'Compare this signal with the layer’s specific guidance, field conditions and local technical advice before taking action.');
+    return '<div class="wapor-result-advice"><span class="wapor-result-signal">' + esc(label) + '</span><p>' + esc(description) + '</p><p><b>Suggested next step:</b> ' + esc(action) + '</p></div>';
+  }
+
+  function renderWaporPointSeries(data) {
+    var latest = data && data.latest;
+    if (!latest || !Number.isFinite(latest.value)) return '<p class="wapor-chart-empty">No usable value was returned for this point.</p>';
+    var baselineText = Number.isFinite(data.baseline)
+      ? data.baseline.toLocaleString('en-US',{maximumFractionDigits:3}) + ' ' + esc(data.unit)
+      : 'Not available';
+    var differenceText = Number.isFinite(data.differencePercent)
+      ? (data.differencePercent > 0 ? '+' : '') + data.differencePercent.toFixed(1) + '%'
+      : 'Not available';
+    var coords = Number(data.latitude).toFixed(4) + ', ' + Number(data.longitude).toFixed(4);
+    var valueText = latest.value.toLocaleString('en-US',{maximumFractionDigits:3}) + ' ' + esc(data.unit);
+    return '<section class="wapor-point-result">' +
+      '<div class="wapor-result-grid">' +
+      '<article><span>Latest usable value</span><strong>' + valueText + '</strong><small>' + esc(latest.date) + ' · sampled pixel</small></article>' +
+      '<article><span>Seasonal baseline</span><strong>' + baselineText + '</strong><small>Mean from ' + esc(data.baselineSamples || 0) + ' comparable pixel sample(s) across previous years</small></article>' +
+      '<article><span>Difference from baseline</span><strong>' + esc(differenceText) + '</strong><small>Comparison with the same calendar dekad/month/day</small></article>' +
+      '</div>' +
+      '<div class="wapor-trend-heading"><h5>Recent trend vs previous years</h5><span>' + esc(data.sampledPeriods) + ' usable period(s)</span></div>' +
+      renderWaporPointChart(data) +
+      renderWaporPointActions(data) +
+      '<details class="mini-explanation"><summary>How were these numbers calculated?</summary>' +
+      '<p>BackToNature samples the selected point from the official WaPOR v3 raster for each date. Raw pixel values are converted using the published layer scale factor. The seasonal baseline is the average of available samples from the same calendar period in the previous two years; it is a comparison reference, not an agronomic target or a universal definition of good/bad.</p>' +
+      '<p><b>Location:</b> ' + esc(coords) + ' · <b>Scale:</b> ' + esc(data.mapset) + ' · <b>Unit:</b> ' + esc(data.unit) + '. This is one map pixel at the selected region’s representative point, not an average over the whole district or a direct sensor reading from the farm.</p>' +
+      (data.partialFailures ? '<p>' + esc(data.partialFailures) + ' raster sample(s) could not be read and were omitted; check the official portal if the trend has gaps.</p>' : '') +
+      '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">Open the official WaPOR map ↗</a></details>' +
+      '</section>';
   }
 
   function renderWaporMapsetCatalog(data) {
@@ -1818,30 +1935,42 @@
         '<div class="wapor-mapset-heading"><span class="wapor-level-tag">' + esc(explanation.level) + '</span><span class="wapor-mapset-code">Technical code: ' + esc(explanation.code) + '</span></div>' +
         '<h4>' + esc(explanation.title) + '</h4><p class="wapor-plain-meaning">' + esc(explanation.short) + '</p>' +
         '<div class="wapor-why"><b>What question can it help answer?</b><p>' + esc(explanation.question) + '</p></div>' +
+        '<div class="wapor-card-guidance">' +
+        '<article><b>If the value is higher than baseline</b><p>' + esc(explanation.highAction) + '</p></article>' +
+        '<article><b>If the value is lower than baseline</b><p>' + esc(explanation.lowAction) + '</p></article>' +
+        '</div>' +
         (quickStart ? '<p class="wapor-starter-tag">★ ' + esc(quickStart) + '</p>' : '') +
         '<details class="mini-explanation"><summary>Time period, map scale and caution</summary>' +
         '<div class="wapor-mapset-meta"><span>' + esc(explanation.time) + '</span><span>' + esc(explanation.resolution) + '</span></div>' +
         '<p><b>Important:</b> ' + esc(explanation.caution) + '</p>' +
         '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open the original dataset details ↗</a></details>' +
+        '<button class="pixel-btn green wapor-point-fetch" data-wapor-point-btn="1" data-wapor-code="' + esc(explanation.code) + '" type="button">FETCH VALUES & TREND</button>' +
+        '<div class="wapor-point-status" id="wapor-status-' + esc(explanation.code) + '" aria-live="polite">Samples one pixel at the selected region’s representative point; no values are fabricated.</div>' +
+        '<div class="wapor-point-results" id="wapor-series-' + esc(explanation.code) + '"><p class="wapor-chart-empty">Click “Fetch values & trend” to retrieve actual raster values and compare them with earlier matching seasons.</p></div>' +
         '</article>';
     }).join('') + '</div>';
 
+    var pointAvailable = !!(currentProvince && geometryCentroid(currentProvince.feature));
+    var pointMessage = pointAvailable
+      ? 'Selected region: ' + String(currentProvince.name || 'current region') + '. Values will be sampled at an approximate representative point, not averaged over every pixel in the region.'
+      : 'Select a region on the map before requesting actual pixel values.';
     return '<section class="wapor-howto">' +
-      '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>How to see actual data for a place</h4></div></div>' +
-      '<ol><li>Open the official WaPOR map.</li><li>Start with <b>Rainfall</b>, <b>Relative soil moisture</b> or <b>Water leaving soil and plants</b>.</li><li>Search for a place, then choose a layer and date range.</li><li>Click a map cell or use the time-series option to inspect values over time.</li></ol>' +
-      '<p><b>Keep in mind:</b> WaPOR data are satellite/model estimates. The cards below explain available datasets; they are not measurements from the selected farm inside BackToNature.</p>' +
+      '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>From dataset description to real numbers</h4></div></div>' +
+      '<ol><li>Choose one layer and read what it measures.</li><li>Press <b>Fetch values & trend</b> on that card to sample actual WaPOR raster values at the selected region’s representative point.</li><li>Compare the latest value with the average from the same calendar period in the previous two years.</li><li>Use the high/low guidance as a question to check in the field—not as an automatic instruction to add water or fertilizer.</li></ol>' +
+      '<p class="wapor-point-selection">' + esc(pointMessage) + '</p>' +
+      '<p><b>Baseline is not a universal target.</b> Seasons, crops and landscape types differ. Some layers have a coarse pixel that may cover several fields; a value above or below the reference is a signal to investigate.</p>' +
       '<a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN INTERACTIVE WAPOR MAP ↗</a> ' +
       '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Read FAO’s data-access guide ↗</a>' +
       '</section>' +
       renderLearningGuide(
-        'The technical code is a short label for a kind of information. The large heading tells you what that layer means in everyday language.',
-        'Rainfall, soil wetness, water use and plant growth are related but are not the same measurement. Check dates, map scale and units before comparing them.',
-        'Choose one clear question first, open that layer in the official map, select your location and dates, and compare with field observations or local measurements.',
-        'Read the layer, not just the code'
+        'The card gives the meaning of the layer; the live query adds a number, an earlier-season reference and a line chart for the selected point.',
+        'Rainfall, soil moisture, water loss and plant growth are related but are not interchangeable. A higher number is not always better.',
+        'Read the current value and baseline together, check the date and map resolution, then verify any concern with field observations or local agricultural guidance.',
+        'What do the numbers say—and what do they not say?'
       ) +
       '<section class="wapor-catalog-block"><div class="wapor-catalog-heading"><h4>Available WaPOR datasets</h4><span>' + records.length + ' datasets from the live FAO catalogue</span></div>' + grid +
       '<p class="nature-method-note">Catalogue refreshed ' + esc(new Date(data.retrievedAt).toLocaleString()) +
-      '. Time step and spatial resolution differ by dataset. Open the dataset details to verify exact coverage before analysis.</p></section>';
+      '. Time step and spatial resolution differ by dataset. Pixel values are loaded only when you request them on an individual card.</p></section>';
   }
 
   function initNatureInlineMap(selection, selectionKey, point) {
@@ -2073,6 +2202,48 @@
       '<details class="technical-details"><summary>How to interpret this tab</summary><p>GBIF and iNaturalist show reported observations, not abundance. NASA POWER and Open-Meteo show gridded estimates, not in-situ measurements. A blank result often means the source did not return a record, not that no plants or water exist.</p><p>Use the data to ask a better field question, then verify on site. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">FAO WaPOR source guide ↗</a></p></details>';
   }
 
+  function wireWaporPointControls() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-wapor-point-btn]'), function (button) {
+      if (button.getAttribute('data-wapor-wired') === '1') return;
+      button.setAttribute('data-wapor-wired','1');
+      button.addEventListener('click', async function () {
+        var selection = currentProvince;
+        var point = selection && geometryCentroid(selection.feature);
+        var code = button.getAttribute('data-wapor-code') || '';
+        var resultNode = el('wapor-series-' + code);
+        var statusNode = el('wapor-status-' + code);
+        var api = window.BackToNatureAPI;
+        if (!point) {
+          if (statusNode) statusNode.textContent = 'Select a region first. No geographic point is available for this boundary.';
+          return;
+        }
+        if (!api || typeof api.fetchWaporPointSeries !== 'function') {
+          if (statusNode) statusNode.textContent = 'WaPOR point-sampling connector is unavailable. Refresh the page and retry.';
+          return;
+        }
+        button.disabled = true;
+        button.textContent = 'READING RASTER PIXELS…';
+        if (statusNode) statusNode.textContent = 'Requesting the official raster time series and sampling the selected point. This may take a little while; no sample values are inserted.';
+        if (resultNode) resultNode.innerHTML = '<p class="wapor-chart-empty">Loading time series and historical comparisons from the public WaPOR rasters…</p>';
+        try {
+          var result = await api.fetchWaporPointSeries(code, point.latitude, point.longitude);
+          if (currentProvince !== selection || currentTab !== 'nature') return;
+          if (resultNode) resultNode.innerHTML = renderWaporPointSeries(result);
+          if (statusNode) statusNode.textContent = result.sampledPeriods + ' recent period(s) with values loaded from the live WaPOR v3 raster. Point: ' +
+            Number(result.latitude).toFixed(4) + ', ' + Number(result.longitude).toFixed(4) + '.';
+          button.textContent = 'VALUES & TREND LOADED';
+        } catch (error) {
+          if (currentProvince !== selection || currentTab !== 'nature') return;
+          if (statusNode) statusNode.textContent = error && error.message ? error.message : 'The WaPOR point query failed.';
+          if (resultNode) resultNode.innerHTML = '<div class="wapor-query-error"><b>No value was substituted.</b><p>The raster could not be sampled for this point. You can still inspect the location in the official WaPOR map, or retry after checking your network connection.</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">Open official WaPOR map ↗</a></div>';
+          button.textContent = 'RETRY VALUES & TREND';
+        } finally {
+          if (currentProvince === selection && currentTab === 'nature') button.disabled = false;
+        }
+      });
+    });
+  }
+
   function wireNatureControls() {
     var selection = currentProvince;
     if (!selection) return;
@@ -2080,6 +2251,7 @@
     var point = geometryCentroid(selection.feature);
     initNatureInlineMap(selection, key, point);
     renderNatureObservationMarkers(key);
+    wireWaporPointControls();
 
     function updateAsyncConnector(config) {
       var button = el(config.buttonId);
@@ -2109,6 +2281,7 @@
             setLiveStatus(config.statusId, config.statusStore[key].message, 'success');
             var results = el(config.resultsId);
             if (results) results.innerHTML = config.render(result);
+            if (typeof config.afterRender === 'function') config.afterRender(result,key,selection);
           }
         } catch (error) {
           if (requestId !== config.requestCounter.value || currentProvince !== selection) return;
@@ -2184,7 +2357,8 @@
       loadingMessage:'Loading public WaPOR v3 dataset metadata…',
       successMessage:function(d){return (d.records||[]).length+' global WaPOR mapsets returned from the official catalog.';},
       failureMessage:'WaPOR catalogue request failed.',
-      render:renderWaporMapsetCatalog
+      render:renderWaporMapsetCatalog,
+      afterRender:function(){wireWaporPointControls();}
     });
 
     var identifyButton = el('plantnet-identify-btn');
