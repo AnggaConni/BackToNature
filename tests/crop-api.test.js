@@ -20,6 +20,12 @@ async function main() {
   assert.ok(appSource.includes('What does the recommendation actually mean?'), 'Quick Field Brief explains recommendations in plain language');
   assert.ok(appSource.includes('Do not drain peat to fit a crop'), 'Quick Field Brief includes a peat and fire safeguard');
   assert.ok(appSource.includes('function renderWaporPublicApiPanel()'), 'Sources has a live public WaPOR v3 catalog panel');
+  assert.ok(appSource.includes('function renderLearningGuide(meaning, connection, recommendation, heading)'), 'data views use a reusable plain-language learning guide');
+  assert.ok(appSource.includes('How is it connected?'), 'data views explain relationships between factors');
+  assert.ok(appSource.includes('What can I do next?'), 'data views include an actionable next step');
+  assert.ok(appSource.includes('See weather measurements'), 'technical climate figures are hidden behind progressive disclosure');
+  assert.ok(appSource.includes("['crossref-search-btn','country-wb-fetch-btn','wapor-source-fetch-btn']"), 'Sources auto-loads a small set of no-key public data sources');
+  assert.ok(appSource.includes('label:\'08 NATURE AROUND US\''), 'Nature tab uses plain-language navigation');
   assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
   assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
   assert.equal(typeof api.searchPlantImages, 'function', 'Commons image search is exported');
