@@ -676,10 +676,31 @@
   function renderFaoFoodPriceResults(data) {
     var records = data && Array.isArray(data.series) ? data.series : [];
     if (!records.length) {
-      return '<p>No matching FAO FPMA price series were returned for <b>' + esc(data && data.countryIso3 || '') +
-        '</b> and <b>' + esc(data && data.query || '') + '</b>. The country may have no published series for that commodity in the searched pages. Try a broader term such as maize, wheat, beans or onion.</p>' +
-        '<p class="nature-method-note">Searched ' + esc(data && data.searchedSeries || 0) + ' metadata series. No sample prices were substituted.</p>';
+      return renderLearningGuide(
+        'No matching published price series came back for this search. That does not mean the commodity has no price.',
+        'Price records depend on which market, product name, unit and time period the source publishes for a country.',
+        'Try another common name such as maize, wheat, beans or onion. If you find a series, compare only records with the same currency, unit and market type.',
+        'No price match found'
+      ) + '<p class="live-note">Searched ' + esc(data && data.searchedSeries || 0) + ' metadata series. No sample prices were substituted.</p>';
     }
+    var cards = records.map(function (record) {
+      var place = [record.market,record.priceType].filter(Boolean).join(' · ') || 'Market details not listed';
+      var latest = record.latest;
+      var latestText = latest ? formatPriceValue(latest.value,record.currency) : 'No published price value';
+      var priceMeta = [record.unit,record.periodicity].filter(Boolean).join(' · ');
+      var change = record.changePct90d == null ? 'Not enough comparable records' :
+        ((record.changePct90d > 0 ? '+' : '') + record.changePct90d.toFixed(1) + '%');
+      var changeMeaning = record.changePct90d == null ? 'There are not enough comparable dates to describe a change.' :
+        record.changePct90d > 0 ? 'The most recent reported price is higher than the comparison point.' :
+        record.changePct90d < 0 ? 'The most recent reported price is lower than the comparison point.' :
+        'The most recent reported price is about the same as the comparison point.';
+      return '<article class="simple-indicator-card"><h4>' + esc(record.commodity) + '</h4>' +
+        '<div class="simple-indicator-value">' + esc(latestText) + '</div>' +
+        '<p><b>Market:</b> ' + esc(place) + '</p><p><b>Reported:</b> ' + esc(latest && latest.date || 'date not provided') +
+        (priceMeta ? ' · ' + esc(priceMeta) : '') + '</p><p><b>Compared with around three months earlier:</b> ' + esc(change) + '</p>' +
+        '<details class="mini-explanation"><summary>What does this mean?</summary><p>' + esc(changeMeaning) +
+        ' This is a comparison of reported prices, not a forecast and not an explanation of why the price changed.</p></details></article>';
+    }).join('');
     var table = '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Commodity / market</th><th>Latest price</th><th>Observation date</th><th>90-day change</th><th>Series</th></tr></thead><tbody>';
     records.forEach(function (record) {
       var place = [record.market,record.priceType].filter(Boolean).join(' · ') || 'Market not specified in series metadata';
@@ -698,9 +719,16 @@
     table += '</tbody></table></div>';
     var errors = data.errors && data.errors.length
       ? '<p class="live-note">Some matching series could not return price history: ' + esc(data.errors.map(function (error) { return error.commodity + ': ' + error.message; }).join(' · ')) + '</p>' : '';
-    return table + errors + '<p class="live-note">Country ' + esc(data.countryIso3) + ' · searched ' + esc(data.searchedSeries) +
+    return renderLearningGuide(
+      'These are prices reported by a particular market source on particular dates, in the currency and unit shown. Different markets can report different prices.',
+      'Price changes can relate to season, transport, supply, demand and many other factors. This dataset describes what was reported; it does not establish the cause.',
+      'Compare like with like: same commodity, market type, unit, currency and dates. Check local market prices before making a buying or selling decision.',
+      'How to use food-price information'
+    ) + '<div class="simple-indicator-grid">' + cards + '</div>' +
+      '<details class="technical-details"><summary>See the complete price table and source series</summary>' + table + errors +
+      '<p class="live-note">Country ' + esc(data.countryIso3) + ' · searched ' + esc(data.searchedSeries) +
       ' metadata series · retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) +
-      '. A missing 90-day change means comparable observations were unavailable. Compare currency, unit, market level and reporting dates before drawing conclusions.</p>';
+      '. A missing 90-day change means comparable observations were unavailable.</p></details>';
   }
 
   function renderWaporPublicApiPanel() {
@@ -1016,40 +1044,97 @@
 
   function renderWorldBankAgricultureSnapshot(data) {
     var indicators = data && Array.isArray(data.indicators) ? data.indicators : [];
+    var explanations = {
+      'AG.LND.AGRI.ZS': {
+        title:'How much land is used for agriculture?',
+        meaning:'The share of a country’s total land area classified as agricultural land.',
+        connection:'A larger share does not automatically mean better soil, higher yields, or more land available for new farms.',
+        action:'Compare it with forest, water and land-cover information. Never use this national percentage to guess what a particular plot looks like.'
+      },
+      'AG.YLD.CREL.KG': {
+        title:'How much cereal is harvested per hectare?',
+        meaning:'An average cereal yield: how much grain is produced from a unit of harvested area.',
+        connection:'Yield can be affected by weather, soil, seed varieties, water, pests, farm inputs and measurement methods. This indicator alone cannot tell us the cause.',
+        action:'Use it for broad national context, then check crop-specific and province-level statistics and ask what conditions explain the difference.'
+      },
+      'AG.PRD.CROP.XD': {
+        title:'Is crop production rising or falling?',
+        meaning:'A crop production index that compares a country’s production level with a fixed reference period. It is an index, not tonnes of food.',
+        connection:'A change can reflect several crops together, not the harvest from one crop or one district.',
+        action:'Compare multiple years and open the original indicator notes before explaining why production changed.'
+      },
+      'NV.AGR.TOTL.ZS': {
+        title:'How much does agriculture contribute to the economy?',
+        meaning:'The percentage of national economic value added from agriculture, forestry and fishing.',
+        connection:'This is an economic share, not the income of an individual farmer. It can change because agriculture changes or other parts of the economy grow.',
+        action:'Pair it with employment, food prices and local livelihood evidence before making claims about farmers’ welfare.'
+      }
+    };
+    var cards = indicators.map(function (indicator) {
+      var info = explanations[indicator.id] || {
+        title:indicator.label || 'Agriculture indicator',
+        meaning:'The source reports a national-level statistic. Read the unit and year before interpreting it.',
+        connection:'A national number cannot describe every province, district or farm.',
+        action:'Open the source metadata, then compare it with a more local and recent source.'
+      };
+      var val = indicator.value == null ? 'No published value returned' :
+        Number(indicator.value).toLocaleString('en-US',{maximumFractionDigits:2}) + ' ' + (indicator.unit || '');
+      return '<article class="simple-indicator-card"><h4>' + esc(info.title) + '</h4>' +
+        '<div class="simple-indicator-value">' + esc(val) + '</div>' +
+        '<p><b>What it means:</b> ' + esc(info.meaning) + '</p>' +
+        '<details class="mini-explanation"><summary>Why it matters and what to do</summary><p><b>How it connects:</b> ' + esc(info.connection) + '</p><p><b>Next step:</b> ' + esc(info.action) + '</p></details>' +
+        '<small>Latest available year: ' + esc(indicator.year || 'not provided') + '</small></article>';
+    }).join('');
     var rows = indicators.map(function (indicator) {
       return '<tr><td><b>' + esc(indicator.label) + '</b><small>' + esc(indicator.id) + '</small></td>' +
         '<td>' + esc(indicator.value == null ? 'No value returned' : Number(indicator.value).toLocaleString('en-US',{maximumFractionDigits:2})) + '</td>' +
         '<td>' + esc(indicator.unit) + '</td><td>' + esc(indicator.year || '—') + '</td>' +
-        '<td><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(indicator.sourceUrl)) + '">API record ↗</a></td></tr>';
+        '<td><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(indicator.sourceUrl)) + '">Source record ↗</a></td></tr>';
     }).join('');
-    return '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Indicator</th><th>Latest value</th><th>Unit</th><th>Year</th><th>Source</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<p class="nature-method-note">Retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. ' +
-      (data.failedIndicators && data.failedIndicators.length ? 'Some indicator endpoints failed: ' + esc(data.failedIndicators.join(', ')) + '. ' : '') +
-      'World Bank values are country-level and may lag behind the current year.</p>';
+    return renderLearningGuide(
+      'These statistics describe a whole country, not the selected province or one farm. Each card explains what a particular indicator measures.',
+      'Land use, crop yield, overall production and agriculture’s economic role describe different parts of the food system. One indicator cannot explain the whole picture.',
+      'Use these figures as a starting point. Compare dates and units, open the source notes, and look for province-level statistics or field observations before making a local recommendation.',
+      'National data, local decisions'
+    ) + '<div class="simple-indicator-grid">' + cards + '</div>' +
+    '<details class="technical-details"><summary>See the exact figures, units, years and indicator codes</summary>' +
+    '<div class="live-table-wrap"><table class="live-table"><thead><tr><th>Indicator</th><th>Value</th><th>Unit</th><th>Year</th><th>Source</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="nature-method-note">Retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. ' +
+    (data.failedIndicators && data.failedIndicators.length ? 'Some indicator endpoints failed: ' + esc(data.failedIndicators.join(', ')) + '. ' : '') +
+    'World Bank values are national-level and the latest available year may lag behind the current year.</p></details>';
   }
-
-
 
   function renderCrossrefWorks(result) {
     var works = result && Array.isArray(result.works) ? result.works : [];
-    if (!works.length) return '<p>No matching publication metadata was returned. Try broader keywords or remove the location name.</p>';
-    return '<ul class="live-record-list">' + works.map(function (work) {
+    if (!works.length) return '<p>No matching publication records were found. Try simpler words or search without the region name.</p>';
+    var cards = works.map(function (work) {
       var title = esc(work.title || 'Untitled publication');
-      var meta = [work.year, work.type, work.journal].filter(Boolean).map(esc).join(' · ');
-      var authors = Array.isArray(work.authors) && work.authors.length ? work.authors.join(', ') : 'Author metadata not listed';
-      if (work.additionalAuthors) authors += ' +' + work.additionalAuthors + ' more';
+      var meta = [work.year, work.journal || work.publisher].filter(Boolean).map(esc).join(' · ');
       var linkMarkup = work.url
-        ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(work.url)) + '">Open DOI / publication record ↗</a>'
-        : '<small>No DOI or direct publication URL was supplied in this metadata record.</small>';
-      return '<li><b>' + title + '</b>' +
-        (meta ? '<small class="record-code">' + meta + '</small>' : '') +
-        '<p><b>Authors:</b> ' + esc(authors) + '</p>' +
-        (work.publisher ? '<small>Publisher: ' + esc(work.publisher) + '</small>' : '') +
-        '<div>' + linkMarkup + '</div></li>';
-    }).join('') + '</ul>' +
-      '<p class="live-note">Crossref reports ' + Number(result.totalResults || works.length).toLocaleString('en-US') +
-      ' matching metadata record(s). This is not a count of open-access full texts. Check the publisher\'s terms before reusing article content.</p>' +
-      '<small>Retrieved ' + esc(new Date(result.retrievedAt).toLocaleString()) + ' · Source: Crossref REST API</small>';
+        ? '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(work.url)) + '">Open publication ↗</a>'
+        : '<span class="live-note">No direct publication link was supplied.</span>';
+      var authors = Array.isArray(work.authors) && work.authors.length ? work.authors.join(', ') : 'Author details not listed';
+      if (work.additionalAuthors) authors += ' +' + work.additionalAuthors + ' more';
+      return '<article class="simple-publication-card"><h4>' + title + '</h4>' +
+        (meta ? '<p class="publication-meta">' + meta + '</p>' : '') +
+        '<p class="publication-help">This title may be relevant to your search. Open the record and check its abstract, study location, method and findings before using it as evidence.</p>' +
+        linkMarkup +
+        '<details class="mini-explanation"><summary>Bibliographic details</summary><p><b>Authors:</b> ' + esc(authors) + '</p>' +
+        (work.publisher ? '<p><b>Publisher:</b> ' + esc(work.publisher) + '</p>' : '') +
+        '<p><b>Record type:</b> ' + esc(work.type || 'publication') + '</p></details></article>';
+    }).join('');
+    return renderLearningGuide(
+      'These are publication records related to your search words. A title helps you decide what to open, but does not tell you whether the study supports a claim.',
+      'Research can explain what happened in a study setting. To apply it to this region, check whether its climate, soil, crop and farming conditions are similar.',
+      'Open a promising publication, read its abstract and methods, note where the study was done, then compare its findings with trusted local information and field observations.',
+      'Turn a search result into useful evidence'
+    ) +
+    '<p class="live-note">Showing ' + works.length + ' publication record(s) from ' + Number(result.totalResults || works.length).toLocaleString('en-US') +
+    ' matching metadata entries. Crossref metadata does not guarantee free full-text access.</p>' +
+    '<div class="simple-publication-grid">' + cards + '</div>' +
+    '<details class="technical-details"><summary>Search and retrieval details</summary><p>Search phrase: ' + esc(result.query) +
+    '<br>Retrieved: ' + esc(new Date(result.retrievedAt).toLocaleString()) +
+    '<br>Source: <a target="_blank" rel="noopener noreferrer" href="https://www.crossref.org/documentation/retrieve-metadata/rest-api/">Crossref REST API ↗</a></p></details>';
   }
 
   function renderCrossrefEvidencePanel(countryName) {
@@ -1317,6 +1402,19 @@
         el('live-fao-catalog-results').textContent = (error && error.message ? error.message : 'Unknown API error') + ' The request may be blocked by CORS or network policy. No fake records were substituted.';
       } finally { catBtn.disabled = false; }
     });
+
+    // Start a small set of public, no-key data lookups as soon as Sources opens.
+    // WOCAT and Pl@ntNet are excluded because they require user-provided credentials.
+    window.setTimeout(function () {
+      ['crossref-search-btn','country-wb-fetch-btn','wapor-source-fetch-btn'].concat(
+        currentSourceIso3 === 'IDN' ? ['live-faostat-btn'] : []
+      ).forEach(function (buttonId, index) {
+        window.setTimeout(function () {
+          var button = el(buttonId);
+          if (button && !button.disabled) button.click();
+        }, index * 180);
+      });
+    }, 80);
 
     var wocatBtn = el('live-wocat-btn');
     if (wocatBtn) wocatBtn.addEventListener('click', async function () {
@@ -2272,11 +2370,11 @@
     {id:'overview',label:'01 OVERVIEW',icon:'🏡'},
     {id:'soil',label:'02 SOIL & LAND',icon:'🧪'},
     {id:'crops',label:'03 CROPS',icon:'🌾'},
-    {id:'climate',label:'04 CLIMATE & PLANTING',icon:'🌦️'},
+    {id:'climate',label:'04 SEASONS',icon:'🌦️'},
     {id:'farming',label:'05 FARMING GUIDE',icon:'🚜'},
     {id:'technology',label:'06 TECHNOLOGY',icon:'🛠️'},
-    {id:'sources',label:'07 SOURCES',icon:'📚'},
-    {id:'nature',label:'08 NATURE DATA',icon:'🦋'}
+    {id:'sources',label:'07 DATA & RESEARCH',icon:'📚'},
+    {id:'nature',label:'08 NATURE AROUND US',icon:'🦋'}
   ];
   el('modal-tabs').innerHTML = tabs.map(function (t) {
     return '<button class="tab-btn" type="button" role="tab" aria-selected="false" data-tab="' + t.id + '">' + t.icon + ' ' + t.label + '</button>';
