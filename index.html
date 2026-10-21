@@ -597,7 +597,40 @@
     @media(max-width:850px){.learning-grid{grid-template-columns:1fr}.learning-item{padding:10px}.simple-indicator-grid,.simple-publication-grid{grid-template-columns:1fr}}
     @media print{.learning-guide{break-inside:avoid}.technical-details:not([open])>*:not(summary),.mini-explanation:not([open])>*:not(summary){display:none!important}}
 
-</style>
+
+    /* Practical learning cards: farming methods, transparent technology provenance and WaPOR's plain-language decoder. */
+    .farming-system-library{margin:18px 0 22px;padding:14px;background:#f6ecd0;border:3px solid #a98a52;box-shadow:3px 4px 0 rgba(0,0,0,.10)}
+    .farming-system-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+    .farming-system-card{min-width:0;padding:12px;background:#fff8df;border:2px solid #c4a86d;box-shadow:2px 3px 0 rgba(0,0,0,.08)}
+    .farming-system-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+    .farming-system-icon{display:grid;place-items:center;flex:none;width:37px;height:37px;background:#dfe9d1;border:1px solid #8da675;font-size:22px}
+    .farming-system-top .mini-code{font-size:8px;color:#7b5733;line-height:1.5}
+    .farming-system-card h4{margin:4px 0 7px;color:#57402a;font-size:19px;line-height:1.2}
+    .farming-system-card>p{margin:6px 0;font-size:13px;line-height:1.5}
+    .farming-system-details{margin-top:9px;padding:8px;background:#f4efdd;border:1px solid #ddcfaa}
+    .farming-system-details>summary{cursor:pointer;font-weight:800;font-size:12px;color:#4e6a39}
+    .farming-system-details[open]>summary{margin-bottom:7px}
+    .farming-system-details p{font-size:12px;line-height:1.5;margin:6px 0}
+    .farming-system-details>a{font-size:12px;font-weight:800}
+    .tech-method-note{margin:12px 0;padding:12px;background:#e9eedf;border:2px solid #91a77b;border-left:6px solid #527543}
+    .tech-method-note h3{margin:4px 0;color:#35512f;font-size:18px}
+    .tech-method-note p{margin:5px 0;font-size:13px;line-height:1.5}
+    .tech-reference-block{margin:14px 0;padding:13px;background:#e7edf0;border:2px solid #8fa7b9}
+    .tech-reference-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:9px}
+    .tech-reference-grid>a{display:flex;flex-direction:column;gap:5px;min-width:0;padding:10px;background:#fff8df;border:1px solid #c2a66b;color:#285783;text-decoration:none}
+    .tech-reference-grid>a:hover{background:#f1f5e9;border-color:#6b8752}
+    .tech-reference-grid>a>b{font-size:13px;line-height:1.35}
+    .tech-reference-grid>a>span{font-size:11px;line-height:1.45;color:#5a4b36}
+    .wapor-mapset-code{font-size:10px;line-height:1.35;color:#6f5738;font-weight:700;text-align:right;overflow-wrap:anywhere}
+    .wapor-plain-meaning{font-size:13px!important;line-height:1.5!important;color:#3d4e35}
+    .wapor-why{margin:8px 0;padding:8px;background:#eaf0e2;border-left:3px solid #77935e}
+    .wapor-why>b{display:block;font-size:11px;color:#49643a}
+    .wapor-why>p{margin:4px 0 0;font-size:12px;line-height:1.45}
+    .wapor-mapset-card .wapor-mapset-meta{margin:6px 0}
+    @media(max-width:850px){.farming-system-grid{grid-template-columns:1fr}.tech-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:560px){.tech-reference-grid{grid-template-columns:1fr}.farming-system-library{padding:9px}.farming-system-card{padding:9px}.wapor-mapset-code{text-align:left}}
+
+  </style>
 </head>
 <body>
   <div id="map" role="application" aria-label="Interactive world, region and district map"></div>
@@ -727,7 +760,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261021-gbif-wapor-map-v3"></script>
-  <script src="./app.js?v=20261021-gbif-wapor-map-v3"></script>
+  <script src="./api.js?v=20261021-farming-wapor-plain-v4"></script>
+  <script src="./app.js?v=20261021-farming-wapor-plain-v4"></script>
 </body>
 </html>
