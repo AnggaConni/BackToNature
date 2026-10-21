@@ -31,6 +31,9 @@
     'Species observations · GBIF + iNaturalist':natureObservationLayer
   }, { collapsed:true, position:'topright' }).addTo(map);
   var natureObservationLayerSelectionKey = '';
+  var natureInlineMap = null;
+  var natureInlineMarkerLayer = null;
+  var natureInlineMapSelectionKey = '';
 
   var worldLayer = null;
   var provinceLayer = null;
@@ -538,7 +541,7 @@
       var reasons = (best.reasons || []).slice(0,2).map(function (reason) { return '<li>' + esc(reason) + '</li>'; }).join('');
       var cautions = (best.cautions || []).slice(0,2).map(function (caution) { return '<li>' + esc(caution) + '</li>'; }).join('');
       return '<article class="climate-crop-card">' +
-        '<div id="climate-photo-' + esc(crop.id) + '" class="climate-crop-photo"><div class="crop-image-placeholder"><span>🌱</span><b>Plant reference</b><small>Image loads from Wikimedia Commons</small></div></div>' +
+        '<div id="climate-photo-' + esc(crop.id) + '" class="climate-crop-photo"><div class="crop-image-placeholder"><span>🌱</span><b>Plant reference</b><small>Looking for a GBIF species photo first</small></div></div>' +
         '<div class="climate-crop-body"><div class="climate-crop-heading"><span class="data-tag green">SEASON SHORTLIST ' + String(index + 1).padStart(2,'0') + '</span></div>' +
         '<h3>' + esc(crop.name) + '</h3><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
         '<p class="climate-start-month"><strong>Season to investigate:</strong> ' + esc(best.month || 'Not identified') + ' · about ' + esc(best.durationMonths || crop.climateRule && crop.climateRule.months || '—') + ' month(s)</p>' +
@@ -577,6 +580,39 @@
       '<p>Wind speed and gust figures are historical reference values, not storm forecasts. Historical weather source: <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs/historical-weather-api">Open-Meteo Historical Weather API</a>. Crop temperature/rainfall bands are provisional app rules, not a verified global agronomic model. Confirm with local extension and soil tests.</p></details>';
   }
 
+  function renderPlantImageCandidates(slot, credit, images, altText) {
+    if (!slot) return;
+    var candidates = Array.isArray(images) ? images.slice() : [];
+    function tryCandidate(index) {
+      if (index >= candidates.length) {
+        slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>No usable photo could be loaded</b><small>Try the source record or the photo-search link below.</small></div>';
+        if (credit) credit.textContent = 'No image URL could be loaded. Photo availability and reuse terms depend on the original record.';
+        return;
+      }
+      var image = candidates[index] || {};
+      var imageUrl = safeHttps(image.imageUrl);
+      var fileUrl = safeHttps(image.fileUrl);
+      if (imageUrl === '#' || fileUrl === '#') { tryCandidate(index + 1); return; }
+      slot.innerHTML = '<a class="crop-image-link" href="' + esc(fileUrl) + '" target="_blank" rel="noopener noreferrer" title="Open the source record and photo details"><img src="' + esc(imageUrl) + '" alt="' + esc(altText || image.title || 'Plant reference photo') + '" loading="lazy" decoding="async"><span class="crop-image-open">OPEN SOURCE PHOTO ↗</span></a>';
+      var imageNode = slot.querySelector('img');
+      if (!imageNode) return;
+      imageNode.onload = function () {
+        if (slot.querySelector('img') !== imageNode || !credit) return;
+        var licenseHref = safeHttps(image.licenseUrl);
+        var sourceName = String(image.source || 'public data');
+        var licenseText = String(image.license || 'Check the source record');
+        credit.innerHTML = 'Photo source: <b>' + esc(sourceName) + '</b> · <a target="_blank" rel="noopener noreferrer" href="' + esc(fileUrl) + '">open record ↗</a><br>Credit: ' +
+          esc(image.artist || 'See source record') + ' · License: ' +
+          (licenseHref !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(licenseHref) + '">' + esc(licenseText) + '</a>' : esc(licenseText));
+      };
+      imageNode.onerror = function () {
+        if (slot.querySelector('img') !== imageNode) return;
+        tryCandidate(index + 1);
+      };
+    }
+    tryCandidate(0);
+  }
+
   async function loadClimateCropPhotos(recommendations, selection) {
     var api = window.BackToNatureAPI;
     if (!api || !api.searchPlantImages) return;
@@ -592,26 +628,19 @@
           if (requestId !== climatePhotoRequestId || currentProvince !== selection) return;
           var slot = el('climate-photo-' + crop.id);
           var credit = el('climate-credit-' + crop.id);
-          if (!slot || !images.length) {
-            if (credit && !images.length) credit.textContent = 'No suitable reference photo returned. Use the photo search link below.';
+          if (!slot) return;
+          if (!images.length) {
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>No public photo found</b><small>Open the species search link below.</small></div>';
+            if (credit) credit.textContent = 'No usable image was returned from GBIF or the fallback photo library.';
             return;
           }
-          var image = images[0];
-          var imageUrl = safeHttps(image.imageUrl);
-          var fileUrl = safeHttps(image.fileUrl);
-          if (imageUrl === '#' || fileUrl === '#') return;
-          slot.innerHTML = '<a class="crop-image-link" href="' + esc(fileUrl) + '" target="_blank" rel="noopener noreferrer" title="Open the original image and its license"><img src="' + esc(imageUrl) + '" alt="' + esc(crop.name + ' (' + crop.scientific + ')') + '" loading="lazy" decoding="async"><span class="crop-image-open">OPEN IMAGE ↗</span></a>';
-          var imageNode = slot.querySelector('img');
-          if (imageNode) imageNode.addEventListener('error', function () {
-            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo unavailable</b><small>Open the original file page to investigate.</small></div>';
-          }, { once:true });
-          var licenseHref = safeHttps(image.licenseUrl);
-          if (credit) credit.innerHTML = 'Photo: <a target="_blank" rel="noopener noreferrer" href="' + esc(fileUrl) + '">' + esc(image.title.replace(/^File:/,'') ) + '</a><br>Credit: ' + esc(image.artist) + ' · License: ' +
-            (licenseHref !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(licenseHref) + '">' + esc(image.license) + '</a>' : esc(image.license));
+          renderPlantImageCandidates(slot, credit, images, crop.name + ' (' + crop.scientific + ')');
         } catch (_) {
           if (requestId !== climatePhotoRequestId || currentProvince !== selection) return;
+          var failedSlot = el('climate-photo-' + crop.id);
           var failedCredit = el('climate-credit-' + crop.id);
-          if (failedCredit) failedCredit.textContent = 'Photo lookup is unavailable; use the photo search link below.';
+          if (failedSlot) failedSlot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo lookup unavailable</b><small>Check the connection, then open the source search.</small></div>';
+          if (failedCredit) failedCredit.textContent = 'Photo search is temporarily unavailable. The crop and season screening still work without an image.';
         }
       }));
     }
@@ -823,7 +852,7 @@
         return '<li>' + esc(caution) + '</li>';
       }).join('');
       return '<article class="crop-match-card">' +
-        '<div class="crop-match-image" id="crop-image-' + esc(crop.id) + '"><div class="crop-image-placeholder"><span>🌱</span><b>Searching plant photos…</b><small>Wikimedia Commons</small></div></div>' +
+        '<div class="crop-match-image" id="crop-image-' + esc(crop.id) + '"><div class="crop-image-placeholder"><span>🌱</span><b>Searching GBIF for a plant photo…</b><small>Public biodiversity records first</small></div></div>' +
         '<div class="crop-match-body">' +
         '<div class="crop-match-topline"><span class="data-tag green">CROP IDEA ' + String(index + 1).padStart(2, '0') + '</span></div>' +
         '<h4>' + esc(crop.name) + '</h4><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
@@ -847,13 +876,11 @@
   async function loadCropPhotos(crops, requestId) {
     var api = window.BackToNatureAPI;
     if (!api || !api.searchPlantImages) {
-      cropLabStatus('Crop matches are ready, but the photo API is not available. Reload the page and try again.', 'error');
+      cropLabStatus('Crop matches are ready, but the public photo lookup is unavailable. Reload the page and try again.', 'error');
       return;
     }
-
     var successCount = 0;
     var errorCount = 0;
-    // Limit concurrent requests to reduce load on Commons; the API is also cached in memory.
     for (var i = 0; i < Math.min(crops.length, 4); i += 2) {
       var batch = crops.slice(i, i + 2);
       await Promise.all(batch.map(async function (crop) {
@@ -864,46 +891,26 @@
           var credit = el('crop-credit-' + crop.id);
           if (!slot) return;
           if (!images.length) {
-            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌿</span><b>No suitable public photo found</b><small>Try another crop or search the Commons file library.</small></div>';
-            if (credit) credit.innerHTML = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search more photos ↗</a>';
+            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>No public photo found</b><small>Try the photo-search link below.</small></div>';
+            if (credit) credit.innerHTML = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.gbif.org/occurrence/search?scientific_name=' + encodeURIComponent(crop.scientific) + '">Search species observations on GBIF ↗</a> · <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search Commons ↗</a>';
             return;
           }
-          var image = images[0];
-          var imageUrl = safeHttps(image.imageUrl);
-          var fileUrl = safeHttps(image.fileUrl);
-          if (imageUrl === '#' || fileUrl === '#') {
-            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo URL unavailable</b></div>';
-            return;
-          }
-          slot.innerHTML = '<a class="crop-image-link" href="' + esc(fileUrl) + '" target="_blank" rel="noopener noreferrer" title="Open the original image and its license"><img src="' + esc(imageUrl) + '" alt="' + esc(crop.name + ' (' + crop.scientific + ')') + '" loading="lazy" decoding="async"><span class="crop-image-open">OPEN IMAGE ↗</span></a>';
-          var imgNode = slot.querySelector('img');
-          if (imgNode) imgNode.addEventListener('error', function () {
-            slot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo could not be loaded</b><small>Open the source file page to check availability.</small></div>';
-          }, { once:true });
-          if (credit) {
-            var licenseHref = safeHttps(image.licenseUrl);
-            credit.innerHTML = 'Photo: <a target="_blank" rel="noopener noreferrer" href="' + esc(fileUrl) + '">' + esc(image.title.replace(/^File:/, '')) + '</a><br>Credit: ' + esc(image.artist) + ' · License: ' +
-              (licenseHref !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(licenseHref) + '">' + esc(image.license) + '</a>' : esc(image.license));
-          }
+          renderPlantImageCandidates(slot, credit, images, crop.name + ' (' + crop.scientific + ')');
           successCount++;
         } catch (_) {
           if (requestId !== cropLabRequestId) return;
           errorCount++;
           var failedSlot = el('crop-image-' + crop.id);
-          if (failedSlot) failedSlot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo search unavailable</b><small>Crop matching still works without photos.</small></div>';
+          var failedCredit = el('crop-credit-' + crop.id);
+          if (failedSlot) failedSlot.innerHTML = '<div class="crop-image-placeholder"><span>🌱</span><b>Photo lookup unavailable</b><small>Try again when the source is reachable.</small></div>';
+          if (failedCredit) failedCredit.textContent = 'No sample image was substituted. You can still review the crop screening and open a public species search.';
         }
       }));
     }
-    if (requestId !== cropLabRequestId) return;
-    crops.slice(4).forEach(function (crop) {
-      var slot = el('crop-image-' + crop.id);
-      var credit = el('crop-credit-' + crop.id);
-      if (slot) slot.innerHTML = '<div class="crop-image-placeholder"><span>🌿</span><b>Photo search not run</b><small>To keep requests modest, photos load for the first four matches.</small></div>';
-      if (credit) credit.innerHTML = '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&amp;search=' + encodeURIComponent(crop.scientific) + '">Search photos on Commons ↗</a>';
-    });
-    if (successCount && errorCount) cropLabStatus('Crop screening complete. Some photo searches were blocked or returned no image; available images show their source and license.', 'success');
-    else if (successCount) cropLabStatus('Crop screening complete. Open each photo source to review image identity, attribution and license.', 'success');
-    else cropLabStatus('Crop matches are ready, but photo lookup did not return any usable images. Check the connection or open Wikimedia Commons manually.', 'pending');
+    if (requestId === cropLabRequestId) {
+      var note = el('crop-photo-status');
+      if (note) note.textContent = successCount + ' crop photo searches returned candidates; ' + errorCount + ' request(s) could not be completed. GBIF is checked first and Wikimedia Commons is only a fallback.';
+    }
   }
 
   function wireCropLab(profile) {
@@ -1597,30 +1604,126 @@
 
   function renderWaporMapsetCatalog(data) {
     var records = data && Array.isArray(data.records) ? data.records : [];
-    if (!records.length) return '<p>No WaPOR datasets were returned by the official catalogue.</p>';
+    if (!records.length) {
+      return '<section class="wapor-howto"><h4>No dataset list returned</h4><p>The official catalogue request returned no records this time. You can still open the FAO WaPOR Portal directly.</p><a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN WAPOR PORTAL ↗</a></section>';
+    }
     var grid = '<div class="wapor-mapset-grid">' + records.map(function (record) {
-      var keyText = /AETI/.test(record.code) ? 'Water that leaves land and plants through evaporation and transpiration' :
-        /RET/.test(record.code) ? 'Reference estimate of how much water could evaporate from a well-watered surface' :
-        /RSM/.test(record.code) ? 'Estimated relative wetness of the soil' :
-        /NPP/.test(record.code) ? 'An indicator of plant growth and biomass production' :
-        /PCP/.test(record.code) ? 'Precipitation / rainfall' : 'Water or land indicator';
+      var code = String(record.code || '');
+      var keyText = /AETI/.test(code) ? 'Water leaving soil and plants through evaporation and transpiration. Helpful context for water use, but not a direct irrigation prescription.' :
+        /RET/.test(code) ? 'A reference estimate of water that could evaporate from a well-watered surface. It is not the same as crop water need.' :
+        /RSM/.test(code) ? 'A relative indicator of how wet the soil appears in the satellite/model data.' :
+        /NPP/.test(code) ? 'An indicator linked to plant growth and biomass production.' :
+        /PCP/.test(code) ? 'Rainfall estimated from gridded data; it may differ from rain measured on your farm.' : 'An environmental indicator derived from satellite/model data.';
+      var starter = /PCP/.test(code) ? 'Start here to explore rainfall' :
+        /RSM/.test(code) ? 'Start here to explore relative soil moisture' :
+        /AETI/.test(code) ? 'Explore water loss from soil and plants' :
+        /NPP/.test(code) ? 'Explore plant growth' : '';
       return '<article class="wapor-mapset-card">' +
-        '<div class="wapor-mapset-heading"><span class="mini-code">' + esc(record.code) + '</span><span class="wapor-level-tag">' + esc(record.level) + '</span></div>' +
-        '<h4>' + esc(record.caption) + '</h4><p>' + esc(keyText) + '.</p>' +
-        '<details class="mini-explanation"><summary>Dataset coverage and technical details</summary>' +
+        '<div class="wapor-mapset-heading"><span class="mini-code">' + esc(code) + '</span><span class="wapor-level-tag">' + esc(record.level) + '</span></div>' +
+        '<h4>' + esc(record.caption) + '</h4><p>' + esc(keyText) + '</p>' +
+        (starter ? '<p class="wapor-starter-tag">★ ' + esc(starter) + '</p>' : '') +
+        '<details class="mini-explanation"><summary>Coverage, dates and technical details</summary>' +
         '<div class="wapor-mapset-meta"><span>' + esc(record.temporalResolution) + '</span><span>' + esc(record.resolutionNote) + '</span></div>' +
-        '<p>Check the time period and map resolution before comparing this dataset with local measurements.</p>' +
-        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open dataset catalogue ↗</a></details>' +
+        '<p>Before using it, check that your location and dates are covered. Coarser map cells can hide differences between nearby fields.</p>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open this dataset’s metadata/API ↗</a></details>' +
         '</article>';
     }).join('') + '</div>';
-    return renderLearningGuide(
-      'WaPOR lists satellite and model-based datasets about rainfall, soil moisture, water use and plant growth. Loading this catalogue does not measure the selected farm.',
-      'These layers can provide broad environmental context. Their usefulness depends on where they cover, how detailed the map is and which dates it represents.',
-      'Choose the variable and date range you need, open its coverage information, and compare it with field notes or local measurements before using it in a decision.',
-      'What are these water and vegetation layers?'
-    ) + '<details class="technical-details"><summary>Explore the available WaPOR datasets</summary>' + grid +
-      '<p class="nature-method-note">Catalogue metadata retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) +
-      '. These links list dataset metadata; no value for the selected point has been extracted.</p></details>';
+
+    return '<section class="wapor-howto">' +
+      '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>How to see real data for a place</h4></div></div>' +
+      '<ol><li>Open the official WaPOR map.</li><li>Choose a layer—for a first look, try <b>Precipitation (rain)</b>, <b>Relative Soil Moisture</b> or <b>Actual Evapotranspiration</b>.</li><li>Search for a place or enter its latitude and longitude, then click a point on the map.</li><li>Choose a date range to inspect its value or a point time series.</li></ol>' +
+      '<p><b>Important:</b> the list below is the dataset catalogue (what data exists and at what scale). It is not yet a measured value for the selected farm inside BackToNature.</p>' +
+      '<a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN INTERACTIVE WAPOR MAP ↗</a> ' +
+      '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Read FAO’s data-access guide ↗</a>' +
+      '</section>' +
+      renderLearningGuide(
+        'Each card is a kind of water or vegetation information created from satellite observations and models. Rainfall, soil moisture and plant growth describe different things.',
+        'The layers can help you ask better questions, but their coverage, map resolution and dates matter. A 300-metre pixel can cover more than one type of land.',
+        'Choose one variable first, open it in the official map, select the location and dates, then compare the result with field observations before making decisions.',
+        'Which dataset should I choose?'
+      ) +
+      '<section class="wapor-catalog-block"><div class="wapor-catalog-heading"><h4>Available WaPOR datasets</h4><span>' + records.length + ' datasets from the live FAO catalogue</span></div>' + grid +
+      '<p class="nature-method-note">Catalogue refreshed ' + esc(new Date(data.retrievedAt).toLocaleString()) +
+      '. BackToNature lists the available layers here; actual pixel values and time-series analysis are opened in the official WaPOR map.</p></section>';
+  }
+
+  function initNatureInlineMap(selection, selectionKey, point) {
+    var node = el('nature-observation-map');
+    if (!node || !window.L) return;
+    if (natureInlineMap) {
+      natureInlineMap.remove();
+      natureInlineMap = null;
+      natureInlineMarkerLayer = null;
+    }
+    var lat = point && Number(point.latitude);
+    var lon = point && Number(point.longitude);
+    var validCenter = Number.isFinite(lat) && Number.isFinite(lon);
+    natureInlineMap = L.map(node, { scrollWheelZoom:false, worldCopyJump:true });
+    natureInlineMap.setView(validCenter ? [lat,lon] : [0,0], validCenter ? 8 : 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:18,
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>'
+    }).addTo(natureInlineMap);
+    natureInlineMarkerLayer = L.layerGroup().addTo(natureInlineMap);
+    natureInlineMapSelectionKey = selectionKey;
+    renderNatureInlineMarkers(selectionKey);
+    window.setTimeout(function () {
+      if (natureInlineMap) natureInlineMap.invalidateSize();
+    }, 100);
+  }
+
+  function renderNatureInlineMarkers(selectionKey) {
+    if (!natureInlineMap || !natureInlineMarkerLayer || selectionKey !== natureInlineMapSelectionKey) return 0;
+    natureInlineMarkerLayer.clearLayers();
+    var gbif = natureOccurrenceDataBySelection[selectionKey];
+    var inat = natureINaturalistDataBySelection[selectionKey];
+    var markerCount = 0;
+    var seen = {};
+
+    function addRecord(record, source) {
+      if (!record) return;
+      var lat = Number(record.latitude);
+      var lon = Number(record.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+      var sourceId = String(record.key || record.id || '');
+      var identity = source + ':' + (sourceId || String(record.scientificName || '') + ':' + lat.toFixed(5) + ':' + lon.toFixed(5));
+      if (seen[identity]) return;
+      seen[identity] = true;
+      var name = String(record.vernacularName || record.commonName || record.scientificName || 'Unidentified species');
+      var sourceUrl = safeHttps(record.sourceUrl || record.uri);
+      var date = String(record.eventDate || record.observedOn || '');
+      var popup = '<div class="nature-map-popup"><span class="nature-map-popup-source">' + esc(source === 'GBIF' ? 'GBIF RECORD' : 'iNATURALIST OBSERVATION') + '</span>' +
+        '<h3>' + esc(name) + '</h3><p><i>' + esc(record.scientificName || name) + '</i></p>' +
+        (date ? '<p><b>Date:</b> ' + esc(date) + '</p>' : '') +
+        (record.locality ? '<p>' + esc(record.locality) + '</p>' : '') +
+        '<p class="nature-map-popup-note">This is a reported observation, not a complete survey.</p>' +
+        (sourceUrl !== '#' ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(sourceUrl) + '">Open source record ↗</a>' : '') + '</div>';
+      var marker = L.circleMarker([lat,lon], {
+        radius:source === 'GBIF' ? 6 : 5,
+        color:source === 'GBIF' ? '#2e6b45' : '#2367a8',
+        weight:2,
+        fillColor:source === 'GBIF' ? '#70b778' : '#6ab5ef',
+        fillOpacity:0.9
+      });
+      marker.bindPopup(popup, { maxWidth:260 });
+      marker.addTo(natureInlineMarkerLayer);
+      markerCount++;
+    }
+
+    var gbifRecords = gbif && Array.isArray(gbif.observations) ? gbif.observations :
+      (gbif && Array.isArray(gbif.records) ? gbif.records : []);
+    gbifRecords.forEach(function (record) { addRecord(record, 'GBIF'); });
+    (inat && Array.isArray(inat.records) ? inat.records : []).forEach(function (record) { addRecord(record, 'iNaturalist'); });
+
+    var summary = el('nature-map-summary');
+    if (summary) summary.textContent = markerCount
+      ? 'Showing ' + markerCount + ' mapped observations returned by the live sources. A point means a record exists—not that a species is common.'
+      : 'No mapped observations yet. The map will update when GBIF or iNaturalist returns records with coordinates.';
+    if (markerCount && natureInlineMarkerLayer.getLayers().length) {
+      var bounds = natureInlineMarkerLayer.getBounds();
+      if (bounds && bounds.isValid()) natureInlineMap.fitBounds(bounds.pad(0.15), { maxZoom:11 });
+    }
+    return markerCount;
   }
 
   function renderNatureObservationMarkers(selectionKey) {
@@ -1683,9 +1786,12 @@
       markerCount += 1;
     }
 
-    (gbif && Array.isArray(gbif.records) ? gbif.records : []).forEach(function (record) { addRecord(record,'GBIF'); });
+    var gbifRecords = gbif && Array.isArray(gbif.observations) ? gbif.observations :
+      (gbif && Array.isArray(gbif.records) ? gbif.records : []);
+    gbifRecords.forEach(function (record) { addRecord(record,'GBIF'); });
     (inat && Array.isArray(inat.records) ? inat.records : []).forEach(function (record) { addRecord(record,'iNaturalist'); });
 
+    renderNatureInlineMarkers(selectionKey);
     if (markerCount) {
       natureObservationLayer.addTo(map);
     } else if (map.hasLayer(natureObservationLayer)) {
@@ -1725,6 +1831,11 @@
       '<h3>Plant reports nearby</h3><p>Find georeferenced plant reports within about 25 km. They document reported presence, not how many plants exist or whether they are suitable crops.</p>' +
       '<button id="nature-gbif-btn" class="pixel-btn green" type="button">↻ REFRESH PLANT REPORTS</button>' +
       '<div id="nature-gbif-status" class="live-status ' + esc(occurrenceStatus.type) + '" aria-live="polite">' + esc(occurrenceStatus.message) + '</div>' +
+      '<section class="nature-inline-map-wrap" aria-label="Biodiversity observation map">' +
+      '<div class="nature-inline-map-heading"><b>Where were plants reported?</b><span class="mini-code">MAP OF OBSERVATIONS</span></div>' +
+      '<p>Each dot is a georeferenced report, not a count of all plants. Green dots are GBIF records; blue dots are iNaturalist observations.</p>' +
+      '<div id="nature-observation-map" class="nature-inline-map" role="region" aria-label="Interactive map of nearby biodiversity records"></div>' +
+      '<p id="nature-map-summary" class="nature-inline-map-summary">Loading nearby records…</p></section>' +
       '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Nearby plant reports will appear here when the search finishes.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://techdocs.gbif.org/en/openapi/v1/occurrence">GBIF Occurrence API ↗</a></p></article>' +
       '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">INATURALIST / PLANTS</span></div>' +
@@ -1770,6 +1881,7 @@
     if (!selection) return;
     var key = climateSelectionKey(selection);
     var point = geometryCentroid(selection.feature);
+    initNatureInlineMap(selection, key, point);
     renderNatureObservationMarkers(key);
 
     function updateAsyncConnector(config) {
@@ -1936,6 +2048,12 @@
     var profile = profileFor(currentProvince.name);
     var content = el('modal-content');
     if (!content) return;
+    if (natureInlineMap) {
+      natureInlineMap.remove();
+      natureInlineMap = null;
+      natureInlineMarkerLayer = null;
+      natureInlineMapSelectionKey = '';
+    }
     currentTab = tab;
     content.innerHTML = tab === 'overview' ? renderOverview(profile) :
       tab === 'soil' ? renderSoil(profile) :
