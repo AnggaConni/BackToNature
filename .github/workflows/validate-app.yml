@@ -7,11 +7,17 @@ on:
       - "app.js"
       - "api.js"
       - "tests/crop-api.test.js"
+      - "field-log.js"
+      - "field-log.html"
+      - "tests/field-log.test.js"
       - ".github/workflows/validate-app.yml"
   pull_request:
     paths:
       - "app.js"
       - "api.js"
+      - "field-log.js"
+      - "field-log.html"
+      - "tests/field-log.test.js"
       - ".github/workflows/validate-app.yml"
   workflow_dispatch:
 
@@ -30,7 +36,12 @@ jobs:
           node --check app.js
           node --check api.js
           node --check tests/crop-api.test.js
+          node --check field-log.js
+          node --check tests/field-log.test.js
           echo "JavaScript syntax is valid."
 
       - name: Smoke test crop screener and photo API mapping
         run: node tests/crop-api.test.js
+
+      - name: Smoke test My Plot Field Log exports
+        run: node tests/field-log.test.js
