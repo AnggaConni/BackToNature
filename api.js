@@ -1455,7 +1455,8 @@
       throw new Error('A valid selected-region coordinate is required.');
     }
     var meta = getWaporPointMeta(code);
-    var cacheKey = code + '|' + lat.toFixed(4) + '|' + lon.toFixed(4);
+    var maxPeriods = Math.min(12, Math.max(4, Math.round(Number(options && options.maxPeriods) || 12)));
+    var cacheKey = code + '|' + lat.toFixed(4) + '|' + lon.toFixed(4) + '|periods:' + maxPeriods;
     if (!(options && options.forceRefresh) && WAPOR_POINT_SERIES_CACHE[cacheKey]) {
       return WAPOR_POINT_SERIES_CACHE[cacheKey];
     }
@@ -1463,7 +1464,8 @@
     var pending = (async function () {
       var allRasters = await collectWaporRasters(code);
       if (!allRasters.length) throw new Error('The official raster catalogue returned no dated files for this layer.');
-      var recent = allRasters.slice(-12);
+      var maxPeriods = Math.min(12, Math.max(4, Math.round(Number(options && options.maxPeriods) || 12)));
+      var recent = allRasters.slice(-maxPeriods);
       var required = {};
       recent.forEach(function (item) { required[item.code] = item; });
       var historicalByRecentCode = {};
