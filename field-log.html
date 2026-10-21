@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#31472d">
+  <meta name="description" content="Offline-first field notes for plots, soil, water, GPS, photos, and sustainable agriculture.">
+  <link rel="icon" type="image/jpeg" href="./favicon.jpg">
+  <title>My Plot Field Log — BackToNature</title>
+  <style>
+    :root{--forest:#30472d;--leaf:#527744;--leaf-light:#e4efd9;--wood:#825431;--cream:#fff7e2;--paper:#f3e7c7;--line:#d8c79d;--ink:#2f352a;--muted:#68715f;--danger:#a84130;--blue:#264f7a;--shadow:rgba(42,37,24,.12)}
+    *{box-sizing:border-box}
+    body{margin:0;background:#e8e5d6;color:var(--ink);font:15px/1.55 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:#235b85}
+    button,input,select,textarea{font:inherit}
+    button,a{touch-action:manipulation}
+    button{cursor:pointer}
+    .site-header{background:linear-gradient(135deg,#243b26,#48663a);color:#fff6d9;padding:24px 18px;border-bottom:5px solid #b89560}
+    .site-header-inner{max-width:1160px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand-icon{display:grid;place-items:center;width:52px;height:52px;background:#e5efd8;border:3px solid #a3be81;border-radius:10px;font-size:28px}
+    .eyebrow{text-transform:uppercase;font-size:11px;letter-spacing:.14em;font-weight:800;color:#d7e9bd}
+    h1{font-size:clamp(27px,4vw,38px);line-height:1.1;margin:3px 0 5px}
+    .header-copy{margin:0;color:#e4edda;max-width:680px}
+    .header-links{display:flex;flex-wrap:wrap;gap:8px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border:2px solid #6e8b55;border-radius:8px;background:#50733e;color:#fff9e6;text-decoration:none;font-weight:800}
+    .btn:hover{filter:brightness(1.08)}
+    .btn.secondary{background:#fff6dc;color:#403321;border-color:#b6a175}
+    .btn.blue{background:#244a72;border-color:#183550}
+    .btn.danger{background:#fff0e9;color:#8e2d20;border-color:#d9a99a}
+    .btn.small{padding:6px 9px;font-size:13px}
+    main{max-width:1160px;margin:22px auto;padding:0 16px 44px}
+    .notice{padding:12px 14px;border:1px solid #b3c9a1;background:#eef4e6;border-radius:10px;margin-bottom:16px;color:#344a2d}
+    .notice strong{display:block;margin-bottom:2px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:18px;align-items:start}
+    .panel{background:#fffdf6;border:1px solid var(--line);border-radius:13px;box-shadow:0 5px 18px var(--shadow);overflow:hidden;min-width:0}
+    .panel-heading{padding:16px 18px;background:#f4ebd3;border-bottom:1px solid var(--line)}
+    .panel-heading h2{font-size:20px;margin:0 0 3px}
+    .panel-heading p{margin:0;color:var(--muted);font-size:13px}
+    .panel-body{padding:17px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+    .field{min-width:0}
+    .field.full{grid-column:1/-1}
+    label{display:block;margin-bottom:5px;font-size:13px;font-weight:800;color:#49533f}
+    input,select,textarea{width:100%;min-width:0;padding:10px 11px;border:1px solid #c9bd9e;border-radius:7px;background:#fffef9;color:var(--ink);outline-offset:2px}
+    input:focus,select:focus,textarea:focus{outline:2px solid #89a96b;border-color:#527744}
+    textarea{resize:vertical;min-height:90px}
+    input[type=file]{padding:8px;background:#faf6e9}
+    .hint{font-size:12px;color:var(--muted);margin-top:5px}
+    .gps-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+    .form-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:17px}
+    .status{min-height:24px;margin-top:9px;font-size:13px;color:#526347}
+    .status.error{color:var(--danger)}
+    .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:9px}
+    .photo-item{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f2ead6}
+    .photo-item img{display:block;width:100%;height:82px;object-fit:cover}
+    .photo-item small{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;padding:5px;font-size:10px}
+    .photo-item button{position:absolute;right:4px;top:4px;padding:3px 6px;border:0;border-radius:4px;background:rgba(50,36,27,.85);color:#fff}
+    .list-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:13px}
+    .list-toolbar input{flex:1;min-width:160px}
+    .record-card{padding:13px;border:1px solid #dbcfaf;border-radius:10px;background:#fffaf0;margin-bottom:10px}
+    .record-top{display:flex;justify-content:space-between;gap:10px;align-items:start}
+    .record-card h3{margin:0;font-size:17px;line-height:1.3;overflow-wrap:anywhere}
+    .record-meta{font-size:12px;color:var(--muted);margin:4px 0 8px}
+    .record-tags{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0}
+    .tag{font-size:11px;font-weight:700;padding:3px 7px;border-radius:99px;background:#e8efdf;color:#3e5a32}
+    .record-card p{font-size:13px;margin:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+    .record-preview-photo{width:58px;height:58px;object-fit:cover;border-radius:7px;border:1px solid var(--line);flex:none}
+    .record-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+    .empty-state{padding:26px 12px;text-align:center;border:1px dashed #c9bd9e;border-radius:9px;background:#faf5e6;color:var(--muted)}
+    .export-strip{display:flex;flex-wrap:wrap;gap:7px;padding:12px 16px;background:#edf1e6;border-top:1px solid #cbd8bd}
+    footer{max-width:1160px;padding:0 16px 26px;margin:auto;color:#68715f;font-size:12px}
+    .privacy{font-size:12px;margin-top:11px;color:#6b745f}
+    @media(max-width:850px){.layout{grid-template-columns:1fr}.site-header-inner{align-items:flex-start}.header-links{width:100%}}
+    @media(max-width:540px){.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.gps-row{grid-template-columns:1fr 1fr}.gps-row .btn{grid-column:1/-1;width:100%}.panel-body{padding:13px}.site-header{padding:18px 14px}.brand-icon{width:43px;height:43px}.header-links .btn{flex:1}}
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">🌱</div>
+        <div>
+          <div class="eyebrow">BackToNature · Living Land Lab</div>
+          <h1>My Plot Field Log</h1>
+          <p class="header-copy">Record observations from the field. Keep notes, photos, GPS coordinates, soil and water details together—even when no API is available.</p>
+        </div>
+      </div>
+      <nav class="header-links" aria-label="Page navigation">
+        <a class="btn secondary" href="./index.html">← Back to World Explorer</a>
+        <button id="open-report-btn" class="btn" type="button">Open Editable Report ↗</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      <strong>🔒 Local-first field notebook</strong>
+      Records and photos are stored in this browser on this device using IndexedDB. Nothing is uploaded to BackToNature servers. Export a JSON backup regularly if you need to move your records to another browser or device.
+    </div>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="form-heading">
+        <div class="panel-heading">
+          <h2 id="form-heading">📝 New field observation</h2>
+          <p>Use measured values where possible. Leave unknown fields blank instead of guessing.</p>
+        </div>
+        <div class="panel-body">
+          <form id="field-log-form">
+            <input type="hidden" id="entry-id" name="id">
+            <div class="form-grid">
+              <div class="field">
+                <label for="plot-name">Plot / site name *</label>
+                <input id="plot-name" name="plotName" maxlength="120" required placeholder="e.g. North rice plot">
+              </div>
+              <div class="field">
+                <label for="observation-date">Observation date *</label>
+                <input id="observation-date" name="observationDate" type="date" required>
+              </div>
+              <div class="field">
+                <label for="region-name">Village / district / region</label>
+                <input id="region-name" name="regionName" maxlength="180" placeholder="Village, district, province, country">
+              </div>
+              <div class="field">
+                <label for="observer-name">Observer</label>
+                <input id="observer-name" name="observerName" maxlength="120" placeholder="Name or team">
+              </div>
+
+              <div class="field full">
+                <label>GPS coordinates (optional)</label>
+                <div class="gps-row">
+                  <div><label for="latitude">Latitude</label><input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" placeholder="-6.200000"></div>
+                  <div><label for="longitude">Longitude</label><input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" placeholder="106.816666"></div>
+                  <button id="gps-btn" class="btn blue" type="button">📍 Use GPS</button>
+                </div>
+                <div class="hint">Browser location permission is required. The coordinates are saved only with this field record.</div>
+              </div>
+
+              <div class="field">
+                <label for="soil-texture">Observed soil texture</label>
+                <select id="soil-texture" name="soilTexture">
+                  <option value="">Not recorded</option>
+                  <option value="Sandy">Sandy</option><option value="Sandy loam">Sandy loam</option>
+                  <option value="Loam">Loam</option><option value="Clay loam">Clay loam</option>
+                  <option value="Clay">Clay</option><option value="Peaty / organic">Peaty / organic</option>
+                  <option value="Stony / gravelly">Stony / gravelly</option><option value="Other / uncertain">Other / uncertain</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="soil-ph">Soil pH (measured)</label>
+                <input id="soil-ph" name="soilPh" type="number" min="0" max="14" step="0.1" placeholder="e.g. 5.8">
+                <div class="hint">Use a real test result; do not infer pH from appearance.</div>
+              </div>
+              <div class="field">
+                <label for="drainage">Drainage / wetness</label>
+                <select id="drainage" name="drainage">
+                  <option value="">Not recorded</option><option value="Very well drained">Very well drained</option>
+                  <option value="Well drained">Well drained</option><option value="Moderate">Moderate</option>
+                  <option value="Poorly drained">Poorly drained</option><option value="Waterlogged">Waterlogged</option>
+                  <option value="Seasonally flooded">Seasonally flooded</option><option value="Unknown">Unknown</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="water-source">Water source / availability</label>
+                <select id="water-source" name="waterSource">
+                  <option value="">Not recorded</option><option value="Rain-fed">Rain-fed</option>
+                  <option value="Canal / irrigation">Canal / irrigation</option><option value="River / stream">River / stream</option>
+                  <option value="Groundwater / well">Groundwater / well</option><option value="Pond / reservoir">Pond / reservoir</option>
+                  <option value="Seasonal / unreliable">Seasonal / unreliable</option><option value="Other / unknown">Other / unknown</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="land-cover">Current land cover / use</label>
+                <select id="land-cover" name="landCover">
+                  <option value="">Not recorded</option><option value="Annual cropland">Annual cropland</option>
+                  <option value="Perennial crops / plantation">Perennial crops / plantation</option><option value="Agroforestry">Agroforestry</option>
+                  <option value="Forest / secondary vegetation">Forest / secondary vegetation</option><option value="Grassland / pasture">Grassland / pasture</option>
+                  <option value="Wetland / mangrove / peatland">Wetland / mangrove / peatland</option><option value="Degraded / bare land">Degraded / bare land</option>
+                  <option value="Urban / home garden">Urban / home garden</option><option value="Other / mixed">Other / mixed</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="crop-species">Crop / plant species</label>
+                <input id="crop-species" name="cropSpecies" maxlength="180" placeholder="Common or scientific name">
+              </div>
+              <div class="field full">
+                <label for="activity">Activity / intervention</label>
+                <input id="activity" name="activity" maxlength="180" placeholder="e.g. soil sampling, planting, mulching, erosion check">
+              </div>
+              <div class="field full">
+                <label for="notes">Field notes / observations</label>
+                <textarea id="notes" name="notes" maxlength="8000" placeholder="What did you observe? Include context, method, units, uncertainties, or follow-up tasks."></textarea>
+              </div>
+              <div class="field full">
+                <label for="photo-files">Photos (optional, up to 6 per record)</label>
+                <input id="photo-files" name="photos" type="file" accept="image/*" multiple>
+                <div id="photo-selection-status" class="hint">Photos are resized before storage to save local space. Avoid including people or sensitive details without permission.</div>
+                <div id="photo-preview" class="photo-grid" aria-live="polite"></div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" id="save-btn" type="submit">Save observation</button>
+              <button class="btn secondary" id="cancel-edit-btn" type="button" hidden>Cancel edit</button>
+              <button class="btn secondary" id="reset-btn" type="button">Clear form</button>
+            </div>
+            <div id="form-status" class="status" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="records-heading">
+        <div class="panel-heading">
+          <h2 id="records-heading">📚 Saved observations <span id="records-count">(0)</span></h2>
+          <p>Stored locally on this device. Select Edit to update a record.</p>
+        </div>
+        <div class="panel-body">
+          <div class="list-toolbar">
+            <input id="record-search" type="search" placeholder="Search site, region, crop, activity, notes…" aria-label="Search saved records">
+            <button class="btn secondary" id="refresh-records-btn" type="button">Refresh</button>
+          </div>
+          <div id="records-list"><div class="empty-state">Loading local records…</div></div>
+          <div class="privacy">Tip: a JSON backup includes photos. CSV is lightweight and contains the text/measurement fields, not image bytes.</div>
+        </div>
+        <div class="export-strip">
+          <button id="export-json-btn" class="btn blue" type="button">Download JSON backup</button>
+          <button id="export-csv-btn" class="btn secondary" type="button">Download CSV</button>
+          <button id="import-json-btn" class="btn secondary" type="button">Import JSON backup</button>
+          <input id="import-json-file" type="file" accept="application/json,.json" hidden>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    BackToNature · My Plot Field Log. Field notes are user observations, not verified soil laboratory results or official agronomic recommendations. Keep backups in a safe place.
+  </footer>
+  <script src="./field-log.js?v=20261021-field-log-v1"></script>
+</body>
+</html>
