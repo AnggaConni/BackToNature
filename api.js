@@ -1428,7 +1428,8 @@
       var rasterValues = await image.readRasters({ window:[col,row,col+1,row+1], samples:[0], interleave:true });
       var rawValue = rasterValues && rasterValues.length ? Number(rasterValues[0]) : NaN;
       if (!Number.isFinite(rawValue)) return null;
-      var noData = typeof image.getGDALNoData === 'function' ? Number(image.getGDALNoData()) : NaN;
+      var noDataRaw = typeof image.getGDALNoData === 'function' ? image.getGDALNoData() : null;
+      var noData = noDataRaw == null || noDataRaw === '' ? NaN : Number(noDataRaw);
       if (Number.isFinite(noData) && rawValue === noData) return null;
       if (rawValue === -9999 || rawValue === -3.4028234663852886e+38) return null;
       return rawValue * scaleFactor;
