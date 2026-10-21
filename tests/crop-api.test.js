@@ -39,6 +39,11 @@ async function main() {
   assert.ok(appSource.includes('function initNatureInlineMap(selection, selectionKey, point)'), 'Plant reports include an embedded biodiversity map');
   assert.ok(appSource.includes('Where were plants reported?'), 'Plant report map explains what its points mean');
   assert.ok(appSource.includes('function renderWaporPointSeries(data)'), 'WaPOR cards display actual values, a seasonal baseline and a trend chart');
+  assert.ok(appSource.includes('function analyzeWaporTrend(data)'), 'WaPOR charts classify rising, falling and fluctuating trends');
+  assert.ok(appSource.includes('function renderWaporTrendStory(data)'), 'WaPOR graphs include plain-language interpretation and a next step');
+  assert.ok(appSource.includes('function autoFetchWaporLearningLayers()'), 'WaPOR automatically loads key indicators when Nature opens');
+  assert.ok(appSource.includes("var codes = ['L1-PCP-D','L1-RSM-D','L1-AETI-D','L1-NPP-D']"), 'auto-loading is limited to rainfall, soil moisture, water loss and plant growth');
+  assert.ok(appSource.includes('automatic ? {maxPeriods:6} : {maxPeriods:12}'), 'auto-loads use a lighter period count than manual requests');
   assert.ok(appSource.includes('If the value is higher than baseline'), 'WaPOR cards provide higher-value field guidance');
   assert.ok(appSource.includes('If the value is lower than baseline'), 'WaPOR cards provide lower-value field guidance');
   assert.ok(appSource.includes('countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + indonesiaLiveTerminal'), 'the duplicate WaPOR API panel is removed from Sources');
@@ -522,6 +527,9 @@ async function main() {
   assert.equal(waporSeries.baselineSamples,2,'baseline uses the previous two matching calendar periods when available');
   assert.match(waporSeries.baselineMethod,/same calendar month\/dekad\/day/i,'baseline method is disclosed');
   assert.ok(waporSeries.sampledAt,'the result includes a retrieval timestamp');
+  const shorterWaporSeries = await api.fetchWaporPointSeries('L1-NPP-D',-7.5,125.5,{maxPeriods:6});
+  assert.equal(shorterWaporSeries.series.length,6,'lighter auto-load can request six recent periods without reusing a twelve-period cache');
+  assert.notEqual(shorterWaporSeries.sampledPeriods,waporSeries.sampledPeriods,'the lighter query uses its own cached period window');
 
   // Country-specific source registry keeps Indonesian national sources scoped to Indonesia.
   const idnSources = api.getCountrySourceCatalog('IDN','Indonesia');
