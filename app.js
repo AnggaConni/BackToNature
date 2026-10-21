@@ -814,8 +814,8 @@
   }
 
   function renderCropMatchCards(crops) {
-    if (!crops.length) return '<p>No screening matches were found. Try leaving uncertain fields as “Not sure” and check the local soil and climate data.</p>';
-    return crops.map(function (crop, index) {
+    if (!crops.length) return '<p>No crop ideas matched those inputs. Leave uncertain fields as “Not sure” and check the local soil and climate information.</p>';
+    var cards = crops.map(function (crop, index) {
       var reasons = (crop.reasons || []).slice(0, 3).map(function (reason) {
         return '<li>' + esc(reason) + '</li>';
       }).join('');
@@ -825,15 +825,23 @@
       return '<article class="crop-match-card">' +
         '<div class="crop-match-image" id="crop-image-' + esc(crop.id) + '"><div class="crop-image-placeholder"><span>🌱</span><b>Searching plant photos…</b><small>Wikimedia Commons</small></div></div>' +
         '<div class="crop-match-body">' +
-        '<div class="crop-match-topline"><span class="data-tag green">SCREEN ' + String(index + 1).padStart(2, '0') + '</span><span class="crop-score">' + esc(crop.score) + '/100</span></div>' +
+        '<div class="crop-match-topline"><span class="data-tag green">CROP IDEA ' + String(index + 1).padStart(2, '0') + '</span></div>' +
         '<h4>' + esc(crop.name) + '</h4><p class="crop-local-name">' + esc(crop.local) + ' · <i>' + esc(crop.scientific) + '</i></p>' +
         '<p>' + esc(crop.note) + '</p>' +
-        '<div class="crop-match-meta"><span>Screening pH ' + esc(crop.pHText) + '</span><span>' + esc(crop.category.replace(/-/g, ' ')) + '</span></div>' +
-        (reasons ? '<div class="crop-reason"><b>Why it matched</b><ul>' + reasons + '</ul></div>' : '') +
-        (cautions ? '<div class="crop-caution"><b>Before planting</b><ul>' + cautions + '</ul></div>' : '') +
+        (reasons ? '<div class="crop-reason"><b>Why it appears on the list</b><ul>' + reasons + '</ul></div>' : '') +
+        (cautions ? '<div class="crop-caution"><b>Check before planting</b><ul>' + cautions + '</ul></div>' : '') +
+        '<details class="technical-details"><summary>See the screening details</summary>' +
+        '<p>This is a rule-based shortlist, not a probability of success, yield forecast, or soil diagnosis.</p>' +
+        '<div class="crop-match-meta"><span>Screening score ' + esc(crop.score) + '/100</span><span>pH profile ' + esc(crop.pHText) + '</span><span>Crop group ' + esc(crop.category.replace(/-/g, ' ')) + '</span></div></details>' +
         '<p class="crop-photo-credit" id="crop-credit-' + esc(crop.id) + '">Photo credit and license will be shown when a suitable image is available.</p>' +
         '</div></article>';
     }).join('');
+    return renderLearningGuide(
+      'This shortlist compares your answers with broad starter profiles for different crops. It helps you decide what to investigate first.',
+      'Soil texture, pH, drainage, water supply and climate work together. A strong match for one condition can still be a poor choice if another important condition is wrong.',
+      'Read the reasons and cautions, confirm pH with a real soil test, check local varieties and season, and ask an extension worker before buying seed or changing the land.',
+      'How to use these crop ideas'
+    ) + cards;
   }
 
   async function loadCropPhotos(crops, requestId) {
