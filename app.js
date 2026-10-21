@@ -977,6 +977,100 @@
       '<section class="source-strip"><div><span class="mini-code">NEXT QUEST</span><h3>Need province-level production statistics?</h3><p>Use the official BPS table for rice harvested area, productivity and output. It is a statistical source, not a field-level crop suitability assessment.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://www.bps.go.id/en/statistics-table/2/MTQ5OCMy/luaspanen-produksi-dan-produktivitas-padi-menurutprovinsi.html">OPEN BPS DATA ↗</a></section>';
   }
 
+  function renderFarmingSystemLibrary() {
+    var systems = [
+      {
+        icon:'🚜', category:'SOIL-BASED', title:'Open-field / conventional farming',
+        summary:'Plants grow directly in soil, in rows, beds or plots. Farmers manage soil, seed, water, weeds, pests and harvest.',
+        best:'A plot with suitable soil, enough light and a workable water supply; it is the default comparison for many crops.',
+        first:'Check soil texture and drainage, water access, sunlight, crop variety and the local planting calendar. Start with one small test bed.',
+        watch:'Rainfall, soil fertility, weeds and pests can change results. “Conventional” does not automatically mean sustainable or unsustainable.',
+        url:'https://www.fao.org/3/i2215e/i2215e.pdf', link:'FAO crop-production guide'
+      },
+      {
+        icon:'🌧️', category:'WATER SOURCE', title:'Rainfed farming',
+        summary:'The crop depends mainly on rain rather than a dependable irrigation system.',
+        best:'Areas with a reliable seasonal rainy period and crops/varieties suited to local rainfall.',
+        first:'Look at the start and end of the rainy season, likely dry spells, soil water-holding capacity and locally recommended seed.',
+        watch:'A planting date on the calendar cannot guarantee rain. Keep soil covered and make a safe plan for dry spells.',
+        url:'https://www.fao.org/land-water/water/agricultural-water-management/rainfed-agriculture/en', link:'FAO rainfed agriculture'
+      },
+      {
+        icon:'💧', category:'WATER SOURCE', title:'Irrigated farming',
+        summary:'Water is delivered to crops when rainfall is not enough, using a canal, pump, sprinkler, drip line or another system.',
+        best:'Where the water source is legal, reliable, affordable and suitable for the crop.',
+        first:'Confirm water availability across the whole season, water quality, energy/labour costs and safe drainage.',
+        watch:'Irrigation is not “add as much water as possible”. Poor scheduling can waste water, damage roots or increase salinity.',
+        url:'https://www.fao.org/land-water/water/agricultural-water-management/en', link:'FAO agricultural water management'
+      },
+      {
+        icon:'🥬', category:'SOIL-LESS', title:'Hydroponics',
+        summary:'Roots get dissolved plant nutrients from water, with or without an inert support such as coco coir or another growing medium. Field soil is not used.',
+        best:'Often used for leafy vegetables and herbs where clean water, nutrients, a suitable place and regular monitoring are available.',
+        first:'Learn safe nutrient mixing, water quality, pH and electrical conductivity (EC), hygiene, and how to handle a system failure.',
+        watch:'It can save space, but it is not automatically cheap or easier: nutrient mistakes, contaminated water or a pump failure can affect many plants quickly. Some simple non-circulating systems do not need a pump.',
+        url:'https://teca.apps.fao.org/en/technologies/8825/', link:'FAO TECA: simple hydroponics'
+      },
+      {
+        icon:'🐟', category:'FISH + PLANTS', title:'Aquaponics',
+        summary:'Fish farming and hydroponics are linked: helpful bacteria convert waste from fish into nutrients plants can use, and water circulates through the system.',
+        best:'A learning project or farm that can manage fish care and plant production together—not just a tank with plants added.',
+        first:'Plan fish welfare, filtration/biofilter capacity, water quality testing, oxygen, feeding and a safe backup plan before stocking fish.',
+        watch:'Fish, bacteria and plants need a stable balance. A failure in water quality or oxygen can harm fish quickly; setup and monitoring are more complex than a basic garden.',
+        url:'https://teca.apps.fao.org/en/technologies/8350/', link:'FAO TECA: design an aquaponics unit'
+      },
+      {
+        icon:'🏡', category:'PROTECTED GROWING', title:'Greenhouse / net-house farming',
+        summary:'A structure such as a greenhouse or insect net-house changes the growing environment or blocks some weather and pest pressure.',
+        best:'Higher-value crops where protecting plants or extending the growing period can justify construction and daily management.',
+        first:'Plan ventilation, temperature, humidity, light, irrigation, sanitation and the crop’s pollination needs. A net-house and a sealed greenhouse behave differently.',
+        watch:'A structure does not eliminate heat, humidity or pests. Poor ventilation can make disease worse, and construction can be expensive.',
+        url:'https://www.fao.org/family-farming/detail/en/c/1697565/', link:'FAO: protected cultivation factsheets'
+      },
+      {
+        icon:'🪴', category:'SMALL SPACE', title:'Container, rooftop or vertical gardening',
+        summary:'Plants grow in pots, sacks, raised beds or stacked structures using a suitable growing medium rather than open ground.',
+        best:'Homes, schools, rooftops or small urban spaces with adequate sunlight and safe water.',
+        first:'Use clean containers with drainage, known growing media, safe water and a plan for frequent watering and nutrient replacement.',
+        watch:'Containers dry out faster than open ground; roofs must carry the load safely. Avoid vegetables in potentially contaminated soil or water.',
+        url:'https://www.fao.org/family-farming/detail/en/c/1697565/', link:'FAO: protected and small-space cultivation'
+      },
+      {
+        icon:'🌳', category:'TREES + CROPS', title:'Agroforestry / mixed farming',
+        summary:'Trees or shrubs are deliberately combined with crops and sometimes livestock in a planned layout or sequence.',
+        best:'Farms where compatible trees can add food, shade, fodder, soil protection or income without harming the main crop.',
+        first:'Choose suitable species, check mature tree size, spacing, shade, root competition, land rights and the time before trees produce.',
+        watch:'Trees can improve diversity, but the wrong species or layout can compete for light and water. Local context and long-term planning matter.',
+        url:'https://www.fao.org/agroforestry/about-agroforestry/overview/', link:'FAO agroforestry overview'
+      },
+      {
+        icon:'🍂', category:'SOIL PROTECTION', title:'Conservation agriculture',
+        summary:'A soil-protection approach built around three ideas: disturb soil less, keep it covered, and diversify crops through rotation or association.',
+        best:'Many rainfed and irrigated systems when the practices can be adapted to local crops, residues, weeds and equipment.',
+        first:'Try appropriate residue cover, crop diversification and less disruptive planting methods on a small plot; plan how weeds will be managed.',
+        watch:'It is not just “never till”. Results depend on local adaptation, weed management, machinery, soil and crop sequence.',
+        url:'https://www.fao.org/conservation-agriculture/overview/conservation-agriculture-principles/en/', link:'FAO conservation agriculture principles'
+      }
+    ];
+    var cards = systems.map(function (system, index) {
+      return '<article class="farming-system-card">' +
+        '<div class="farming-system-top"><span class="farming-system-icon" aria-hidden="true">' + system.icon + '</span><span class="mini-code">' + esc(system.category) + '</span></div>' +
+        '<h4>' + esc(system.title) + '</h4><p>' + esc(system.summary) + '</p>' +
+        '<details class="farming-system-details"><summary>When to use it and what to check</summary>' +
+        '<p><b>When it may fit:</b> ' + esc(system.best) + '</p>' +
+        '<p><b>Start by checking:</b> ' + esc(system.first) + '</p>' +
+        '<p><b>Important limitation:</b> ' + esc(system.watch) + '</p>' +
+        '<a class="text-link" href="' + esc(safeHttps(system.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(system.link) + ' ↗</a>' +
+        '</details></article>';
+    }).join('');
+    return '<section class="farming-system-library">' +
+      '<div class="section-title"><span class="mini-code">FARMING SYSTEMS 101</span><h3>Choose how you want to grow 🌱</h3></div>' +
+      '<p class="live-explainer">“Traditional farming”, irrigation, hydroponics and greenhouses are not all the same kind of category. Some describe where roots grow, some describe the water source, and some describe structures. A farm can combine them—for example, a greenhouse with hydroponics.</p>' +
+      '<div class="farming-system-grid">' + cards + '</div>' +
+      '<p class="nature-method-note">These are learning summaries curated from public FAO guides, not promises of yield or a recommendation for every location. Check local crop, water, soil and food-safety advice before investing.</p>' +
+      '</section>';
+  }
+
   function renderFarming(profile) {
     var useGlobalClimatePortal = !!(currentProvince && currentProvince.countryIso3 && currentProvince.countryIso3 !== 'IDN');
     var climatePortalUrl = useGlobalClimatePortal ? 'https://climateknowledgeportal.worldbank.org/' : 'https://www.bmkg.go.id/';
@@ -1046,14 +1140,25 @@
     return '<div class="tab-intro"><div class="eyebrow">FARMING GUIDE / HOW TO CULTIVATE</div><h2>Your farm, one step at a time 🚜</h2><p>This starter workflow is adapted to the broad landscape type for ' + esc(profile.name) + '. It deliberately avoids invented seed rates, spacing or fertilizer dosages; use local crop-specific extension recommendations for those details.</p></div>' +
       '<section class="soil-profile"><div class="soil-profile-icon">📍</div><div><span class="mini-code">PLANNING CONTEXT</span><h3>' + esc(profile.zone) + '</h3><p>Priority: ' + esc(profile.focus) + '. Start small, observe the response and scale only when the site, water and economics support it.</p><span class="data-tag green">CURATED STARTER WORKFLOW</span></div></section>' +
       '<div class="guide-grid">' + steps + '</div>' +
+      renderFarmingSystemLibrary() +
       '<section class="source-strip"><div><span class="mini-code">LOCAL CALENDAR & EXTENSION</span><h3>Check the latest field guidance</h3><p>Exact planting month, plant spacing, seed rate, fertilizer rate and pest controls depend on crop variety and local conditions. Confirm them with extension staff and seasonal rainfall outlook.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="' + climatePortalUrl + '">' + climatePortalLabel + ' ↗</a></section>';
   }
 
   function renderTechnology(profile) {
     return '<div class="tab-intro"><div class="eyebrow">TECHNOLOGY & RESTORATION / TOOLBOX</div><h2>Choose the right tool for the land</h2><p>Technology is a response to a diagnosed constraint. Start with low-regret practices, trial them on a small area and monitor changes before scaling.</p></div>' +
+      '<section class="tech-method-note"><div class="mini-code">HOW THESE SUGGESTIONS ARE GENERATED</div><h3>Curated rules, matched to the landscape type</h3><p>These cards currently come from a small, hand-curated library in BackToNature’s JavaScript (<code>techByKind</code>). The app chooses a group using the selected region’s broad landscape profile. This tab is <b>not currently populated by a live WOCAT or technology API</b>, and the suggestions are not a diagnosis of an individual farm.</p></section>' +
       buildTechCards(profile) +
       '<section class="quest-panel"><div class="quest-icon">🛠️</div><div><div class="mini-code">RESTORATION RULE</div><h3>Do not engineer what you have not diagnosed</h3><p>Terraces, drainage, bunds and water-control structures can create new risks if designed without slope, hydrology and downstream impacts. Get local technical advice before major earthworks.</p></div></section>' +
-      '<section class="source-strip"><div><span class="mini-code">DOCUMENTED PRACTICES</span><h3>Search WOCAT sustainable land management technologies</h3><p>WOCAT records can help compare documented techniques and contexts. Exact live API queries may require authorized access; the public catalogue remains available for browsing.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://qcat.wocat.net/en/wocat/list/">BROWSE WOCAT ↗</a></section>';
+      '<section class="tech-reference-block"><div class="section-title"><span class="mini-code">OPEN LEARNING SOURCES</span><h3>Read how these practices work</h3></div>' +
+      '<div class="tech-reference-grid">' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/conservation-agriculture/overview/conservation-agriculture-principles/en/"><b>Conservation agriculture</b><span>Soil cover, less disturbance and crop diversity ↗</span></a>' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/farmer-field-schools/themes/integrated-pest-management/"><b>Integrated pest management</b><span>Observe, prevent and control pests responsibly ↗</span></a>' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/agroforestry/about-agroforestry/overview/"><b>Agroforestry</b><span>Plan trees with crops or livestock ↗</span></a>' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/land-water/water/agricultural-water-management/rainfed-agriculture/en"><b>Rainfed water management</b><span>Plan around rain and soil moisture ↗</span></a>' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://teca.apps.fao.org/en/technologies/8825/"><b>Hydroponics</b><span>A simple method for growing vegetables without field soil ↗</span></a>' +
+      '<a target="_blank" rel="noopener noreferrer" href="https://teca.apps.fao.org/en/technologies/8350/"><b>Aquaponics</b><span>Learn the fish-and-plant system design ↗</span></a>' +
+      '</div></section>' +
+      '<section class="source-strip"><div><span class="mini-code">DOCUMENTED PRACTICES</span><h3>Compare real-world case studies in WOCAT</h3><p>WOCAT remains a useful next step for documented sustainable land-management practices and context-specific case studies. This build currently links to its public catalogue rather than fetching records through a live WOCAT API.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="https://qcat.wocat.net/en/wocat/list/">BROWSE WOCAT ↗</a></section>';
   }
 
 
@@ -1602,49 +1707,141 @@
   }
 
 
+  function explainWaporMapset(record) {
+    var code = String(record && record.code || '').toUpperCase();
+    var variable = code.split('-')[1] || '';
+    var timeCode = code.split('-')[2] || '';
+    var levelCode = code.split('-')[0] || '';
+    var dictionary = {
+      AETI:{
+        title:'How much water actually leaves land and plants',
+        short:'A combined estimate of water evaporating from the ground, used by plants and evaporated from rain caught on leaves.',
+        question:'Is water leaving this landscape quickly or slowly over the selected period?',
+        caution:'This is not a direct instruction for how many litres to irrigate. The number depends on weather, vegetation and land cover.'
+      },
+      E:{
+        title:'Water evaporating from soil or wet surfaces',
+        short:'An estimate of water that goes back to the air from soil, water or wet plant surfaces—not water taken up inside the plant.',
+        question:'Could evaporation be an important part of the local water loss?',
+        caution:'Do not treat this as total crop water use; plant transpiration is a different process.'
+      },
+      T:{
+        title:'Water used by plants and released through leaves',
+        short:'An estimate of water taken up by roots and released by plants into the air through transpiration.',
+        question:'How does water use by plant growth change over time?',
+        caution:'A satellite/model estimate is not a sensor reading from one individual plant.'
+      },
+      I:{
+        title:'Rain intercepted by leaves and vegetation',
+        short:'An estimate of rain caught on leaves and other surfaces that may evaporate before reaching the ground.',
+        question:'How much rainfall might be caught by the vegetation canopy?',
+        caution:'It does not tell you directly how much water reached crop roots.'
+      },
+      RET:{
+        title:'How strongly the weather could pull water from a reference surface',
+        short:'Reference evapotranspiration is a standard estimate of the atmosphere’s evaporative demand when water is not limiting.',
+        question:'Are conditions likely to create high or low evaporative demand?',
+        caution:'It is not the actual water use of your crop. Crop type and growth stage change water needs.'
+      },
+      RSM:{
+        title:'How wet the soil is relative to its usual range',
+        short:'A model/satellite indicator of relative soil moisture in the mapped area.',
+        question:'Does the mapped area look relatively wetter or drier over time?',
+        caution:'Relative moisture is not the same as a soil sample or a calibrated sensor at root depth.'
+      },
+      PCP:{
+        title:'How much rain fell or is estimated to have fallen',
+        short:'A gridded rainfall estimate for a map cell over the selected time period.',
+        question:'Which periods or areas were wetter or drier?',
+        caution:'The estimate can differ from a rain gauge on your farm, especially during local storms.'
+      },
+      NPP:{
+        title:'How much new plant material is being produced',
+        short:'Net primary production is an estimate of new plant biomass after plants use some of their captured energy themselves.',
+        question:'Where does the landscape appear to be producing more or less plant growth over time?',
+        caution:'It is not harvested yield, food calories or crop profit. It can include natural vegetation.'
+      },
+      AGBP:{
+        title:'Estimated above-ground plant biomass',
+        short:'An estimate related to the mass of plant material above the soil surface.',
+        question:'How does the amount of standing vegetation vary across areas or dates?',
+        caution:'Biomass is not automatically edible harvest or farm income.'
+      },
+      GBWP:{
+        title:'How much biomass is produced per unit of water',
+        short:'A measure relating biomass production to water consumed or used in production.',
+        question:'How efficiently is plant material produced relative to water use?',
+        caution:'Check the units, method and crop/land cover before comparing two places.'
+      }
+    };
+    var explanation = dictionary[variable] || {
+      title:String(record && record.caption || 'Environmental map layer'),
+      short:'A satellite/model dataset describing one part of water use, rainfall or vegetation.',
+      question:'What pattern does this variable show across the map or over time?',
+      caution:'Open the dataset details and its unit before interpreting values.'
+    };
+    var time = {
+      D:'Every 10 days (a “dekad”)',
+      M:'Monthly',
+      E:'Daily',
+      A:'Yearly'
+    }[timeCode] || String(record && record.temporalResolution || 'Time step not confirmed');
+    var level = levelCode === 'L1' ? 'Broad/global product' :
+      levelCode === 'L2' ? 'More local/national product where available' :
+      levelCode === 'L3' ? 'Area-specific product' : String(record && record.level || 'Coverage not confirmed');
+    return {
+      code:code,
+      variable:variable,
+      time:time,
+      level:level,
+      title:explanation.title,
+      short:explanation.short,
+      question:explanation.question,
+      caution:explanation.caution,
+      resolution:String(record && record.resolutionNote || 'Check the original layer details'),
+      temporal:String(record && record.temporalResolution || time)
+    };
+  }
+
   function renderWaporMapsetCatalog(data) {
     var records = data && Array.isArray(data.records) ? data.records : [];
     if (!records.length) {
-      return '<section class="wapor-howto"><h4>No dataset list returned</h4><p>The official catalogue request returned no records this time. You can still open the FAO WaPOR Portal directly.</p><a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN WAPOR PORTAL ↗</a></section>';
+      return '<section class="wapor-howto"><h4>No dataset list returned</h4><p>The official catalogue returned no records this time. You can still explore the official WaPOR map.</p><a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN WAPOR PORTAL ↗</a></section>';
     }
     var grid = '<div class="wapor-mapset-grid">' + records.map(function (record) {
-      var code = String(record.code || '');
-      var keyText = /AETI/.test(code) ? 'Water leaving soil and plants through evaporation and transpiration. Helpful context for water use, but not a direct irrigation prescription.' :
-        /RET/.test(code) ? 'A reference estimate of water that could evaporate from a well-watered surface. It is not the same as crop water need.' :
-        /RSM/.test(code) ? 'A relative indicator of how wet the soil appears in the satellite/model data.' :
-        /NPP/.test(code) ? 'An indicator linked to plant growth and biomass production.' :
-        /PCP/.test(code) ? 'Rainfall estimated from gridded data; it may differ from rain measured on your farm.' : 'An environmental indicator derived from satellite/model data.';
-      var starter = /PCP/.test(code) ? 'Start here to explore rainfall' :
-        /RSM/.test(code) ? 'Start here to explore relative soil moisture' :
-        /AETI/.test(code) ? 'Explore water loss from soil and plants' :
-        /NPP/.test(code) ? 'Explore plant growth' : '';
+      var explanation = explainWaporMapset(record);
+      var quickStart = /PCP/.test(explanation.code) ? 'Good first layer: explore rainfall' :
+        /RSM/.test(explanation.code) ? 'Good first layer: explore relative soil moisture' :
+        /AETI/.test(explanation.code) ? 'Explore water loss from soil and plants' :
+        /NPP/.test(explanation.code) ? 'Explore plant growth, not harvest yield' : '';
       return '<article class="wapor-mapset-card">' +
-        '<div class="wapor-mapset-heading"><span class="mini-code">' + esc(code) + '</span><span class="wapor-level-tag">' + esc(record.level) + '</span></div>' +
-        '<h4>' + esc(record.caption) + '</h4><p>' + esc(keyText) + '</p>' +
-        (starter ? '<p class="wapor-starter-tag">★ ' + esc(starter) + '</p>' : '') +
-        '<details class="mini-explanation"><summary>Coverage, dates and technical details</summary>' +
-        '<div class="wapor-mapset-meta"><span>' + esc(record.temporalResolution) + '</span><span>' + esc(record.resolutionNote) + '</span></div>' +
-        '<p>Before using it, check that your location and dates are covered. Coarser map cells can hide differences between nearby fields.</p>' +
-        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open this dataset’s metadata/API ↗</a></details>' +
+        '<div class="wapor-mapset-heading"><span class="wapor-level-tag">' + esc(explanation.level) + '</span><span class="wapor-mapset-code">Technical code: ' + esc(explanation.code) + '</span></div>' +
+        '<h4>' + esc(explanation.title) + '</h4><p class="wapor-plain-meaning">' + esc(explanation.short) + '</p>' +
+        '<div class="wapor-why"><b>What question can it help answer?</b><p>' + esc(explanation.question) + '</p></div>' +
+        (quickStart ? '<p class="wapor-starter-tag">★ ' + esc(quickStart) + '</p>' : '') +
+        '<details class="mini-explanation"><summary>Time period, map scale and caution</summary>' +
+        '<div class="wapor-mapset-meta"><span>' + esc(explanation.time) + '</span><span>' + esc(explanation.resolution) + '</span></div>' +
+        '<p><b>Important:</b> ' + esc(explanation.caution) + '</p>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open the original dataset details ↗</a></details>' +
         '</article>';
     }).join('') + '</div>';
 
     return '<section class="wapor-howto">' +
-      '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>How to see real data for a place</h4></div></div>' +
-      '<ol><li>Open the official WaPOR map.</li><li>Choose a layer—for a first look, try <b>Precipitation (rain)</b>, <b>Relative Soil Moisture</b> or <b>Actual Evapotranspiration</b>.</li><li>Search for a place or enter its latitude and longitude, then click a point on the map.</li><li>Choose a date range to inspect its value or a point time series.</li></ol>' +
-      '<p><b>Important:</b> the list below is the dataset catalogue (what data exists and at what scale). It is not yet a measured value for the selected farm inside BackToNature.</p>' +
+      '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>How to see actual data for a place</h4></div></div>' +
+      '<ol><li>Open the official WaPOR map.</li><li>Start with <b>Rainfall</b>, <b>Relative soil moisture</b> or <b>Water leaving soil and plants</b>.</li><li>Search for a place, then choose a layer and date range.</li><li>Click a map cell or use the time-series option to inspect values over time.</li></ol>' +
+      '<p><b>Keep in mind:</b> WaPOR data are satellite/model estimates. The cards below explain available datasets; they are not measurements from the selected farm inside BackToNature.</p>' +
       '<a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN INTERACTIVE WAPOR MAP ↗</a> ' +
       '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Read FAO’s data-access guide ↗</a>' +
       '</section>' +
       renderLearningGuide(
-        'Each card is a kind of water or vegetation information created from satellite observations and models. Rainfall, soil moisture and plant growth describe different things.',
-        'The layers can help you ask better questions, but their coverage, map resolution and dates matter. A 300-metre pixel can cover more than one type of land.',
-        'Choose one variable first, open it in the official map, select the location and dates, then compare the result with field observations before making decisions.',
-        'Which dataset should I choose?'
+        'The technical code is a short label for a kind of information. The large heading tells you what that layer means in everyday language.',
+        'Rainfall, soil wetness, water use and plant growth are related but are not the same measurement. Check dates, map scale and units before comparing them.',
+        'Choose one clear question first, open that layer in the official map, select your location and dates, and compare with field observations or local measurements.',
+        'Read the layer, not just the code'
       ) +
       '<section class="wapor-catalog-block"><div class="wapor-catalog-heading"><h4>Available WaPOR datasets</h4><span>' + records.length + ' datasets from the live FAO catalogue</span></div>' + grid +
       '<p class="nature-method-note">Catalogue refreshed ' + esc(new Date(data.retrievedAt).toLocaleString()) +
-      '. BackToNature lists the available layers here; actual pixel values and time-series analysis are opened in the official WaPOR map.</p></section>';
+      '. Time step and spatial resolution differ by dataset. Open the dataset details to verify exact coverage before analysis.</p></section>';
   }
 
   function initNatureInlineMap(selection, selectionKey, point) {
