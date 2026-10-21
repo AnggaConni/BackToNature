@@ -157,6 +157,15 @@ Records and photographs are kept locally in the current browser using IndexedDB.
 
 The tool is a field-notes and documentation aid, not a laboratory diagnosis or an agronomic recommendation engine. Blank values remain unknown; user-entered measurements should be checked and interpreted in context.
 
+
+## Student-friendly interpretation layer and automatic data loading
+
+The fieldbook uses a plain-language guide with three prompts: **What does it mean? How is it connected? What can I do next?** Climate, crop screening, biodiversity, food prices, national indicators and dataset catalogues now lead with an interpretation and a practical next step. Technical numbers, indicator codes and detailed source tables are placed inside expandable details where appropriate.
+
+When users open **Data & Research**, the page automatically starts a small set of public, no-key lookups: Crossref publication metadata, World Bank country indicators, the FAO WaPOR catalogue and—when Indonesia is selected—FAOSTAT land-use data. The Nature tab already requests selected public biodiversity and climate sources on opening. Users can refresh these lookups. Credential-based services such as WOCAT QCAT and Pl@ntNet are never auto-submitted.
+
+These explanations are educational prompts, not claims that a particular cause has been proven. National statistics, satellite/model estimates, publications, and field observations represent different kinds of evidence. The interface clearly distinguishes them and encourages checking location, dates, units, methods and local conditions before acting. No sample values are inserted when requests fail.
+
 ## Files
 
 - `index.html` — page shell, retro game-inspired styles, and main navigation.
