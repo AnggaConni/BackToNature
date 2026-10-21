@@ -43,7 +43,10 @@ async function main() {
   assert.ok(appSource.includes('function analyzeWaporTrend(data)'), 'WaPOR charts classify rising, falling and fluctuating trends');
   assert.ok(appSource.includes('function renderWaporTrendStory(data)'), 'WaPOR graphs include plain-language interpretation and a next step');
   assert.ok(appSource.includes('function autoFetchWaporLearningLayers()'), 'WaPOR automatically loads key indicators when Nature opens');
-  assert.ok(appSource.includes("var codes = ['L1-PCP-D','L1-RSM-D','L1-AETI-D','L1-NPP-D']"), 'auto-loading is limited to rainfall, soil moisture, water loss and plant growth');
+  assert.ok(appSource.includes("document.querySelectorAll('[data-wapor-point-btn]')"), 'auto-loading discovers every card returned by the WaPOR catalogue');
+  assert.ok(appSource.includes('await request;'), 'WaPOR auto-load waits for one card request to finish before starting the next');
+  assert.ok(appSource.includes('var natureWaporAutoQueuePromise = null;'), 'one shared queue lock prevents overlapping WaPOR auto-load runs');
+  assert.ok(!appSource.includes("var codes = ['L1-PCP-D','L1-RSM-D','L1-AETI-D','L1-NPP-D']"), 'WaPOR auto-load no longer stops at four hard-coded layers');
   assert.ok(appSource.includes('automatic ? {maxPeriods:6} : {maxPeriods:12}'), 'auto-loads use a lighter period count than manual requests');
   assert.ok(appSource.includes('If the value is higher than baseline'), 'WaPOR cards provide higher-value field guidance');
   assert.ok(appSource.includes('If the value is lower than baseline'), 'WaPOR cards provide lower-value field guidance');
