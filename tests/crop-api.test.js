@@ -24,7 +24,7 @@ async function main() {
   assert.ok(appSource.includes('How is it connected?'), 'data views explain relationships between factors');
   assert.ok(appSource.includes('What can I do next?'), 'data views include an actionable next step');
   assert.ok(appSource.includes('See weather measurements'), 'technical climate figures are hidden behind progressive disclosure');
-  assert.ok(appSource.includes("['crossref-search-btn','country-wb-fetch-btn','wapor-source-fetch-btn']"), 'Sources auto-loads a small set of no-key public data sources');
+  assert.ok(appSource.includes("['crossref-search-btn','country-wb-fetch-btn']"), 'Sources auto-loads a small set of no-key public data sources without duplicating the WaPOR explorer');
   assert.ok(appSource.includes('label:\'08 NATURE AROUND US\''), 'Nature tab uses plain-language navigation');
   assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
   assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
@@ -38,6 +38,11 @@ async function main() {
   assert.ok(appSource.includes('not currently populated by a live WOCAT or technology API'), 'Technology tab documents its rule-based data provenance');
   assert.ok(appSource.includes('function initNatureInlineMap(selection, selectionKey, point)'), 'Plant reports include an embedded biodiversity map');
   assert.ok(appSource.includes('Where were plants reported?'), 'Plant report map explains what its points mean');
+  assert.ok(appSource.includes('function renderWaporPointSeries(data)'), 'WaPOR cards display actual values, a seasonal baseline and a trend chart');
+  assert.ok(appSource.includes('If the value is higher than baseline'), 'WaPOR cards provide higher-value field guidance');
+  assert.ok(appSource.includes('If the value is lower than baseline'), 'WaPOR cards provide lower-value field guidance');
+  assert.ok(appSource.includes('countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + indonesiaLiveTerminal'), 'the duplicate WaPOR API panel is removed from Sources');
+  assert.equal(typeof api.fetchWaporPointSeries, 'function', 'WaPOR raster point/time-series reader is exported');
   assert.equal(typeof api.searchPlantImages, 'function', 'GBIF-first public plant image lookup is exported');
 
   const recommendations = api.listCropRecommendations({
