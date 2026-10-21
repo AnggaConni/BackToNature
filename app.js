@@ -1457,7 +1457,7 @@
   function renderNatureOccurrenceCards(data) {
     var records = data && Array.isArray(data.records) ? data.records : [];
     if (!records.length) {
-      return '<p>No coordinate-backed GBIF records were returned inside this search radius. This does not mean the area has no wildlife; recording effort and data coverage vary.</p>';
+      return '<p>No georeferenced plant records were returned in this search area. That does not prove plants are absent; some places have fewer reported observations.</p>';
     }
     return '<div class="nature-record-grid">' + records.map(function (record) {
       var detail = [record.locality, record.countryCode].filter(Boolean).join(' · ');
@@ -1465,48 +1465,63 @@
         ? 'https://www.gbif.org/species/' + encodeURIComponent(record.taxonKey)
         : 'https://www.gbif.org/occurrence/search?scientific_name=' + encodeURIComponent(record.scientificName);
       return '<article class="field-card nature-record-card">' +
-        '<div class="card-topline"><span class="card-emoji">🦋</span><span class="mini-code">' + esc(numberOrDash(record.distanceKm,' km away')) + '</span></div>' +
-        '<h3>' + esc(record.vernacularName || record.scientificName) + '</h3>' +
-        (record.vernacularName ? '<p><i>' + esc(record.scientificName) + '</i></p>' : '<p><i>Scientific name / identification supplied by record</i></p>') +
-        (record.eventDate ? '<p><b>Observation date:</b> ' + esc(record.eventDate) + '</p>' : '') +
-        (detail ? '<p>' + esc(detail) + '</p>' : '') +
+        '<div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">REPORTED NEARBY</span></div>' +
+        '<h3>' + esc(record.vernacularName || record.scientificName || 'Plant record') + '</h3>' +
+        '<p>This plant has a record in the nearby search area. It does not show how many plants exist or whether this species is suitable to grow here.</p>' +
+        ((record.eventDate || detail) ? '<p class="record-meta">' + esc([record.eventDate,detail].filter(Boolean).join(' · ')) + '</p>' : '') +
+        '<details class="mini-explanation"><summary>Scientific and source details</summary>' +
+        '<p><i>' + esc(record.scientificName || 'Scientific name not supplied') + '</i></p>' +
         (record.basisOfRecord ? '<p><b>Record type:</b> ' + esc(record.basisOfRecord.replace(/_/g,' ').toLowerCase()) + '</p>' : '') +
         (record.datasetName ? '<p><b>Dataset:</b> ' + esc(record.datasetName) + '</p>' : '') +
-        '<div class="nature-record-links"><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(taxonUrl)) + '">Open taxon ↗</a>' +
-        ' <a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Source record ↗</a></div>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(taxonUrl)) + '">Open species page ↗</a> ' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Original record ↗</a></details>' +
         '</article>';
     }).join('') + '</div>';
   }
 
   function renderNasaPowerMonthCards(data) {
     var months = data && Array.isArray(data.monthly) ? data.monthly : [];
-    if (!months.length) return '<p>No monthly climate values were returned by NASA POWER.</p>';
-    return '<div class="climate-month-grid">' + months.map(function (month) {
+    if (!months.length) return '<p>No historical monthly climate values were returned by NASA POWER.</p>';
+    var validTemps = months.filter(function (m) { return m.temperatureMean != null && Number.isFinite(Number(m.temperatureMean)); });
+    var warmest = validTemps.slice().sort(function (a,b) { return Number(b.temperatureMean)-Number(a.temperatureMean); })[0];
+    var coolest = validTemps.slice().sort(function (a,b) { return Number(a.temperatureMean)-Number(b.temperatureMean); })[0];
+    var rainMonths = months.filter(function (m) { return m.precipitationRateMmPerDay != null && Number.isFinite(Number(m.precipitationRateMmPerDay)); });
+    var wettest = rainMonths.slice().sort(function (a,b) { return Number(b.precipitationRateMmPerDay)-Number(a.precipitationRateMmPerDay); })[0];
+    var driest = rainMonths.slice().sort(function (a,b) { return Number(a.precipitationRateMmPerDay)-Number(b.precipitationRateMmPerDay); })[0];
+    var meaning = 'This historical snapshot helps compare usual weather patterns across months. It is not today’s weather and is not a sensor reading from the selected farm.';
+    if (warmest && coolest) meaning += ' In this profile, ' + warmest.label + ' is typically warmer and ' + coolest.label + ' cooler.';
+    var connection = 'Temperature and sunlight affect plant growth; rainfall helps describe water supply. The same rain can soak in, run off or drain away differently depending on soil and land shape.';
+    var action = 'Compare these broad patterns with the local weather service and your own rain or soil-moisture observations. Rainfall is shown as an average daily rate, not a monthly total.';
+    if (wettest && driest) action += ' ' + wettest.label + ' is the wetter month in this dataset and ' + driest.label + ' the drier one, so inspect water access in the drier season.';
+    var technical = '<div class="climate-month-grid">' + months.map(function (month) {
       return '<article class="climate-month-card">' +
         '<div class="climate-month-top"><b>' + esc(month.label) + '</b><span>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</span></div>' +
         '<div class="climate-month-metrics">' +
         '<span>Mean temperature</span><b>' + esc(numberOrDash(month.temperatureMean,' °C')) + '</b>' +
         '<span>Typical low–high</span><b>' + esc(numberOrDash(month.temperatureMin,'–') + numberOrDash(month.temperatureMax,' °C')) + '</b>' +
-        '<span>Precipitation rate</span><b>' + esc(numberOrDash(month.precipitationRateMmPerDay,' mm/day')) + '</b>' +
+        '<span>Average rain per day</span><b>' + esc(numberOrDash(month.precipitationRateMmPerDay,' mm/day')) + '</b>' +
         '<span>Solar radiation</span><b>' + esc(numberOrDash(month.solarRadiationKwhM2Day,' kWh/m²/day')) + '</b>' +
         '</div></article>';
     }).join('') + '</div>';
+    return renderLearningGuide(meaning,connection,action,'What can this climate snapshot tell us?') +
+      '<details class="technical-details"><summary>See month-by-month climate figures</summary>' + technical + '</details>';
   }
-
 
   function renderINaturalistPlantRecords(data) {
     var records = data && Array.isArray(data.records) ? data.records : [];
-    if (!records.length) return '<p>No research-grade plant observations were returned in the nearby search. This is not proof that the area has no plants.</p>';
+    if (!records.length) return '<p>No research-grade plant observations came back in this search. This does not mean the area has no plants; observation effort varies.</p>';
     return '<div class="nature-observation-grid">' + records.map(function (record) {
       return '<article class="field-card nature-observation-card">' +
-        '<div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">' + esc(numberOrDash(record.distanceKm,' km away')) + '</span></div>' +
-        '<h3>' + esc(record.commonName || record.scientificName) + '</h3>' +
-        '<p><i>' + esc(record.scientificName) + '</i></p>' +
-        (record.observedOn ? '<p><b>Observed:</b> ' + esc(record.observedOn) + '</p>' : '') +
-        (record.place ? '<p>' + esc(record.place) + '</p>' : '') +
+        '<div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">COMMUNITY OBSERVATION</span></div>' +
+        '<h3>' + esc(record.commonName || record.scientificName || 'Plant observation') + '</h3>' +
+        '<p>Someone recorded this plant near the selected region. A record is a clue to investigate, not a count of how common the plant is.</p>' +
+        (record.observedOn || record.place ? '<p class="record-meta">' + esc([record.observedOn,record.place].filter(Boolean).join(' · ')) + '</p>' : '') +
+        '<details class="mini-explanation"><summary>Scientific and observer details</summary>' +
+        '<p><i>' + esc(record.scientificName || 'Scientific name not provided') + '</i></p>' +
         (record.observer ? '<p><b>Observer:</b> ' + esc(record.observer) + '</p>' : '') +
-        '<div class="nature-record-links"><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.taxonUrl)) + '">Open taxon ↗</a> ' +
-        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Source observation ↗</a></div>' +
+        (record.distanceKm != null ? '<p><b>Approx. distance from map point:</b> ' + esc(numberOrDash(record.distanceKm,' km')) + '</p>' : '') +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.taxonUrl)) + '">Open species page ↗</a> ' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.sourceUrl)) + '">Original observation ↗</a></details>' +
         '</article>';
     }).join('') + '</div>';
   }
@@ -1514,18 +1529,36 @@
   function renderOpenMeteoOutlook(data) {
     var days = data && Array.isArray(data.days) ? data.days : [];
     if (!days.length) return '<p>No seven-day outlook was returned for this location.</p>';
-    return '<div class="outlook-day-grid">' + days.map(function (day) {
+    var rainDays = days.filter(function (d) { return d.precipitationMm != null && Number.isFinite(Number(d.precipitationMm)); });
+    var tempDays = days.filter(function (d) { return d.temperatureMean != null && Number.isFinite(Number(d.temperatureMean)); });
+    var pairs = days.filter(function (d) { return d.precipitationMm != null && d.referenceEt0Mm != null &&
+      Number.isFinite(Number(d.precipitationMm)) && Number.isFinite(Number(d.referenceEt0Mm)); });
+    var totalRain = rainDays.reduce(function (sum,d) { return sum + Number(d.precipitationMm); },0);
+    var meanTemp = tempDays.length ? tempDays.reduce(function (sum,d) { return sum + Number(d.temperatureMean); },0)/tempDays.length : null;
+    var balance = pairs.length ? pairs.reduce(function (sum,d) { return sum + Number(d.precipitationMm) - Number(d.referenceEt0Mm); },0) : null;
+    var deficitDays = pairs.filter(function (d) { return Number(d.precipitationMm)-Number(d.referenceEt0Mm)<0; }).length;
+    var meaning = 'This is a model forecast for the next seven days near a representative point, not a promise about what will happen on every farm.';
+    meaning += ' It predicts about ' + Number(totalRain).toFixed(1) + ' mm of rain across the days returned' +
+      (meanTemp == null ? '.' : ' and an average temperature near ' + meanTemp.toFixed(1) + ' °C.');
+    var connection = 'Rain, temperature, soil and drainage work together. Forecast rain is not the same as water stored in the root zone; runoff, previous rainfall and irrigation all matter.';
+    var action = balance == null ? 'Check the local forecast and actual field conditions before planning work.' :
+      balance < 0 ? 'Forecast rain is below the reference water-demand estimate overall. Check soil moisture and irrigation before sowing; this does not prove drought.' :
+      'Forecast rain is at or above reference water demand overall. Check drainage and field conditions; this does not prove that the soil is saturated.';
+    if (pairs.length && deficitDays) action += ' ' + deficitDays + ' forecast day(s) have less rain than reference demand.';
+    var technical = '<div class="outlook-day-grid">' + days.map(function (day) {
       return '<article class="outlook-day-card">' +
         '<b>' + esc(day.date) + '</b>' +
         '<span class="outlook-temperature">' + esc(numberOrDash(day.temperatureMean,' °C')) + '</span>' +
         '<span>Rain <b>' + esc(numberOrDash(day.precipitationMm,' mm')) + '</b></span>' +
-        '<span>ET₀ <b>' + esc(numberOrDash(day.referenceEt0Mm,' mm')) + '</b></span>' +
-        '<span class="' + (day.waterBalanceMm != null && day.waterBalanceMm < 0 ? 'water-deficit' : '') + '">Rain − ET₀ <b>' + esc(numberOrDash(day.waterBalanceMm,' mm')) + '</b></span>' +
-        '<span>Model soil moisture · 0–7 cm <b>' + esc(day.soilMoistureTopM3M3 == null ? '—' : numberOrDash(day.soilMoistureTopM3M3*100,' %')) + '</b></span>' +
-        '<span>Model soil temperature · 0–7 cm <b>' + esc(numberOrDash(day.soilTemperatureTopC,' °C')) + '</b></span>' +
-        '<span>Vapour pressure deficit <b>' + esc(numberOrDash(day.vapourPressureDeficitKpa,' kPa')) + '</b></span>' +
+        '<span>Reference water demand (ET₀) <b>' + esc(numberOrDash(day.referenceEt0Mm,' mm')) + '</b></span>' +
+        '<span class="' + (day.waterBalanceMm != null && day.waterBalanceMm < 0 ? 'water-deficit' : '') + '">Rain − reference demand <b>' + esc(numberOrDash(day.waterBalanceMm,' mm')) + '</b></span>' +
+        '<span>Modelled topsoil moisture <b>' + esc(day.soilMoistureTopM3M3 == null ? '—' : numberOrDash(day.soilMoistureTopM3M3*100,' %')) + '</b></span>' +
+        '<span>Modelled topsoil temperature <b>' + esc(numberOrDash(day.soilTemperatureTopC,' °C')) + '</b></span>' +
+        '<span>Air dryness estimate <b>' + esc(numberOrDash(day.vapourPressureDeficitKpa,' kPa')) + '</b></span>' +
         '</article>';
     }).join('') + '</div>';
+    return renderLearningGuide(meaning,connection,action,'What might next week mean for the field?') +
+      '<details class="technical-details"><summary>See the daily forecast estimates</summary>' + technical + '</details>';
   }
 
   function renderPlantNetResults(data) {
@@ -1545,24 +1578,31 @@
 
   function renderWaporMapsetCatalog(data) {
     var records = data && Array.isArray(data.records) ? data.records : [];
-    if (!records.length) return '<p>No WaPOR mapsets were returned from the official catalog.</p>';
-    return '<div class="wapor-mapset-grid">' + records.map(function (record) {
-      var keyText = /AETI/.test(record.code) ? 'Actual evapotranspiration' :
-        /RET/.test(record.code) ? 'Reference evapotranspiration' :
-        /RSM/.test(record.code) ? 'Relative soil moisture' :
-        /NPP/.test(record.code) ? 'Vegetation productivity' :
-        /PCP/.test(record.code) ? 'Precipitation' : 'Water / land indicator';
+    if (!records.length) return '<p>No WaPOR datasets were returned by the official catalogue.</p>';
+    var grid = '<div class="wapor-mapset-grid">' + records.map(function (record) {
+      var keyText = /AETI/.test(record.code) ? 'Water that leaves land and plants through evaporation and transpiration' :
+        /RET/.test(record.code) ? 'Reference estimate of how much water could evaporate from a well-watered surface' :
+        /RSM/.test(record.code) ? 'Estimated relative wetness of the soil' :
+        /NPP/.test(record.code) ? 'An indicator of plant growth and biomass production' :
+        /PCP/.test(record.code) ? 'Precipitation / rainfall' : 'Water or land indicator';
       return '<article class="wapor-mapset-card">' +
         '<div class="wapor-mapset-heading"><span class="mini-code">' + esc(record.code) + '</span><span class="wapor-level-tag">' + esc(record.level) + '</span></div>' +
-        '<h4>' + esc(record.caption) + '</h4>' +
+        '<h4>' + esc(record.caption) + '</h4><p>' + esc(keyText) + '.</p>' +
+        '<details class="mini-explanation"><summary>Dataset coverage and technical details</summary>' +
         '<div class="wapor-mapset-meta"><span>' + esc(record.temporalResolution) + '</span><span>' + esc(record.resolutionNote) + '</span></div>' +
-        '<p>' + esc(keyText) + '. Time-step and spatial resolution matter when comparing this dataset with local field measurements.</p>' +
-        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open raster catalog ↗</a>' +
+        '<p>Check the time period and map resolution before comparing this dataset with local measurements.</p>' +
+        '<a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(record.apiUrl)) + '">Open dataset catalogue ↗</a></details>' +
         '</article>';
-    }).join('') + '</div>' +
-    '<p class="nature-method-note">Catalog metadata loaded at ' + esc(new Date(data.retrievedAt).toLocaleString()) + '. The links list source raster metadata; this panel does not claim to have extracted a value for this point.</p>';
+    }).join('') + '</div>';
+    return renderLearningGuide(
+      'WaPOR lists satellite and model-based datasets about rainfall, soil moisture, water use and plant growth. Loading this catalogue does not measure the selected farm.',
+      'These layers can provide broad environmental context. Their usefulness depends on where they cover, how detailed the map is and which dates it represents.',
+      'Choose the variable and date range you need, open its coverage information, and compare it with field notes or local measurements before using it in a decision.',
+      'What are these water and vegetation layers?'
+    ) + '<details class="technical-details"><summary>Explore the available WaPOR datasets</summary>' + grid +
+      '<p class="nature-method-note">Catalogue metadata retrieved ' + esc(new Date(data.retrievedAt).toLocaleString()) +
+      '. These links list dataset metadata; no value for the selected point has been extracted.</p></details>';
   }
-
 
   function renderNatureObservationMarkers(selectionKey) {
     if (!natureObservationLayer || !map || !selectionKey) return;
@@ -1650,57 +1690,61 @@
     var region = currentProvince && currentProvince.name || profile.name;
     var point = currentProvince && geometryCentroid(currentProvince.feature);
     var pointText = point ? (Number(point.latitude).toFixed(4) + ', ' + Number(point.longitude).toFixed(4)) : 'representative point unavailable';
-    return '<div class="tab-intro"><div class="eyebrow">NATURE & CLIMATE / LIVE DATA</div>' +
-      '<h2>Explore nearby life and climate 🌿</h2>' +
-      '<p>Detailed evidence for <b>' + esc(region) + '</b>. Live searches use an approximate representative point (' + esc(pointText) + '), not every part of the selected administrative area.</p>' +
-      '<p class="nature-map-hint">Map markers appear as each source loads. Close this fieldbook to click a point; use the top-right map layer control to show or hide observations.</p></div>' +
+    var intro = '<div class="tab-intro"><div class="eyebrow">NATURE & CLIMATE / FIELD EXPLORER</div>' +
+      '<h2>What has been reported near this region? 🌿</h2>' +
+      '<p>When this tab opens, BackToNature checks several free public sources automatically. It shows an error rather than inventing a result if a source is unavailable.</p>' +
+      '<details class="technical-details"><summary>How do the map searches work?</summary><p>Searches use an approximate representative point (' + esc(pointText) + ') and a nearby radius. This is a discovery aid, not a complete survey of every place in ' + esc(region) + '.</p></details></div>';
+    var beginnerGuide = renderLearningGuide(
+      'Species lists show plants that people or research projects have reported nearby. Weather layers describe a broader area using historical records or computer models.',
+      'Plant observations help us ask what may live in the area. Rainfall, temperature and soil moisture describe conditions, but they do not prove that a plant will grow well on a farm.',
+      'Open the original observation for context, check the date, then compare the map with a real field visit. Record what you see in My Plot Field Log.',
+      'A clue is not the whole story'
+    );
+    return intro + beginnerGuide +
       '<div class="tile-grid nature-connectors-grid">' +
-      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌱</span><span class="mini-code">GBIF / PLANT OCCURRENCES</span></div>' +
-      '<h3>Plant species recorded nearby</h3><p>Species-level, georeferenced plant records from GBIF within 25 km. Records document reported occurrence, not crop suitability or abundance.</p>' +
-      '<button id="nature-gbif-btn" class="pixel-btn green" type="button">↻ REFRESH GBIF PLANTS</button>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌱</span><span class="mini-code">GBIF / PLANTS</span></div>' +
+      '<h3>Plant reports nearby</h3><p>Find georeferenced plant reports within about 25 km. They document reported presence, not how many plants exist or whether they are suitable crops.</p>' +
+      '<button id="nature-gbif-btn" class="pixel-btn green" type="button">↻ REFRESH PLANT REPORTS</button>' +
       '<div id="nature-gbif-status" class="live-status ' + esc(occurrenceStatus.type) + '" aria-live="polite">' + esc(occurrenceStatus.message) + '</div>' +
-      '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Opening this tab loads nearby GBIF plant observations.') + '</div>' +
+      '<div id="nature-gbif-results" class="live-results">' + (occurrenceData ? renderNatureOccurrenceCards(occurrenceData) : 'Nearby plant reports will appear here when the search finishes.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://techdocs.gbif.org/en/openapi/v1/occurrence">GBIF Occurrence API ↗</a></p></article>' +
-      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">iNATURALIST / PLANTS</span></div>' +
-      '<h3>Independent observation cross-check</h3><p>Research-grade plant observations from another community source. Its records may overlap with GBIF or be concentrated where people observe nature.</p>' +
-      '<button id="nature-inat-btn" class="pixel-btn green" type="button">↻ REFRESH INAT OBSERVATIONS</button>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">🌿</span><span class="mini-code">INATURALIST / PLANTS</span></div>' +
+      '<h3>Check another source</h3><p>iNaturalist adds a second set of community observations. The same plant may appear in both sources, and some places have more observers than others.</p>' +
+      '<button id="nature-inat-btn" class="pixel-btn green" type="button">↻ REFRESH SECOND SOURCE</button>' +
       '<div id="nature-inat-status" class="live-status ' + esc(iNatStatus.type) + '" aria-live="polite">' + esc(iNatStatus.message) + '</div>' +
-      '<div id="nature-inat-results" class="live-results">' + (iNatData ? renderINaturalistPlantRecords(iNatData) : 'Opening this tab loads nearby plant observations.') + '</div>' +
+      '<div id="nature-inat-results" class="live-results">' + (iNatData ? renderINaturalistPlantRecords(iNatData) : 'A second set of plant reports will appear here.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.inaturalist.org/pages/developers">iNaturalist API ↗</a></p></article>' +
-      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">☀️</span><span class="mini-code">NASA POWER / MONTHLY</span></div>' +
-      '<h3>Climate cross-check</h3><p>Monthly averages for temperature, precipitation rate and solar radiation over five complete calendar years.</p>' +
-      '<button id="nature-power-btn" class="pixel-btn green" type="button">↻ REFRESH NASA POWER</button>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">☀️</span><span class="mini-code">NASA POWER / HISTORY</span></div>' +
+      '<h3>Usual climate through the year</h3><p>Historical estimates for temperature, rainfall rate and sunlight, averaged by month over five complete years.</p>' +
+      '<button id="nature-power-btn" class="pixel-btn green" type="button">↻ REFRESH CLIMATE HISTORY</button>' +
       '<div id="nature-power-status" class="live-status ' + esc(powerStatus.type) + '" aria-live="polite">' + esc(powerStatus.message) + '</div>' +
-      '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'Opening this tab loads the historical climate cross-check.') + '</div>' +
+      '<div id="nature-power-results" class="live-results">' + (powerData ? renderNasaPowerMonthCards(powerData) : 'The usual seasonal pattern will appear here.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://power.larc.nasa.gov/docs/services/api/temporal/monthly/">NASA POWER API ↗</a></p></article>' +
-      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">💧</span><span class="mini-code">OPEN-METEO / NEXT 7 DAYS</span></div>' +
-      '<h3>Rain versus reference water demand</h3><p>Forecast rain minus FAO reference evapotranspiration (ET₀), plus modelled topsoil moisture/temperature and vapour-pressure deficit. These are weather-model estimates, not field measurements or crop-specific irrigation advice.</p>' +
-      '<button id="nature-outlook-btn" class="pixel-btn green" type="button">↻ REFRESH 7-DAY OUTLOOK</button>' +
+      '<article class="field-card nature-connector-card"><div class="card-topline"><span class="card-emoji">💧</span><span class="mini-code">OPEN-METEO / NEXT WEEK</span></div>' +
+      '<h3>What may the next week bring?</h3><p>A short-term forecast to help plan a visit or observation. It is modelled weather, not a sensor installed on the farm.</p>' +
+      '<button id="nature-outlook-btn" class="pixel-btn green" type="button">↻ REFRESH NEXT-WEEK OUTLOOK</button>' +
       '<div id="nature-outlook-status" class="live-status ' + esc(outlookStatus.type) + '" aria-live="polite">' + esc(outlookStatus.message) + '</div>' +
-      '<div id="nature-outlook-results" class="live-results">' + (outlookData ? renderOpenMeteoOutlook(outlookData) : 'Opening this tab loads the next seven days.') + '</div>' +
+      '<div id="nature-outlook-results" class="live-results">' + (outlookData ? renderOpenMeteoOutlook(outlookData) : 'The forecast summary will appear here.') + '</div>' +
       '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://open-meteo.com/en/docs">Open-Meteo API ↗</a></p></article>' +
       '</div>' +
-      '<section class="live-connectors plantnet-panel"><div class="section-title"><span class="mini-code">OPTIONAL PHOTO TOOL / PL@NTNET</span><h3>Identify a plant from your photo 📷</h3></div>' +
-      '<p class="live-explainer">Use your own Pl@ntNet API key (free quota: up to 500 identification requests per day). The key is used for this request only and is not saved in the app. Do not paste a shared organisation secret into a public browser app. Upload 1–5 JPEG/PNG photos of the same plant, ideally showing a clear leaf, flower or fruit.</p>' +
+      '<section class="live-connectors plantnet-panel"><div class="section-title"><span class="mini-code">OPTIONAL PHOTO TOOL / PL@NTNET</span><h3>Would you like help identifying a plant? 📷</h3></div>' +
+      '<p class="live-explainer">This optional tool needs your own Pl@ntNet key and sends selected photos only after you press Identify. Treat its best match as a suggestion and compare it with the original photo and local expertise. Never paste a shared organisation secret into this public page.</p>' +
       '<div class="plantnet-controls"><label for="plantnet-api-key">Your Pl@ntNet API key</label><input id="plantnet-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your personal key for this request">' +
-      '<label for="plantnet-photos">Plant photos (1–5)</label><input id="plantnet-photos" type="file" accept="image/jpeg,image/png" multiple>' +
-      '<label for="plantnet-organ">Photo organ</label><select id="plantnet-organ"><option value="auto">Detect automatically</option><option value="leaf">Leaf</option><option value="flower">Flower</option><option value="fruit">Fruit</option><option value="bark">Bark</option></select>' +
+      '<label for="plantnet-photos">Photos of one plant (1–5)</label><input id="plantnet-photos" type="file" accept="image/jpeg,image/png" multiple>' +
+      '<label for="plantnet-organ">What part is in the photo?</label><select id="plantnet-organ"><option value="auto">Not sure / automatic</option><option value="leaf">Leaf</option><option value="flower">Flower</option><option value="fruit">Fruit</option><option value="bark">Bark</option></select>' +
       '<button id="plantnet-identify-btn" class="pixel-btn green" type="button">IDENTIFY PLANT</button></div>' +
-      '<div id="plantnet-status" class="live-status" aria-live="polite">Optional service · API key not supplied</div>' +
-      '<div id="plantnet-results" class="live-results">No image has been submitted. Photos are sent to Pl@ntNet only after you press Identify Plant.</div>' +
+      '<div id="plantnet-status" class="live-status" aria-live="polite">Optional service · your key has not been supplied</div>' +
+      '<div id="plantnet-results" class="live-results">No photo has been sent.</div>' +
       '<a href="https://my.plantnet.org/" target="_blank" rel="noopener noreferrer" aria-label="Powered by Pl@ntNet"><img class="plantnet-powered-logo" src="https://my.plantnet.org/images/powered-by-plantnet-light.png" alt="Powered by Pl@ntNet" loading="lazy"></a>' +
-      '<p class="nature-method-note">Identification is a model suggestion, not a definitive expert determination. <a target="_blank" rel="noopener noreferrer" href="https://my.plantnet.org/terms_of_use">Free-use conditions ↗</a></p></section>' +
-
-      '<section class="live-connectors wapor-panel"><div class="section-title"><span class="mini-code">FAO / WAPOR VERSION 3</span><h3>Global water and vegetation data catalogue</h3></div>' +
-      '<p class="live-explainer">Load the public WaPOR v3 catalogue without an API key. It lists global datasets for actual evapotranspiration, reference evapotranspiration, relative soil moisture, precipitation and vegetation productivity. This is a metadata browser—not yet a sampled value for the selected point. Available spatial resolution differs by variable.</p>' +
-      '<button id="nature-wapor-btn" class="pixel-btn green" type="button">↻ LOAD / REFRESH WAPOR CATALOG</button>' +
+      '<p class="nature-method-note">Photo identification can be wrong. <a target="_blank" rel="noopener noreferrer" href="https://my.plantnet.org/terms_of_use">Pl@ntNet use terms ↗</a></p></section>' +
+      '<section class="live-connectors wapor-panel"><div class="section-title"><span class="mini-code">FAO / WAPOR VERSION 3</span><h3>Explore water and plant-growth maps</h3></div>' +
+      '<p class="live-explainer">The free public catalogue lists satellite/model datasets on rainfall, water use, soil moisture and vegetation productivity. The catalogue itself does not read a value from your plot.</p>' +
+      '<button id="nature-wapor-btn" class="pixel-btn green" type="button">↻ REFRESH DATASET LIST</button>' +
       '<div id="nature-wapor-status" class="live-status ' + esc(waporStatus.type) + '" aria-live="polite">' + esc(waporStatus.message) + '</div>' +
-      '<div id="nature-wapor-results" class="live-results">' + (waporData ? renderWaporMapsetCatalog(waporData) : 'Opening this tab loads the WaPOR catalogue. No raster values are fabricated.') + '</div>' +
-      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">FAO WaPOR v3 data access ↗</a> · <a target="_blank" rel="noopener noreferrer" href="https://data.apps.fao.org/gismgr/shared/docs/api-reference/index.html">GISMGR API documentation ↗</a></p></section>' +
-      '<section class="climate-method-note"><b>How to interpret these sources</b><p>GBIF and iNaturalist describe reported observations, not population size. NASA POWER and Open-Meteo are gridded weather products, not a measurement from the selected farm. The ESA WorldCover 2021 land-cover layer can be toggled from the map layer control. Verify soil, water and the actual planting calendar locally.</p>' +
-      '<p><a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Open FAO WaPOR data portal ↗</a> (global reference-water/actual evapotranspiration layers; investigate the available spatial and temporal level before using for a local decision).</p></section>';
+      '<div id="nature-wapor-results" class="live-results">' + (waporData ? renderWaporMapsetCatalog(waporData) : 'The dataset list will appear here.') + '</div>' +
+      '<p class="nature-method-note">Source: <a target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">FAO WaPOR v3 data guide ↗</a></p></section>' +
+      '<details class="technical-details"><summary>How to interpret this tab</summary><p>GBIF and iNaturalist show reported observations, not abundance. NASA POWER and Open-Meteo show gridded estimates, not in-situ measurements. A blank result often means the source did not return a record, not that no plants or water exist.</p><p>Use the data to ask a better field question, then verify on site. <a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">FAO WaPOR source guide ↗</a></p></details>';
   }
-
 
   function wireNatureControls() {
     var selection = currentProvince;
