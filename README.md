@@ -30,6 +30,15 @@ The world map uses the public datasets/geo-countries GeoJSON source. Monthly gen
 
 ## Data connectors
 
+### Crossref — Research & Evidence Finder (free public metadata API)
+The Sources tab includes an on-demand literature search using the public Crossref REST API. It retrieves a small set of bibliographic metadata records—title, authors, publication year, journal or publisher, publication type and DOI/publication link—with no API key. Results are cached in page memory for ten minutes to reduce repeated calls.
+
+This connector does **not** retrieve paywalled article full text, guarantee open-access availability, or grant rights to reuse abstracts or full articles. Crossref metadata completeness varies by publisher; missing authors, dates, or DOI links are shown as unavailable rather than invented. Users should follow the publication's original access and reuse terms.
+
+Official documentation: https://www.crossref.org/documentation/retrieve-metadata/rest-api/
+
+
+
 ### FAOSTAT — national land-use context
 The Sources tab can request the Land Use (RL) domain for Indonesia from the public FAOSTAT API. Results are labelled as **national context** and must not be interpreted as province-level measurements.
 
