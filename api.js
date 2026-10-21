@@ -336,12 +336,16 @@
 
   async function searchGbifPlantImages(cropInfo, limit) {
     var scientific = String(cropInfo && (cropInfo.scientific || cropInfo.scientificName) || '').trim();
-    if (!/^[A-Z][a-z-]+\s+[a-z][a-z-]+$/.test(scientific)) return [];
+    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\\s+(?:spp?\\.?|species)$/i);
+    var isGenus = !!genusMatch;
+    var matchName = isGenus ? genusMatch[1] : scientific;
+    var expectedRank = isGenus ? 'GENUS' : 'SPECIES';
+    if (!isGenus && !/^[A-Z][a-z-]+\\s+[a-z][a-z-]+$/.test(scientific)) return [];
     var maxImages = Math.min(Math.max(Number(limit) || 4, 1), 8);
 
     function secureMediaUrl(value) {
-      var url = String(value || '').trim().replace(/^http:\/\//i, 'https://');
-      return /^https:\/\//i.test(url) ? url : '';
+      var url = String(value || '').trim().replace(/^http:\\/\\//i, 'https://');
+      return /^https:\\/\\//i.test(url) ? url : '';
     }
     function itemsFrom(payload) {
       if (Array.isArray(payload)) return payload;
@@ -353,7 +357,7 @@
     function mapMedia(media, record, usageKey) {
       if (!media || typeof media !== 'object') return null;
       var kind = String(media.type || media.mediaType || '').trim();
-      if (kind && !/(still.?image|image\/|^image$)/i.test(kind)) return null;
+      if (kind && !/(still.?image|image\\/|^image$)/i.test(kind)) return null;
       var imageUrl = secureMediaUrl(media.identifier || media.url || media.thumbnail);
       if (!imageUrl) return null;
       var occurrenceKey = record && record.key != null ? String(record.key) : '';
@@ -361,13 +365,13 @@
         ? 'https://www.gbif.org/occurrence/' + encodeURIComponent(occurrenceKey)
         : 'https://www.gbif.org/species/' + encodeURIComponent(String(usageKey || ''));
       var license = String(media.license || media.rights || '').trim();
-      var licenseUrl = /^https:\/\//i.test(license) ? license : '';
+      var licenseUrl = /^https?:\\/\\//i.test(license) ? license.replace(/^http:\\/\\//i, 'https://') : '';
       return {
         title:String(media.title || media.description || (record && (record.acceptedScientificName || record.scientificName)) || scientific),
         imageUrl:imageUrl,
         fileUrl:sourceUrl,
         artist:String(media.creator || media.rightsHolder || media.publisher || (record && record.recordedBy) || 'Credit details on the GBIF source record'),
-        license:license && !/^https:\/\//i.test(license) ? license : (licenseUrl ? 'Open license details' : 'Check source record for license'),
+        license:license && !/^https?:\\/\\//i.test(license) ? license : (licenseUrl ? 'Open license details' : 'Check source record for license'),
         licenseUrl:licenseUrl,
         description:String(media.description || ''),
         source:'GBIF'
@@ -375,14 +379,14 @@
     }
 
     try {
-      var matchUrl = 'https://api.gbif.org/v1/species/match?name=' + encodeURIComponent(scientific) +
-        '&rank=SPECIES&strict=true&kingdom=Plantae';
+      var matchUrl = 'https://api.gbif.org/v1/species/match?name=' + encodeURIComponent(matchName) +
+        '&rank=' + expectedRank + '&strict=true&kingdom=Plantae';
       var match = await requestJSON(matchUrl);
       var usageKey = match && (match.usageKey || match.key);
       var matchRank = String(match && (match.rank || match.usage && match.usage.rank) || '').toUpperCase();
-      if (!usageKey || (matchRank && matchRank !== 'SPECIES')) return [];
+      if (!usageKey || (matchRank && matchRank !== expectedRank)) return [];
 
-      // GBIF's species media endpoint is the lightest first choice for a reference photo.
+      // GBIF media can be attached directly to the taxon, but not every taxon has it.
       try {
         var speciesMedia = await requestJSON('https://api.gbif.org/v1/species/' +
           encodeURIComponent(String(usageKey)) + '/media');
@@ -398,14 +402,14 @@
           }).slice(0, maxImages);
         }
       } catch (_) {
-        // Some taxa have no species-profile media; continue to illustrated occurrence records.
+        // Some taxa have no profile media; continue to illustrated occurrence records.
       }
 
-      // Many GBIF images are attached to individual occurrence records instead.
+      // Many useful photos belong to individual observations rather than the species profile.
       var params = new URLSearchParams({
         taxonKey:String(usageKey),
         mediaType:'StillImage',
-        limit:String(Math.max(8, maxImages * 2)),
+        limit:String(Math.max(12, maxImages * 3)),
         offset:'0'
       });
       var occurrences = await requestJSON('https://api.gbif.org/v1/occurrence/search?' + params.toString());
@@ -430,8 +434,7 @@
     var cropInfo = typeof crop === 'string' ? { name:crop, scientific:crop } : (crop || {});
     var scientific = String(cropInfo.scientific || cropInfo.scientificName || '').trim();
     var common = String(cropInfo.name || cropInfo.commonName || '').trim();
-    var query = [scientific, common, 'plant crop'].filter(Boolean).join(' ');
-    var cacheKey = query.toLowerCase();
+    var cacheKey = (scientific + '|' + common).toLowerCase();
     if (plantImageCache[cacheKey]) return plantImageCache[cacheKey];
 
     var gbifImages = await searchGbifPlantImages(cropInfo, limit);
@@ -440,42 +443,57 @@
       return gbifImages;
     }
 
-    // Wikimedia Commons remains a fallback for crops with no usable GBIF image.
-    var params = new URLSearchParams({
-      action:'query',
-      format:'json',
-      origin:'*',
-      generator:'search',
-      gsrsearch:query,
-      gsrnamespace:'6',
-      gsrlimit:String(Math.min(Math.max(Number(limit) || 4, 1), 8)),
-      prop:'imageinfo',
-      iiprop:'url|extmetadata',
-      iiurlwidth:'640',
-      iiextmetadatafilter:'Artist|Credit|LicenseShortName|LicenseUrl|Attribution|ImageDescription'
-    });
-    var payload = await requestJSON('https://commons.wikimedia.org/w/api.php?' + params.toString());
-    var pages = payload && payload.query && payload.query.pages ? Object.keys(payload.query.pages).map(function (key) {
-      return payload.query.pages[key];
-    }) : [];
-    var images = pages.map(function (page) {
-      var info = page.imageinfo && page.imageinfo[0] ? page.imageinfo[0] : null;
-      if (!info || !info.url || !/^image\//i.test(info.mime || '')) return null;
-      var meta = info.extmetadata || {};
-      function metaValue(key) { return plainMetadata(meta[key] && meta[key].value || ''); }
-      return {
-        title: String(page.title || ''),
-        imageUrl: String(info.thumburl || info.url),
-        fileUrl: String(info.descriptionurl || ('https://commons.wikimedia.org/wiki/' + encodeURIComponent(page.title || '').replace(/%3A/gi, ':').replace(/%20/g, '_'))),
-        artist: metaValue('Artist') || metaValue('Credit') || 'Author details on the file page',
-        license: metaValue('LicenseShortName') || 'Check file page',
-        licenseUrl: String(meta.LicenseUrl && meta.LicenseUrl.value || ''),
-        description: metaValue('ImageDescription'),
-        source: 'Wikimedia Commons'
-      };
-    }).filter(Boolean);
-    plantImageCache[cacheKey] = images;
-    return images;
+    // Wikimedia Commons is a fallback only. Try broader terms if a crop is listed as a group (e.g. "Musa spp.").
+    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\\s+(?:spp?\\.?|species)$/i);
+    var scientificIsBinomial = /^[A-Z][a-z-]+\\s+[a-z][a-z-]+$/.test(scientific);
+    var queries = scientificIsBinomial
+      ? [scientific, common, common ? common + ' plant' : scientific]
+      : [common, genusMatch ? genusMatch[1] : scientific, common ? common + ' plant' : scientific];
+    queries = queries.filter(function (query, index) { return query && queries.indexOf(query) === index; });
+    var maxResults = Math.min(Math.max(Number(limit) || 4, 1), 8);
+    var commonsImages = [];
+    for (var q = 0; q < queries.length && !commonsImages.length; q++) {
+      try {
+        var params = new URLSearchParams({
+          action:'query',
+          format:'json',
+          origin:'*',
+          generator:'search',
+          gsrsearch:queries[q],
+          gsrnamespace:'6',
+          gsrlimit:String(maxResults),
+          prop:'imageinfo',
+          iiprop:'url|extmetadata',
+          iiurlwidth:'640',
+          iiextmetadatafilter:'Artist|Credit|LicenseShortName|LicenseUrl|Attribution|ImageDescription'
+        });
+        var payload = await requestJSON('https://commons.wikimedia.org/w/api.php?' + params.toString());
+        var pages = payload && payload.query && payload.query.pages ? Object.keys(payload.query.pages).map(function (key) {
+          return payload.query.pages[key];
+        }) : [];
+        commonsImages = pages.map(function (page) {
+          var info = page.imageinfo && page.imageinfo[0] ? page.imageinfo[0] : null;
+          if (!info || !info.url || !/^image\\//i.test(info.mime || '')) return null;
+          var meta = info.extmetadata || {};
+          function metaValue(key) { return plainMetadata(meta[key] && meta[key].value || ''); }
+          return {
+            title:String(page.title || ''),
+            imageUrl:String(info.thumburl || info.url),
+            fileUrl:String(info.descriptionurl || ('https://commons.wikimedia.org/wiki/' + encodeURIComponent(page.title || '').replace(/%3A/gi, ':').replace(/%20/g, '_'))),
+            artist:metaValue('Artist') || metaValue('Credit') || 'Author details on the file page',
+            license:metaValue('LicenseShortName') || 'Check file page',
+            licenseUrl:String(meta.LicenseUrl && meta.LicenseUrl.value || ''),
+            description:metaValue('ImageDescription'),
+            source:'Wikimedia Commons'
+          };
+        }).filter(Boolean);
+      } catch (_) {
+        // A public image service can be unreachable from some networks; return an empty result instead of breaking the card.
+        commonsImages = [];
+      }
+    }
+    plantImageCache[cacheKey] = commonsImages;
+    return commonsImages;
   }
 
   var climateRequestCache = {};
