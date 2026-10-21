@@ -1297,6 +1297,252 @@
   }
 
 
+  var WAPOR_POINT_SERIES_CACHE = {};
+  var WAPOR_RASTER_SAMPLE_CACHE = {};
+  var WAPOR_V3_CATALOG_URL = 'https://data.apps.fao.org/gismgr/api/v2/catalog/workspaces/WAPOR-3/mapsets?overview=false&paged=false';
+
+  function getWaporPointMeta(mapsetCode) {
+    var parts = String(mapsetCode || '').toUpperCase().split('-');
+    var variable = parts[1] || '';
+    var temporal = parts[2] || 'D';
+    var labels = {
+      AETI:{title:'Water leaving soil and plants',meaning:'Combines evaporation from surfaces, water released by plants and evaporation of rain caught on leaves.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : 'mm/day (average during each 10-day period)',scale:0.1},
+      E:{title:'Evaporation from surfaces',meaning:'Water that returns to the air from wet soil and other surfaces.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : 'mm/day',scale:0.1},
+      T:{title:'Water released by plants',meaning:'Water absorbed by roots and released through leaves as the plant grows.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : 'mm/day',scale:0.1},
+      I:{title:'Rain caught by leaves',meaning:'Rain intercepted by vegetation that may evaporate before reaching the soil.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : 'mm/day',scale:0.1},
+      RET:{title:'Atmospheric demand for water',meaning:'A reference estimate of how quickly water could evaporate from a well-watered grass-like surface; it is not the crop’s own water use.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : 'mm/day',scale:0.1},
+      RSM:{title:'Relative soil moisture',meaning:'A relative indicator of how wet the soil is compared with its usual range; it is not a direct sensor reading at root depth.',unit:'relative moisture (%)',scale:0.001},
+      PCP:{title:'Rainfall',meaning:'A gridded estimate of rainfall for the pixel and time period.',unit:temporal === 'M' ? 'mm/month' : temporal === 'A' ? 'mm/year' : temporal === 'E' ? 'mm/day' : 'mm/day (average during each 10-day period)',scale:0.1},
+      NPP:{title:'New plant growth',meaning:'Estimated net primary production: the carbon plants turn into new organic matter after using some energy themselves. It is not harvested yield.',unit:temporal === 'M' ? 'gC/m²/month' : 'gC/m²/day (average during each 10-day period)',scale:0.001}
+    };
+    var info = labels[variable] || {title:'Water or vegetation indicator',meaning:'A satellite/model estimate of an environmental variable.',unit:'Check the official metadata',scale:1};
+    return {
+      code:String(mapsetCode || ''),
+      variable:variable,
+      temporal:temporal,
+      title:info.title,
+      meaning:info.meaning,
+      unit:info.unit,
+      scaleFactor:info.scale,
+      frequency:temporal === 'M' ? 'monthly' : temporal === 'A' ? 'annual' : temporal === 'E' ? 'daily' : 'dekadal'
+    };
+  }
+
+  function parseWaporRasterPeriod(raster, mapsetCode) {
+    var code = String(raster && (raster.code || raster.rasterCode || raster.id) || '');
+    var match = code.match(/(20\d{2})[-_](\d{2})(?:[-_](?:D)?(\d{1,2}))?/i);
+    if (!match) {
+      var rawDate = String(raster && (raster.date || raster.startDate || raster.dateFrom || raster.time) || '');
+      var dateMatch = rawDate.match(/(20\d{2})[-_](\d{2})[-_](\d{2})/);
+      if (dateMatch) match = dateMatch;
+    }
+    if (!match) return null;
+    var year = Number(match[1]);
+    var month = Number(match[2]);
+    if (!(month >= 1 && month <= 12)) return null;
+    var temporal = String(mapsetCode || '').toUpperCase().split('-')[2] || 'D';
+    var third = match[3] == null ? '' : String(match[3]);
+    var day = 1;
+    var slot = '';
+    if (temporal === 'D') {
+      var dekad = Number(third.replace(/^D/i, '')) || 1;
+      if (dekad > 3) dekad = Math.min(3, Math.ceil(dekad / 10));
+      day = dekad === 1 ? 1 : dekad === 2 ? 11 : 21;
+      slot = String(month).padStart(2,'0') + '-D' + dekad;
+    } else if (temporal === 'E') {
+      day = Math.min(31, Math.max(1, Number(third) || 1));
+      slot = String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    } else if (temporal === 'M') {
+      day = 1;
+      slot = String(month).padStart(2,'0');
+    } else {
+      slot = 'YEAR';
+    }
+    var timestamp = Date.UTC(year, month - 1, day);
+    return { year:year, month:month, day:day, slot:slot, timestamp:timestamp, date:new Date(timestamp).toISOString().slice(0,10), code:code };
+  }
+
+  function waporRasterUrl(raster) {
+    if (!raster || typeof raster !== 'object') return '';
+    var candidate = raster.downloadUrl || raster.downloadURL || raster.url || raster.href || '';
+    if (!candidate && Array.isArray(raster.links)) {
+      var link = raster.links.find(function (item) {
+        return item && item.href && /download|data|raster/i.test(String(item.rel || item.title || ''));
+      });
+      candidate = link && link.href || '';
+    }
+    var url = String(candidate || '').trim();
+    return /^https:\/\//i.test(url) ? url : '';
+  }
+
+  async function collectWaporRasters(mapsetCode) {
+    var pageUrl = 'https://data.apps.fao.org/gismgr/api/v2/catalog/workspaces/WAPOR-3/mapsets/' +
+      encodeURIComponent(mapsetCode) + '/rasters?overview=false&paged=false';
+    var rawItems = [];
+    var visited = {};
+    for (var page = 0; page < 8 && pageUrl; page++) {
+      if (visited[pageUrl]) break;
+      visited[pageUrl] = true;
+      var payload = await requestJSON(pageUrl);
+      var envelope = payload && payload.response ? payload.response : payload;
+      var items = envelope && Array.isArray(envelope.items) ? envelope.items :
+        (envelope && Array.isArray(envelope.results) ? envelope.results : []);
+      rawItems = rawItems.concat(items);
+      var links = envelope && Array.isArray(envelope.links) ? envelope.links :
+        (payload && Array.isArray(payload.links) ? payload.links : []);
+      var next = links.find(function (link) { return link && link.rel === 'next' && link.href; });
+      pageUrl = next && next.href ? new URL(next.href, pageUrl).href : '';
+    }
+    return rawItems.map(function (raster) {
+      var period = parseWaporRasterPeriod(raster, mapsetCode);
+      var downloadUrl = waporRasterUrl(raster);
+      if (!period || !downloadUrl) return null;
+      return { code:period.code, year:period.year, month:period.month, day:period.day,
+        slot:period.slot, timestamp:period.timestamp, date:period.date, downloadUrl:downloadUrl };
+    }).filter(Boolean).sort(function (a,b) {
+      return a.timestamp - b.timestamp;
+    });
+  }
+
+  async function sampleWaporRasterAtPoint(rasterUrl, latitude, longitude, scaleFactor) {
+    if (!window.GeoTIFF || typeof window.GeoTIFF.fromUrl !== 'function') {
+      throw new Error('The public GeoTIFF reader did not load. Refresh the page and try again.');
+    }
+    var cacheKey = rasterUrl + '|' + Number(latitude).toFixed(5) + '|' + Number(longitude).toFixed(5) + '|' + scaleFactor;
+    if (Object.prototype.hasOwnProperty.call(WAPOR_RASTER_SAMPLE_CACHE, cacheKey)) {
+      return WAPOR_RASTER_SAMPLE_CACHE[cacheKey];
+    }
+    var promise = (async function () {
+      var tiff = await window.GeoTIFF.fromUrl(rasterUrl);
+      var image = await tiff.getImage();
+      var bounds = image.getBoundingBox();
+      if (!Array.isArray(bounds) || bounds.length < 4) throw new Error('The WaPOR raster has no readable geographic bounds.');
+      var minX = Number(bounds[0]), minY = Number(bounds[1]), maxX = Number(bounds[2]), maxY = Number(bounds[3]);
+      if (!(maxX > minX && maxY > minY) || longitude < minX || longitude > maxX || latitude < minY || latitude > maxY) {
+        throw new Error('The selected coordinates are outside this raster’s coverage.');
+      }
+      var width = image.getWidth();
+      var height = image.getHeight();
+      var col = Math.min(width - 1, Math.max(0, Math.floor((longitude - minX) / (maxX - minX) * width)));
+      var row = Math.min(height - 1, Math.max(0, Math.floor((maxY - latitude) / (maxY - minY) * height)));
+      var rasterValues = await image.readRasters({ window:[col,row,col+1,row+1], samples:[0], interleave:true });
+      var rawValue = rasterValues && rasterValues.length ? Number(rasterValues[0]) : NaN;
+      if (!Number.isFinite(rawValue)) return null;
+      var noData = typeof image.getGDALNoData === 'function' ? Number(image.getGDALNoData()) : NaN;
+      if (Number.isFinite(noData) && rawValue === noData) return null;
+      if (rawValue === -9999 || rawValue === -3.4028234663852886e+38) return null;
+      return rawValue * scaleFactor;
+    })();
+    WAPOR_RASTER_SAMPLE_CACHE[cacheKey] = promise;
+    try {
+      return await promise;
+    } catch (error) {
+      delete WAPOR_RASTER_SAMPLE_CACHE[cacheKey];
+      throw error;
+    }
+  }
+
+  async function fetchWaporPointSeries(mapsetCode, latitude, longitude, options) {
+    var code = String(mapsetCode || '').toUpperCase();
+    var allowed = {
+      'L1-AETI-D':true,'L1-AETI-M':true,'L1-RET-D':true,'L1-RET-M':true,
+      'L1-RET-E':true,'L1-RSM-D':true,'L1-NPP-D':true,'L1-PCP-D':true,'L1-PCP-M':true
+    };
+    if (!allowed[code]) throw new Error('This WaPOR layer is not enabled for point extraction in BackToNature.');
+    var lat = Number(latitude), lon = Number(longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+      throw new Error('A valid selected-region coordinate is required.');
+    }
+    var meta = getWaporPointMeta(code);
+    var cacheKey = code + '|' + lat.toFixed(4) + '|' + lon.toFixed(4);
+    if (!(options && options.forceRefresh) && WAPOR_POINT_SERIES_CACHE[cacheKey]) {
+      return WAPOR_POINT_SERIES_CACHE[cacheKey];
+    }
+
+    var pending = (async function () {
+      var allRasters = await collectWaporRasters(code);
+      if (!allRasters.length) throw new Error('The official raster catalogue returned no dated files for this layer.');
+      var recent = allRasters.slice(-12);
+      var required = {};
+      recent.forEach(function (item) { required[item.code] = item; });
+      var historicalByRecentCode = {};
+      recent.forEach(function (item) {
+        var historic = allRasters.filter(function (candidate) {
+          return candidate.slot === item.slot && candidate.year < item.year &&
+            candidate.year >= item.year - 2 && candidate.code !== item.code;
+        }).sort(function (a,b) { return b.year - a.year; }).slice(0,2);
+        historicalByRecentCode[item.code] = historic;
+        historic.forEach(function (candidate) { required[candidate.code] = candidate; });
+      });
+      var taskItems = Object.keys(required).map(function (key) { return required[key]; });
+      var valuesByCode = {};
+      var failures = [];
+      for (var i = 0; i < taskItems.length; i += 3) {
+        var batch = taskItems.slice(i,i+3);
+        await Promise.all(batch.map(async function (item) {
+          try {
+            valuesByCode[item.code] = await sampleWaporRasterAtPoint(item.downloadUrl, lat, lon, meta.scaleFactor);
+          } catch (error) {
+            valuesByCode[item.code] = null;
+            failures.push({ code:item.code, message:error && error.message || 'Raster sample failed' });
+          }
+        }));
+      }
+      var series = recent.map(function (item) {
+        var baselineItems = historicalByRecentCode[item.code] || [];
+        var baselineValues = baselineItems.map(function (history) { return valuesByCode[history.code]; })
+          .filter(function (value) { return Number.isFinite(value); });
+        var currentValue = valuesByCode[item.code];
+        return {
+          date:item.date,
+          code:item.code,
+          value:Number.isFinite(currentValue) ? currentValue : null,
+          baselineValue:baselineValues.length ? baselineValues.reduce(function (sum,value) { return sum + value; },0) / baselineValues.length : null,
+          baselineSamples:baselineValues.length
+        };
+      });
+      var validRecent = series.filter(function (point) { return Number.isFinite(point.value); });
+      if (!validRecent.length) {
+        var reason = failures[0] && failures[0].message;
+        throw new Error('No usable pixel value could be read for this point. ' + (reason || 'Check layer coverage and data availability.') +
+          ' You can still use the official WaPOR portal to inspect a point or draw an area.');
+      }
+      var latest = validRecent[validRecent.length - 1];
+      var seasonalReference = Number.isFinite(latest.baselineValue) ? latest.baselineValue : null;
+      var differencePercent = seasonalReference != null && seasonalReference !== 0
+        ? (latest.value - seasonalReference) / Math.abs(seasonalReference) * 100 : null;
+      return {
+        mapset:code,
+        title:meta.title,
+        meaning:meta.meaning,
+        unit:meta.unit,
+        frequency:meta.frequency,
+        scaleFactor:meta.scaleFactor,
+        latitude:lat,
+        longitude:lon,
+        series:series,
+        latest:latest,
+        baseline:seasonalReference,
+        baselineSamples:latest.baselineSamples,
+        differencePercent:differencePercent,
+        sampledPeriods:validRecent.length,
+        requestedPeriods:recent.length,
+        sampledAt:new Date().toISOString(),
+        source:'FAO WaPOR v3 raster catalogue',
+        sourceUrl:'https://wapor.apps.fao.org/',
+        baselineMethod:'Average of available values for the same calendar month/dekad/day in the previous two years. This is a seasonal comparison reference, not a recommended target.',
+        partialFailures:failures.length
+      };
+    })();
+    WAPOR_POINT_SERIES_CACHE[cacheKey] = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      delete WAPOR_POINT_SERIES_CACHE[cacheKey];
+      throw error;
+    }
+  }
+
   var waporMapsetCatalogCache = null;
   var waporMapsetCatalogPromise = null;
   var WAPOR_V3_CATALOG_URL = 'https://data.apps.fao.org/gismgr/api/v2/catalog/workspaces/WAPOR-3/mapsets?overview=false&paged=false';
@@ -1964,6 +2210,7 @@
     fetchOpenMeteoAgroOutlook: fetchOpenMeteoAgroOutlook,
     identifyPlantWithPlantNet: identifyPlantWithPlantNet,
     fetchWaporMapsets: fetchWaporMapsets,
+    fetchWaporPointSeries: fetchWaporPointSeries,
     getCountrySourceCatalog: getCountrySourceCatalog,
     fetchWorldBankAgricultureSnapshot: fetchWorldBankAgricultureSnapshot,
     fetchFaoFoodPrices: fetchFaoFoodPrices,
