@@ -540,6 +540,45 @@
     }
 
     @media(max-width:620px){.wapor-mapset-grid{grid-template-columns:1fr}}
+
+    /* Student-friendly progressive disclosure: plain meaning first, technical details on request. */
+    .learning-guide{margin:14px 0 18px;padding:15px;background:#f4f6ec;border:2px solid #c7d5b8;border-radius:10px;color:#303e2d}
+    .learning-guide-heading{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+    .learning-guide-heading>span{display:grid;place-items:center;flex:none;width:39px;height:39px;border-radius:9px;background:#e2ebd5;border:1px solid #b2c69e;font-size:23px}
+    .learning-guide-heading h3{font-size:20px;line-height:1.2;margin:2px 0 0;color:#2d482b;font-family:'Inter',system-ui,sans-serif;font-weight:800}
+    .learning-guide-heading .mini-code{font-size:8px;color:#5f7950}
+    .learning-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+    .learning-item{position:relative;min-width:0;padding:12px;background:#fffdf5;border:1px solid #d8dfcd;border-radius:8px}
+    .learning-step{display:grid;place-items:center;width:25px;height:25px;margin-bottom:7px;background:#547543;color:#fff9e9;border-radius:50%;font-weight:800;font-size:12px}
+    .learning-item h4{font-size:14px;line-height:1.3;margin:0 0 5px;color:#35502e;font-family:'Inter',system-ui,sans-serif}
+    .learning-item p{font-family:'Inter',system-ui,sans-serif;font-size:13px;line-height:1.5;margin:0;color:#414b3c}
+    .technical-details{margin:9px 0;padding:10px 12px;background:#fbf8ed;border:1px solid #d6c7a5;border-radius:8px;color:#443a2b}
+    .technical-details>summary,.mini-explanation>summary{cursor:pointer;font-weight:750;color:#4f6b3b;line-height:1.45}
+    .technical-details[open]>summary,.mini-explanation[open]>summary{margin-bottom:8px}
+    .technical-details p,.technical-details li,.mini-explanation p{font-size:13px;line-height:1.5}
+    .technical-details .live-table-wrap{margin-top:8px}
+    .mini-explanation{margin-top:8px;padding:7px 9px;background:#f7f3e4;border:1px solid #e1d6ba;border-radius:7px}
+    .mini-explanation>summary{font-size:12px}
+    .mini-explanation p{margin:6px 0}
+    .month-plain-note{font-size:12px;line-height:1.4;color:#63543e;margin:7px 0}
+    .record-meta,.publication-meta{font-size:12px;color:#6d6d5d;margin:5px 0}
+    .simple-indicator-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+    .simple-indicator-card{min-width:0;padding:13px;background:#fffaf0;border:1px solid #d8c79d;border-radius:9px}
+    .simple-indicator-card h4,.simple-publication-card h4{font-size:16px;line-height:1.35;color:#354c2f;margin:0 0 8px;font-family:'Inter',system-ui,sans-serif}
+    .simple-indicator-value{font-size:23px;line-height:1.25;font-weight:800;color:#355f36;overflow-wrap:anywhere;margin:6px 0 9px}
+    .simple-indicator-card p,.simple-publication-card p{font-size:13px;line-height:1.5;margin:7px 0}
+    .simple-indicator-card>small{display:block;font-size:11px;color:#716b5a;margin-top:8px}
+    .simple-publication-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+    .simple-publication-card{min-width:0;padding:13px;background:#fffaf0;border:1px solid #d8c79d;border-radius:9px}
+    .simple-publication-card .publication-help{padding:8px;background:#f0f4e9;border-left:3px solid #849f6c;border-radius:4px}
+    .simple-publication-card>a{display:inline-block;font-size:13px;font-weight:750;margin:5px 0}
+    .simple-publication-card details{margin-top:6px}
+    .crop-match-topline .data-tag{font-size:9px}
+    .crop-match-body>.technical-details{margin-top:10px}
+    .country-worldbank-panel>.learning-guide{margin-top:10px}
+    @media(max-width:850px){.learning-grid{grid-template-columns:1fr}.learning-item{padding:10px}.simple-indicator-grid,.simple-publication-grid{grid-template-columns:1fr}}
+    @media print{.learning-guide{break-inside:avoid}.technical-details:not([open])>*:not(summary),.mini-explanation:not([open])>*:not(summary){display:none!important}}
+
 </style>
 </head>
 <body>
@@ -670,7 +709,7 @@
     </div>
   </div>
 
-  <script src="./api.js?v=20261021-research-evidence-v1"></script>
-  <script src="./app.js?v=20261021-research-evidence-v1"></script>
+  <script src="./api.js?v=20261021-student-ux-v1"></script>
+  <script src="./app.js?v=20261021-student-ux-v1"></script>
 </body>
 </html>
