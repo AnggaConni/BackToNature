@@ -1892,6 +1892,97 @@
     return '<div class="wapor-result-advice"><span class="wapor-result-signal">' + esc(label) + '</span><p>' + esc(description) + '</p><p><b>Suggested next step:</b> ' + esc(action) + '</p></div>';
   }
 
+  function analyzeWaporTrend(data) {
+    var points = data && Array.isArray(data.series) ? data.series : [];
+    var values = points.filter(function (point) { return Number.isFinite(point.value); }).map(function (point) { return point.value; });
+    if (values.length < 4) return {direction:'insufficient', label:'Not enough points to see a trend', meanChange:null};
+    var min = Math.min.apply(null,values);
+    var max = Math.max.apply(null,values);
+    var span = max-min;
+    var meanAbs = values.reduce(function(sum,value){return sum+Math.abs(value);},0)/values.length;
+    var noise = Math.max(span*0.04,meanAbs*0.015,1e-9);
+    var rises = 0, falls = 0;
+    for(var i=1;i<values.length;i++){
+      var delta=values[i]-values[i-1];
+      if(delta>noise) rises++;
+      else if(delta< -noise) falls++;
+    }
+    var net=values[values.length-1]-values[0];
+    var threshold=Math.max(span*0.18,meanAbs*0.04,1e-9);
+    var direction='fluctuating';
+    if(net>threshold && rises>=Math.max(2,falls+1)) direction='rising';
+    else if(net< -threshold && falls>=Math.max(2,rises+1)) direction='falling';
+    else if(rises<2 && falls<2) direction='steady';
+    return {
+      direction:direction,
+      label:direction==='rising'?'Mostly rising':direction==='falling'?'Mostly falling':direction==='steady'?'Mostly steady':'Going up and down',
+      rises:rises,falls:falls,first:values[0],last:values[values.length-1],
+      meanChange:values[0]===0?null:(values[values.length-1]-values[0])/Math.abs(values[0])*100
+    };
+  }
+
+  function renderWaporTrendStory(data) {
+    var trend=analyzeWaporTrend(data);
+    var variable=String(data && data.mapset || '').split('-')[1]||'';
+    var advice={
+      AETI:{
+        rising:['Water loss from soil and plants is generally increasing. This can happen during active plant growth or when weather pulls more water into the air; it does not automatically mean crops are healthier.','Compare rainfall, soil moisture and plant stage. Do not automatically add irrigation.'],
+        falling:['Less water is leaving the soil and vegetation than earlier in this series. Possible reasons include cooler/wetter weather changes, plants reaching maturity, sparse vegetation or limited water.','Check soil moisture and the plants themselves, then compare with rainfall before changing the water plan.'],
+        fluctuating:['Water loss rises in some periods and falls in others. Weather, rainfall and plant growth stages may be changing through the season.','Compare the peaks and dips with rainfall and soil moisture; check whether these changes match the crop calendar.'],
+        steady:['Water loss is staying within a similar range in the recent periods.','Keep monitoring the crop and compare this signal with field moisture; a steady line does not prove that irrigation is correct.']
+      },
+      PCP:{
+        rising:['The rainfall estimate is getting higher across the recent periods. This may signal a wetter part of the season, not a long-term climate trend.','Check field drainage, erosion and flood risk; avoid working saturated soil. Compare with a local rain gauge or weather station.'],
+        falling:['The rainfall estimate is getting lower across recent periods. The area may be moving into a drier spell or the rainy season may be ending.','Check the forecast and soil moisture, conserve water where appropriate, and review planting plans before sowing.'],
+        fluctuating:['Rainfall estimates jump between wetter and drier periods. Rain often comes in bursts, so a few wet periods do not guarantee enough water for the whole crop cycle.','Check both total rainfall and dry gaps, plus local rain-gauge readings. Prepare for both heavy-rain runoff and dry spells when relevant.'],
+        steady:['The rainfall estimate is fairly similar across the recent periods.','A steady pixel estimate can still miss a local storm. Keep checking the local forecast and rain gauge.']
+      },
+      RSM:{
+        rising:['The relative-soil-moisture signal is becoming wetter. That may help a water-stressed crop, but very wet soil can also reduce oxygen around roots.','Check soil moisture at root depth and look for waterlogging. Do not irrigate more based on this map alone.'],
+        falling:['The relative-soil-moisture signal is becoming drier. Plants may face more water stress, but this is a modelled relative indicator—not a sensor at the roots.','Check soil by hand or with a probe, inspect leaves, and consider local water-saving or irrigation advice only if field evidence agrees.'],
+        fluctuating:['The soil-moisture signal alternates between wetter and drier periods. That can reflect rain events, drainage and plant water use.','Look for a pattern between rain and drying; check actual root-zone moisture before deciding to irrigate or drain.'],
+        steady:['Relative soil moisture stays within a similar range in these periods.','Keep watching the root zone, especially during heat or critical growth stages; this broad map pixel is not a soil sensor.']
+      },
+      NPP:{
+        rising:['The estimated production of new plant material is increasing. Vegetation may be growing more actively, but this layer can include natural vegetation and is not a crop-yield measurement.','Compare with crop stage and field appearance. Record crop condition, but do not assume harvest will rise by the same percentage.'],
+        falling:['The estimated production of new plant material is decreasing. This can happen naturally as crops mature or dry, but may also signal water stress, disease or land-cover change.','Inspect plants and check rainfall, soil moisture and crop calendar. Do not apply fertilizer or pesticide until the cause is checked.'],
+        fluctuating:['Estimated plant growth rises and falls across the recent periods. Seasonal growth cycles, harvesting, weather or changes in vegetation can produce this pattern.','Compare with the expected crop stage and field notes. Check the mapped pixel covers the kind of land you are studying.'],
+        steady:['Estimated plant growth is within a similar range in the recent periods.','Check whether this matches the expected crop stage; stable estimated productivity does not tell us how much food will be harvested.']
+      },
+      RET:{
+        rising:['The atmosphere’s demand for water is increasing, often with hotter, sunnier or drier conditions. Plants may lose water faster.','Check root-zone moisture more often and follow locally recommended irrigation scheduling if the crop is irrigated.'],
+        falling:['The atmosphere’s demand for water is decreasing, which can happen in cooler, cloudier or more humid conditions.','Do not assume the crop needs exactly the same amount of water as in hotter periods; still check soil and crop condition.'],
+        fluctuating:['Weather-driven demand for water is rising and falling. Changes in sun, wind, humidity and temperature can alter how quickly water evaporates.','Compare the peaks with weather and soil moisture; use a locally appropriate crop-water plan rather than this layer alone.'],
+        steady:['Atmospheric demand for water is fairly similar across recent periods.','Continue normal monitoring and adjust water only to the crop stage and field evidence.']
+      }
+    };
+    var entry=advice[variable]||{
+      rising:['This indicator is generally increasing. Whether that is helpful depends on what the variable measures.','Read the unit and compare with field observations before acting.'],
+      falling:['This indicator is generally decreasing. A lower number is not automatically better or worse.','Check the data meaning and local conditions before making a change.'],
+      fluctuating:['The indicator is going up and down across recent periods. Seasonal and weather changes may explain some of the movement.','Compare dates with other layers and field notes to investigate the pattern.'],
+      steady:['This indicator is fairly stable over the recent periods.','Keep observing and compare with the same season in later years.']
+    };
+    var selected=entry[trend.direction]||entry.fluctuating;
+    var heading={
+      rising:'The line is mostly going up',
+      falling:'The line is mostly going down',
+      fluctuating:'The line is going up and down',
+      steady:'The line is mostly steady',
+      insufficient:'Not enough data points yet'
+    }[trend.direction];
+    var pattern=trend.direction==='insufficient'
+      ?'There are not enough usable dates to describe the direction confidently.'
+      :trend.direction==='fluctuating'
+        ?'This does not automatically mean something is wrong. The variable may change with weather, seasons and plant growth stages.'
+        :trend.direction==='steady'
+          ?'The recent values are within a similar range. That is a description of the data, not proof that the field is healthy or unhealthy.'
+          :'The recent values show a fairly consistent direction. A few more periods and field observations help confirm whether the pattern continues.';
+    return '<section class="wapor-trend-story"><div class="wapor-trend-story-heading"><span aria-hidden="true">📈</span><div><span class="mini-code">READ THE LINE IN PLAIN LANGUAGE</span><h5>' + esc(heading) + '</h5></div></div>' +
+      '<p>' + esc(selected[0]) + '</p><p class="wapor-trend-context">' + esc(pattern) + '</p>' +
+      '<div class="wapor-trend-action"><b>What should I do?</b><p>' + esc(selected[1]) + '</p></div>' +
+      '<p class="wapor-trend-disclaimer">This story describes the recent points shown in the chart, not a long-term climate trend. The chart alone cannot prove the cause.</p></section>';
+  }
+
   function renderWaporPointSeries(data) {
     var latest = data && data.latest;
     if (!latest || !Number.isFinite(latest.value)) return '<p class="wapor-chart-empty">No usable value was returned for this point.</p>';
@@ -1911,6 +2002,7 @@
       '</div>' +
       '<div class="wapor-trend-heading"><h5>Recent trend vs previous years</h5><span>' + esc(data.sampledPeriods) + ' usable period(s)</span></div>' +
       renderWaporPointChart(data) +
+      renderWaporTrendStory(data) +
       renderWaporPointActions(data) +
       '<details class="mini-explanation"><summary>How were these numbers calculated?</summary>' +
       '<p>BackToNature samples the selected point from the official WaPOR v3 raster for each date. Raw pixel values are converted using the published layer scale factor. The seasonal baseline is the average of available samples from the same calendar period in the previous two years; it is a comparison reference, not an agronomic target or a universal definition of good/bad.</p>' +
@@ -1958,7 +2050,8 @@
       '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>From dataset description to real numbers</h4></div></div>' +
       '<ol><li>Choose one layer and read what it measures.</li><li>Press <b>Fetch values & trend</b> on that card to sample actual WaPOR raster values at the selected region’s representative point.</li><li>Compare the latest value with the average from the same calendar period in the previous two years.</li><li>Use the high/low guidance as a question to check in the field—not as an automatic instruction to add water or fertilizer.</li></ol>' +
       '<p class="wapor-point-selection">' + esc(pointMessage) + '</p>' +
-      '<p><b>Baseline is not a universal target.</b> Seasons, crops and landscape types differ. Some layers have a coarse pixel that may cover several fields; a value above or below the reference is a signal to investigate.</p>' +
+      '<p><b>Baseline is not a universal target.</b> Seasons, crops and landscape types differ. Some layers have a coarse pixel that may cover several fields; a value above or below the reference is a signal to investigate.</p>
+      '<p class="wapor-autoload-note"><b>Automatic on tab opening:</b> rainfall, relative soil moisture, water leaving soil/plants and estimated plant growth are loaded one at a time. The remaining variants stay on-demand to avoid downloading too many rasters at once.</p>' +' +
       '<a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN INTERACTIVE WAPOR MAP ↗</a> ' +
       '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Read FAO’s data-access guide ↗</a>' +
       '</section>' +
@@ -2226,7 +2319,8 @@
         if (statusNode) statusNode.textContent = 'Requesting the official raster time series and sampling the selected point. This may take a little while; no sample values are inserted.';
         if (resultNode) resultNode.innerHTML = '<p class="wapor-chart-empty">Loading time series and historical comparisons from the public WaPOR rasters…</p>';
         try {
-          var result = await api.fetchWaporPointSeries(code, point.latitude, point.longitude);
+          var automatic = button.getAttribute('data-wapor-autoloading') === '1';
+          var result = await api.fetchWaporPointSeries(code, point.latitude, point.longitude, automatic ? {maxPeriods:6} : {maxPeriods:12});
           if (currentProvince !== selection || currentTab !== 'nature') return;
           if (resultNode) resultNode.innerHTML = renderWaporPointSeries(result);
           if (statusNode) statusNode.textContent = result.sampledPeriods + ' recent period(s) with values loaded from the live WaPOR v3 raster. Point: ' +
@@ -2244,6 +2338,31 @@
     });
   }
 
+  function autoFetchWaporLearningLayers() {
+    if (currentTab !== 'nature' || !currentProvince) return;
+    var selection = currentProvince;
+    var codes = ['L1-PCP-D','L1-RSM-D','L1-AETI-D','L1-NPP-D'];
+    (async function () {
+      for (var i=0;i<codes.length;i++) {
+        if (currentTab !== 'nature' || currentProvince !== selection) return;
+        var code = codes[i];
+        var button = document.querySelector('[data-wapor-point-btn][data-wapor-code="' + code + '"]');
+        if (!button || button.getAttribute('data-wapor-autoloaded') === '1') continue;
+        button.setAttribute('data-wapor-autoloaded','1');
+        button.setAttribute('data-wapor-autoloading','1');
+        button.click();
+        var started = Date.now();
+        while (button.isConnected && button.disabled && Date.now()-started < 180000) {
+          if (currentTab !== 'nature' || currentProvince !== selection) return;
+          await new Promise(function (resolve) { window.setTimeout(resolve,250); });
+        }
+        button.removeAttribute('data-wapor-autoloading');
+        if (!button.isConnected || currentTab !== 'nature' || currentProvince !== selection) return;
+        await new Promise(function (resolve) { window.setTimeout(resolve,250); });
+      }
+    })();
+  }
+
   function wireNatureControls() {
     var selection = currentProvince;
     if (!selection) return;
@@ -2252,6 +2371,7 @@
     initNatureInlineMap(selection, key, point);
     renderNatureObservationMarkers(key);
     wireWaporPointControls();
+    autoFetchWaporLearningLayers();
 
     function updateAsyncConnector(config) {
       var button = el(config.buttonId);
@@ -2358,7 +2478,7 @@
       successMessage:function(d){return (d.records||[]).length+' global WaPOR mapsets returned from the official catalog.';},
       failureMessage:'WaPOR catalogue request failed.',
       render:renderWaporMapsetCatalog,
-      afterRender:function(){wireWaporPointControls();}
+      afterRender:function(){wireWaporPointControls();autoFetchWaporLearningLayers();}
     });
 
     var identifyButton = el('plantnet-identify-btn');
