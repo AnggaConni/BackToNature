@@ -28,8 +28,14 @@ async function main() {
   assert.ok(appSource.includes('label:\'08 NATURE AROUND US\''), 'Nature tab uses plain-language navigation');
   assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
   assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
-  assert.ok(appSource.includes('How to see real data for a place'), 'WaPOR catalog gives a beginner-friendly path to actual data');
+  assert.ok(appSource.includes('How to see actual data for a place'), 'WaPOR catalog gives a beginner-friendly path to actual data');
   assert.ok(appSource.includes('OPEN INTERACTIVE WAPOR MAP'), 'WaPOR has a direct route to its interactive map');
+  assert.ok(appSource.includes('function explainWaporMapset(record)'), 'WaPOR codes are translated by a JavaScript explanation dictionary');
+  assert.ok(appSource.includes('What question can it help answer?'), 'WaPOR cards connect layer meaning to a practical question');
+  assert.ok(appSource.includes('function renderFarmingSystemLibrary()'), 'Farming Guide includes a curated beginner library of growing systems');
+  assert.ok(appSource.includes('Hydroponics'), 'Farming Guide explains hydroponics');
+  assert.ok(appSource.includes('Aquaponics'), 'Farming Guide explains aquaponics');
+  assert.ok(appSource.includes('not currently populated by a live WOCAT or technology API'), 'Technology tab documents its rule-based data provenance');
   assert.ok(appSource.includes('function initNatureInlineMap(selection, selectionKey, point)'), 'Plant reports include an embedded biodiversity map');
   assert.ok(appSource.includes('Where were plants reported?'), 'Plant report map explains what its points mean');
   assert.equal(typeof api.searchPlantImages, 'function', 'GBIF-first public plant image lookup is exported');
@@ -123,6 +129,33 @@ async function main() {
   assert.equal(images[0].artist, 'Example Photographer', 'cleans the photographer metadata');
   assert.equal(images[0].license, 'CC BY-SA 4.0', 'returns license metadata');
   assert.ok(images[0].imageUrl.startsWith('https://upload.wikimedia.org/'), 'returns a secure thumbnail URL');
+
+  // Genus-level crop entries such as "Musa spp." should still be able to find GBIF occurrence media.
+  const genusPhotoCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    genusPhotoCalls.push(parsed);
+    let payload;
+    if (parsed.pathname === '/v1/species/match') {
+      payload = { key:555, scientificName:'Musa', canonicalName:'Musa', rank:'GENUS' };
+    } else if (parsed.pathname === '/v1/species/555/media') {
+      payload = { results:[] };
+    } else if (parsed.pathname === '/v1/occurrence/search') {
+      payload = { results:[{
+        key:777,
+        scientificName:'Musa acuminata',
+        media:[{type:'StillImage',identifier:'https://images.example.org/banana.jpg',creator:'Test botanist',license:'CC BY 4.0'}]
+      }] };
+    } else {
+      throw new Error('Unexpected URL during genus-level image test: ' + parsed.href);
+    }
+    return { ok:true, status:200, text:async function () { return JSON.stringify(payload); } };
+  };
+  const bananaImages = await api.searchPlantImages({name:'Banana / Plantain',scientific:'Musa spp.'},2);
+  assert.equal(bananaImages.length,1,'genus-level plant entry can return a GBIF occurrence image');
+  assert.equal(bananaImages[0].source,'GBIF','genus-level image is taken from GBIF first');
+  assert.ok(genusPhotoCalls.some((url) => url.pathname === '/v1/species/match' && url.searchParams.get('rank') === 'GENUS'),'genus label is resolved using GBIF genus matching');
+  assert.ok(genusPhotoCalls.some((url) => url.pathname === '/v1/occurrence/search'),'GBIF occurrences provide a fallback when genus media is empty');
 
   const simulatedNormals = [
     {label:'Jan',temperatureMean:26,temperatureMin:22,temperatureMax:31,precipitationMm:120,rainyDays:15,windMeanKmh:12,windGustMaxMeanKmh:28,windDirection:'E'},
