@@ -1006,6 +1006,41 @@
   }
 
 
+
+  function renderCrossrefWorks(result) {
+    var works = result && Array.isArray(result.works) ? result.works : [];
+    if (!works.length) return '<p>No matching publication metadata was returned. Try broader keywords or remove the location name.</p>';
+    return '<ul class="live-record-list">' + works.map(function (work) {
+      var title = esc(work.title || 'Untitled publication');
+      var meta = [work.year, work.type, work.journal].filter(Boolean).map(esc).join(' · ');
+      var authors = Array.isArray(work.authors) && work.authors.length ? work.authors.join(', ') : 'Author metadata not listed';
+      if (work.additionalAuthors) authors += ' +' + work.additionalAuthors + ' more';
+      var linkMarkup = work.url
+        ? '<a target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(work.url)) + '">Open DOI / publication record ↗</a>'
+        : '<small>No DOI or direct publication URL was supplied in this metadata record.</small>';
+      return '<li><b>' + title + '</b>' +
+        (meta ? '<small class="record-code">' + meta + '</small>' : '') +
+        '<p><b>Authors:</b> ' + esc(authors) + '</p>' +
+        (work.publisher ? '<small>Publisher: ' + esc(work.publisher) + '</small>' : '') +
+        '<div>' + linkMarkup + '</div></li>';
+    }).join('') + '</ul>' +
+      '<p class="live-note">Crossref reports ' + Number(result.totalResults || works.length).toLocaleString('en-US') +
+      ' matching metadata record(s). This is not a count of open-access full texts. Check the publisher\'s terms before reusing article content.</p>' +
+      '<small>Retrieved ' + esc(new Date(result.retrievedAt).toLocaleString()) + ' · Source: Crossref REST API</small>';
+  }
+
+  function renderCrossrefEvidencePanel(countryName) {
+    var context = String(countryName || '').trim();
+    var defaultQuery = context && context !== 'UNK' ? context + ' sustainable land management' : 'sustainable land management';
+    return '<section class="live-connectors crossref-literature-panel"><div class="section-title"><span class="mini-code">OPEN SCHOLARLY METADATA / NO API KEY</span><h3>Research & Evidence Finder</h3></div>' +
+      '<p class="live-explainer">Search publication metadata for sustainable land management, agroforestry, soil conservation, land restoration, food security and related topics. Add a country or region name when useful. Crossref is free to query; this panel does not bypass publisher access controls or assume that full text is open access.</p>' +
+      '<div class="crop-lab-controls"><div class="crop-control"><label for="crossref-query">Search terms</label><input id="crossref-query" type="search" maxlength="180" value="' + esc(defaultQuery) + '" placeholder="e.g. agroforestry soil restoration"></div></div>' +
+      '<button id="crossref-search-btn" class="pixel-btn green" type="button">SEARCH RESEARCH LITERATURE</button>' +
+      '<div id="crossref-status" class="live-status" aria-live="polite">Not queried yet</div>' +
+      '<div id="crossref-results" class="live-results">No publication records are loaded until you start a search.</div>' +
+      '<p class="nature-method-note">Metadata source: <a href="https://www.crossref.org/documentation/retrieve-metadata/rest-api/" target="_blank" rel="noopener noreferrer">Crossref REST API documentation ↗</a></p></section>';
+  }
+
   function renderSources(profile) {
     var selectedIso3 = currentCountryIso3() || 'UNK';
     var selectedCountryName = (currentProvince && currentProvince.countryName) ||
@@ -1036,6 +1071,7 @@
       : '';
 
     var globalSources = [
+      {t:'Crossref REST API — scholarly publication metadata',d:'Search publication metadata for research related to sustainable land management, agroforestry, soil conservation and food security. Full-text access and reuse rights remain with the publisher or rights holder.',u:'https://www.crossref.org/documentation/retrieve-metadata/rest-api/',tag:'RESEARCH LITERATURE · NO API KEY'},
       {t:'FAO Hand-in-Hand geospatial catalogue',d:'Explore land, water, climate and agriculture geospatial datasets. Coverage varies by country and layer.',u:'https://data.apps.fao.org/?lang=en',tag:'GEOSPATIAL DATA'},
       {t:'FAOSTAT',d:'Country-level agriculture, land-use and food-system indicators. These are national statistics, not measurements for this specific region.',u:'https://www.fao.org/faostat/en/#data',tag:'GLOBAL STATISTICS'},
       {t:'World Bank Climate Change Knowledge Portal',d:'Country-level climate context. Validate local seasons and field conditions with national services and extension specialists.',u:'https://climateknowledgeportal.worldbank.org/',tag:'CLIMATE CONTEXT'},
@@ -1065,7 +1101,7 @@
       '. <b>Boundary license:</b> ' + esc(boundaryLicense) + '</p></section>';
 
     return '<div class="tab-intro"><div class="eyebrow">DATA SOURCES / EVIDENCE SHELF</div><h2>Keep the receipts 📚</h2><p>Open the official sources to verify date, methodology, geography, license and units. National indicators are context—not parcel-level measurements.</p></div>' +
-      countrySourceMarkup + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + renderWaporPublicApiPanel() + indonesiaLiveTerminal +
+      countrySourceMarkup + renderCrossrefEvidencePanel(selectedCountryName) + renderFaoFoodPricePanel(selectedIso3, selectedCountryName) + renderWaporPublicApiPanel() + indonesiaLiveTerminal +
       '<div class="source-list">' + globalSources.map(function (source, index) {
         return '<article class="source-card"><div class="source-index">' + String(index + 1).padStart(2,'0') + '</div><div class="source-main"><span class="mini-code">' + esc(source.tag) + '</span><h3>' + esc(source.t) + '</h3><p>' + esc(source.d) + '</p><a class="text-link" target="_blank" rel="noopener noreferrer" href="' + esc(safeHttps(source.u)) + '">Open source ↗</a></div></article>';
       }).join('') + '</div>' + wocatBox + integrity;
@@ -1075,6 +1111,39 @@
     var api = window.BackToNatureAPI;
     var currentSourceIso3 = currentProvince && currentProvince.countryIso3 ? currentProvince.countryIso3 : (selectedCountry && selectedCountry.iso3) || 'IDN';
     var currentSourceCountryName = (currentProvince && currentProvince.countryName) || (selectedCountry && selectedCountry.name) || (countryByISO3[currentSourceIso3] && countryByISO3[currentSourceIso3].name) || currentSourceIso3;
+
+    var crossrefBtn = el('crossref-search-btn');
+    if (crossrefBtn) crossrefBtn.addEventListener('click', async function () {
+      if (!api || !api.searchCrossrefWorks) {
+        setLiveStatus('crossref-status', 'Crossref connector unavailable. Reload the page and retry.', 'error');
+        return;
+      }
+      var queryInput = el('crossref-query');
+      var query = queryInput ? queryInput.value.trim() : '';
+      if (query.length < 3) {
+        setLiveStatus('crossref-status', 'Enter at least three search characters.', 'error');
+        return;
+      }
+      crossrefBtn.disabled = true;
+      setLiveStatus('crossref-status', 'Searching Crossref publication metadata…', 'pending');
+      var resultNode = el('crossref-results');
+      if (resultNode) resultNode.textContent = 'Searching for ' + query + '. No article full text is downloaded.';
+      try {
+        var result = await api.searchCrossrefWorks(query, 8);
+        var works = result && Array.isArray(result.works) ? result.works : [];
+        if (resultNode) resultNode.innerHTML = renderCrossrefWorks(result);
+        setLiveStatus('crossref-status',
+          works.length ? works.length + ' publication metadata record(s) retrieved' + (result.cached ? ' · session cache' : '') + '.'
+            : 'Request succeeded; no matching records were returned.',
+          works.length ? 'success' : 'pending');
+      } catch (error) {
+        setLiveStatus('crossref-status', error && error.message ? error.message : 'Crossref search failed.', 'error');
+        if (resultNode) resultNode.textContent = 'No example records were substituted. Check network/API availability and try broader keywords.';
+      } finally {
+        crossrefBtn.disabled = false;
+      }
+    });
+
     var waporSourceBtn = el('wapor-source-fetch-btn');
     if (waporSourceBtn) waporSourceBtn.addEventListener('click', async function () {
       if (!api || !api.fetchWaporMapsets) {
