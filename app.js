@@ -80,6 +80,8 @@
   var natureINaturalistRequestId = 0;
   var natureOutlookRequestId = 0;
   var natureWaporRequestId = 0;
+  var natureWaporAutoQueuePromise = null;
+  var natureWaporAutoQueueSelectionKey = '';
   var plantNetRequestId = 0;
   var naturePowerRequestId = 0;
 
@@ -2299,7 +2301,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-wapor-point-btn]'), function (button) {
       if (button.getAttribute('data-wapor-wired') === '1') return;
       button.setAttribute('data-wapor-wired','1');
-      button.addEventListener('click', async function () {
+      button.addEventListener('click', function () {
+        var fetchPromise = (async function () {
         var selection = currentProvince;
         var point = selection && geometryCentroid(selection.feature);
         var code = button.getAttribute('data-wapor-code') || '';
@@ -2334,6 +2337,9 @@
         } finally {
           if (currentProvince === selection && currentTab === 'nature') button.disabled = false;
         }
+        })();
+        button.__waporFetchPromise = fetchPromise;
+        return fetchPromise;
       });
     });
   }
@@ -2341,26 +2347,68 @@
   function autoFetchWaporLearningLayers() {
     if (currentTab !== 'nature' || !currentProvince) return;
     var selection = currentProvince;
-    var codes = ['L1-PCP-D','L1-RSM-D','L1-AETI-D','L1-NPP-D'];
-    (async function () {
-      for (var i=0;i<codes.length;i++) {
-        if (currentTab !== 'nature' || currentProvince !== selection) return;
-        var code = codes[i];
-        var button = document.querySelector('[data-wapor-point-btn][data-wapor-code="' + code + '"]');
-        if (!button || button.getAttribute('data-wapor-autoloaded') === '1') continue;
-        button.setAttribute('data-wapor-autoloaded','1');
-        button.setAttribute('data-wapor-autoloading','1');
-        button.click();
-        var started = Date.now();
-        while (button.isConnected && button.disabled && Date.now()-started < 180000) {
+    var selectionKey = climateSelectionKey(selection);
+    var initialButtons = Array.prototype.slice.call(document.querySelectorAll('[data-wapor-point-btn]'));
+    var hasPending = initialButtons.some(function (button) {
+      return button.getAttribute('data-wapor-autoloaded') !== '1';
+    });
+    if (!hasPending) return;
+
+    // Called during tab setup and after the catalog request; one shared queue prevents overlap.
+    if (natureWaporAutoQueuePromise) return;
+    natureWaporAutoQueueSelectionKey = selectionKey;
+
+    var queuePromise = (async function () {
+      try {
+        // Discover all catalogue cards dynamically and process them in visible order.
+        var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-wapor-point-btn]'));
+        for (var i = 0; i < buttons.length; i++) {
+          var button = buttons[i];
+          if (button.getAttribute('data-wapor-autoloaded') === '1') continue;
           if (currentTab !== 'nature' || currentProvince !== selection) return;
-          await new Promise(function (resolve) { window.setTimeout(resolve,250); });
+          if (!button.isConnected) return;
+
+          // Disable the other cards while this one downloads its raster series.
+          buttons.forEach(function (otherButton) {
+            if (otherButton.isConnected) otherButton.disabled = otherButton !== button;
+          });
+          button.setAttribute('data-wapor-autoloaded','1');
+          button.setAttribute('data-wapor-autoloading','1');
+          button.disabled = false;
+          button.click();
+
+          // Wait for this card's complete request, not just for its button state.
+          var request = button.__waporFetchPromise;
+          if (request && typeof request.then === 'function') {
+            await request;
+          } else {
+            var statusNode = el('wapor-status-' + (button.getAttribute('data-wapor-code') || ''));
+            if (statusNode) statusNode.textContent = 'Automatic request could not start. Use this card’s button to retry.';
+          }
+
+          button.removeAttribute('data-wapor-autoloading');
+          if (currentTab !== 'nature' || currentProvince !== selection) return;
+          await new Promise(function (resolve) { window.setTimeout(resolve, 200); });
         }
-        button.removeAttribute('data-wapor-autoloading');
-        if (!button.isConnected || currentTab !== 'nature' || currentProvince !== selection) return;
-        await new Promise(function (resolve) { window.setTimeout(resolve,250); });
+      } finally {
+        // Restore controls after success, failure, or a tab/region change.
+        initialButtons.forEach(function (button) {
+          if (button) button.disabled = false;
+        });
+        if (natureWaporAutoQueuePromise === queuePromise) {
+          natureWaporAutoQueuePromise = null;
+          natureWaporAutoQueueSelectionKey = '';
+        }
+        // If the tab was reopened or the region changed mid-request, continue on the new cards.
+        window.setTimeout(function () {
+          if (currentTab === 'nature' && currentProvince) {
+            autoFetchWaporLearningLayers();
+          }
+        }, 0);
       }
     })();
+
+    natureWaporAutoQueuePromise = queuePromise;
   }
 
   function wireNatureControls() {
