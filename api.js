@@ -334,6 +334,98 @@
       .replace(/&quot;/gi, '"').replace(/\s+/g, ' ').trim();
   }
 
+  async function searchGbifPlantImages(cropInfo, limit) {
+    var scientific = String(cropInfo && (cropInfo.scientific || cropInfo.scientificName) || '').trim();
+    if (!/^[A-Z][a-z-]+\\s+[a-z][a-z-]+$/.test(scientific)) return [];
+    var maxImages = Math.min(Math.max(Number(limit) || 4, 1), 8);
+
+    function secureMediaUrl(value) {
+      var url = String(value || '').trim().replace(/^http:\\/\\//i, 'https://');
+      return /^https:\\/\\//i.test(url) ? url : '';
+    }
+    function itemsFrom(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload.results)) return payload.results;
+      if (payload && Array.isArray(payload.items)) return payload.items;
+      if (payload && Array.isArray(payload.media)) return payload.media;
+      return [];
+    }
+    function mapMedia(media, record, usageKey) {
+      if (!media || typeof media !== 'object') return null;
+      var kind = String(media.type || media.mediaType || '').trim();
+      if (kind && !/(still.?image|image\\/|^image$)/i.test(kind)) return null;
+      var imageUrl = secureMediaUrl(media.identifier || media.url || media.thumbnail);
+      if (!imageUrl) return null;
+      var occurrenceKey = record && record.key != null ? String(record.key) : '';
+      var sourceUrl = occurrenceKey
+        ? 'https://www.gbif.org/occurrence/' + encodeURIComponent(occurrenceKey)
+        : 'https://www.gbif.org/species/' + encodeURIComponent(String(usageKey || ''));
+      var license = String(media.license || media.rights || '').trim();
+      var licenseUrl = /^https:\\/\\//i.test(license) ? license : '';
+      return {
+        title:String(media.title || media.description || (record && (record.acceptedScientificName || record.scientificName)) || scientific),
+        imageUrl:imageUrl,
+        fileUrl:sourceUrl,
+        artist:String(media.creator || media.rightsHolder || media.publisher || (record && record.recordedBy) || 'Credit details on the GBIF source record'),
+        license:license && !/^https:\\/\\//i.test(license) ? license : (licenseUrl ? 'Open license details' : 'Check source record for license'),
+        licenseUrl:licenseUrl,
+        description:String(media.description || ''),
+        source:'GBIF'
+      };
+    }
+
+    try {
+      var matchUrl = 'https://api.gbif.org/v1/species/match?name=' + encodeURIComponent(scientific) +
+        '&rank=SPECIES&strict=true&kingdom=Plantae';
+      var match = await requestJSON(matchUrl);
+      var usageKey = match && (match.usageKey || match.key);
+      var matchRank = String(match && (match.rank || match.usage && match.usage.rank) || '').toUpperCase();
+      if (!usageKey || (matchRank && matchRank !== 'SPECIES')) return [];
+
+      // GBIF's species media endpoint is the lightest first choice for a reference photo.
+      try {
+        var speciesMedia = await requestJSON('https://api.gbif.org/v1/species/' +
+          encodeURIComponent(String(usageKey)) + '/media');
+        var profileImages = itemsFrom(speciesMedia).map(function (media) {
+          return mapMedia(media, null, usageKey);
+        }).filter(Boolean);
+        if (profileImages.length) {
+          var seenProfile = {};
+          return profileImages.filter(function (image) {
+            if (seenProfile[image.imageUrl]) return false;
+            seenProfile[image.imageUrl] = true;
+            return true;
+          }).slice(0, maxImages);
+        }
+      } catch (_) {
+        // Some taxa have no species-profile media; continue to illustrated occurrence records.
+      }
+
+      // Many GBIF images are attached to individual occurrence records instead.
+      var params = new URLSearchParams({
+        taxonKey:String(usageKey),
+        mediaType:'StillImage',
+        limit:String(Math.max(8, maxImages * 2)),
+        offset:'0'
+      });
+      var occurrences = await requestJSON('https://api.gbif.org/v1/occurrence/search?' + params.toString());
+      var images = [];
+      var seen = {};
+      (Array.isArray(occurrences && occurrences.results) ? occurrences.results : []).forEach(function (record) {
+        (Array.isArray(record && record.media) ? record.media : []).forEach(function (media) {
+          var image = mapMedia(media, record, usageKey);
+          if (!image || seen[image.imageUrl]) return;
+          seen[image.imageUrl] = true;
+          images.push(image);
+        });
+      });
+      return images.slice(0, maxImages);
+    } catch (_) {
+      // A failed GBIF request should not prevent the app's public image fallback from working.
+      return [];
+    }
+  }
+
   async function searchPlantImages(crop, limit) {
     var cropInfo = typeof crop === 'string' ? { name:crop, scientific:crop } : (crop || {});
     var scientific = String(cropInfo.scientific || cropInfo.scientificName || '').trim();
@@ -342,6 +434,13 @@
     var cacheKey = query.toLowerCase();
     if (plantImageCache[cacheKey]) return plantImageCache[cacheKey];
 
+    var gbifImages = await searchGbifPlantImages(cropInfo, limit);
+    if (gbifImages.length) {
+      plantImageCache[cacheKey] = gbifImages;
+      return gbifImages;
+    }
+
+    // Wikimedia Commons remains a fallback for crops with no usable GBIF image.
     var params = new URLSearchParams({
       action:'query',
       format:'json',
@@ -361,7 +460,7 @@
     }) : [];
     var images = pages.map(function (page) {
       var info = page.imageinfo && page.imageinfo[0] ? page.imageinfo[0] : null;
-      if (!info || !info.url || !/^image\//i.test(info.mime || '')) return null;
+      if (!info || !info.url || !/^image\\//i.test(info.mime || '')) return null;
       var meta = info.extmetadata || {};
       function metaValue(key) { return plainMetadata(meta[key] && meta[key].value || ''); }
       return {
@@ -1067,6 +1166,7 @@
         if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
         return String(b.eventDate).localeCompare(String(a.eventDate));
       });
+      var observations = records.slice(0, 80);
       if (plantOnly) {
         var seenPlantTaxa = {};
         records = records.filter(function (record) {
@@ -1083,6 +1183,7 @@
         searchedAt:new Date().toISOString(),
         scanned:raw.length,
         records:records.slice(0, limit),
+        observations:observations,
         source:'GBIF occurrence search',
         sourceUrl:'https://www.gbif.org/occurrence/search'
       };
