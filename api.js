@@ -7,6 +7,7 @@
   var FAOSTAT_BASE = 'https://fenixservices.fao.org/faostat/api/v1';
   var WOCAT_BASE = 'https://qcat.wocat.net/en/api/v2/questionnaires/';
   var FAO_CSW = 'https://data.apps.fao.org/map/catalog/srv/eng/csw';
+  var crossrefSearchCache = Object.create(null);
 
   function rowsFrom(json) {
     if (Array.isArray(json)) return json;
@@ -1767,6 +1768,66 @@
     return records;
   }
 
+
+  // Crossref public REST API: bibliographic metadata only, no API key required.
+  // Cache identical searches briefly to reduce repeated requests.
+  async function searchCrossrefWorks(query, limit) {
+    var term = String(query || '').replace(/\\s+/g, ' ').trim();
+    if (term.length < 3) throw new Error('Enter at least three characters to search publication metadata.');
+    if (term.length > 180) throw new Error('Keep the search phrase to 180 characters or fewer.');
+    var rows = Math.min(12, Math.max(3, Number(limit) || 8));
+    var cacheKey = term.toLowerCase() + '|' + rows;
+    var cached = crossrefSearchCache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < 10 * 60 * 1000) {
+      return Object.assign({}, cached.data, { cached: true });
+    }
+    var params = new URLSearchParams({
+      'query.bibliographic': term,
+      rows: String(rows),
+      select: 'DOI,title,author,publisher,container-title,URL,published-print,published-online,issued,type'
+    });
+    var requestUrl = 'https://api.crossref.org/works?' + params.toString();
+    var payload = await requestJSON(requestUrl);
+    var message = payload && payload.message;
+    if (!message || !Array.isArray(message.items)) throw new Error('Crossref returned an unexpected response format.');
+    var works = message.items.map(function (item) {
+      item = item || {};
+      var rawDoi = String(item.DOI || '').trim();
+      var doi = rawDoi.replace(/^https?:\\/\\/(?:dx\\.)?doi\\.org\\//i, '');
+      var doiUrl = /^10\\.\\d{4,9}\\//.test(doi) ? 'https://doi.org/' + doi : '';
+      var rawUrl = String(item.URL || '').trim();
+      var recordUrl = doiUrl || (/^https?:\\/\\//i.test(rawUrl) ? rawUrl : '');
+      var dates = item['published-print'] || item['published-online'] || item.issued || {};
+      var dateParts = dates && dates['date-parts'] && dates['date-parts'][0] ? dates['date-parts'][0] : [];
+      var year = dateParts.length ? String(dateParts[0]) : '';
+      var authors = Array.isArray(item.author) ? item.author.map(function (author) {
+        if (!author) return '';
+        return String(author.literal || [author.given, author.family].filter(Boolean).join(' ')).trim();
+      }).filter(Boolean) : [];
+      var type = String(item.type || '').replace(/-/g, ' ').trim();
+      var title = Array.isArray(item.title) && item.title.length ? String(item.title[0] || '').trim() : '';
+      var journal = Array.isArray(item['container-title']) && item['container-title'].length
+        ? String(item['container-title'][0] || '').trim() : '';
+      return {
+        title:title, doi:doi, url:recordUrl, year:year,
+        authors:authors.slice(0,8), additionalAuthors:Math.max(0,authors.length-8),
+        publisher:String(item.publisher || '').trim(), journal:journal,
+        type:type || 'publication', source:'Crossref'
+      };
+    }).filter(function (work) { return work.title; });
+    var result = {
+      query:term, totalResults:Number(message['total-results']) || works.length,
+      works:works, retrievedAt:new Date().toISOString(), sourceUrl:requestUrl, cached:false
+    };
+    crossrefSearchCache[cacheKey] = { timestamp:Date.now(), data:result };
+    var cacheKeys = Object.keys(crossrefSearchCache);
+    if (cacheKeys.length > 30) {
+      cacheKeys.sort(function (a,b) { return crossrefSearchCache[a].timestamp-crossrefSearchCache[b].timestamp; });
+      delete crossrefSearchCache[cacheKeys[0]];
+    }
+    return result;
+  }
+
   window.BackToNatureAPI = {
     fetchIndonesiaLandUse: fetchIndonesiaLandUse,
     searchFaoCatalog: searchFaoCatalog,
@@ -1786,6 +1847,7 @@
     fetchWaporMapsets: fetchWaporMapsets,
     getCountrySourceCatalog: getCountrySourceCatalog,
     fetchWorldBankAgricultureSnapshot: fetchWorldBankAgricultureSnapshot,
-    fetchFaoFoodPrices: fetchFaoFoodPrices
+    fetchFaoFoodPrices: fetchFaoFoodPrices,
+    searchCrossrefWorks: searchCrossrefWorks
   };
 })();
