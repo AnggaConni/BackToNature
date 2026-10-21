@@ -336,16 +336,16 @@
 
   async function searchGbifPlantImages(cropInfo, limit) {
     var scientific = String(cropInfo && (cropInfo.scientific || cropInfo.scientificName) || '').trim();
-    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\\s+(?:spp?\\.?|species)$/i);
+    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\s+(?:spp?\.?|species)$/i);
     var isGenus = !!genusMatch;
     var matchName = isGenus ? genusMatch[1] : scientific;
     var expectedRank = isGenus ? 'GENUS' : 'SPECIES';
-    if (!isGenus && !/^[A-Z][a-z-]+\\s+[a-z][a-z-]+$/.test(scientific)) return [];
+    if (!isGenus && !/^[A-Z][a-z-]+\s+[a-z][a-z-]+$/.test(scientific)) return [];
     var maxImages = Math.min(Math.max(Number(limit) || 4, 1), 8);
 
     function secureMediaUrl(value) {
-      var url = String(value || '').trim().replace(/^http:\\/\\//i, 'https://');
-      return /^https:\\/\\//i.test(url) ? url : '';
+      var url = String(value || '').trim().replace(/^http:\/\//i, 'https://');
+      return /^https:\/\//i.test(url) ? url : '';
     }
     function itemsFrom(payload) {
       if (Array.isArray(payload)) return payload;
@@ -357,7 +357,7 @@
     function mapMedia(media, record, usageKey) {
       if (!media || typeof media !== 'object') return null;
       var kind = String(media.type || media.mediaType || '').trim();
-      if (kind && !/(still.?image|image\\/|^image$)/i.test(kind)) return null;
+      if (kind && !/(still.?image|image\/|^image$)/i.test(kind)) return null;
       var imageUrl = secureMediaUrl(media.identifier || media.url || media.thumbnail);
       if (!imageUrl) return null;
       var occurrenceKey = record && record.key != null ? String(record.key) : '';
@@ -365,13 +365,13 @@
         ? 'https://www.gbif.org/occurrence/' + encodeURIComponent(occurrenceKey)
         : 'https://www.gbif.org/species/' + encodeURIComponent(String(usageKey || ''));
       var license = String(media.license || media.rights || '').trim();
-      var licenseUrl = /^https?:\\/\\//i.test(license) ? license.replace(/^http:\\/\\//i, 'https://') : '';
+      var licenseUrl = /^https?:\/\//i.test(license) ? license.replace(/^http:\/\//i, 'https://') : '';
       return {
         title:String(media.title || media.description || (record && (record.acceptedScientificName || record.scientificName)) || scientific),
         imageUrl:imageUrl,
         fileUrl:sourceUrl,
         artist:String(media.creator || media.rightsHolder || media.publisher || (record && record.recordedBy) || 'Credit details on the GBIF source record'),
-        license:license && !/^https?:\\/\\//i.test(license) ? license : (licenseUrl ? 'Open license details' : 'Check source record for license'),
+        license:license && !/^https?:\/\//i.test(license) ? license : (licenseUrl ? 'Open license details' : 'Check source record for license'),
         licenseUrl:licenseUrl,
         description:String(media.description || ''),
         source:'GBIF'
@@ -444,8 +444,8 @@
     }
 
     // Wikimedia Commons is a fallback only. Try broader terms if a crop is listed as a group (e.g. "Musa spp.").
-    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\\s+(?:spp?\\.?|species)$/i);
-    var scientificIsBinomial = /^[A-Z][a-z-]+\\s+[a-z][a-z-]+$/.test(scientific);
+    var genusMatch = scientific.match(/^([A-Z][a-z-]+)\s+(?:spp?\.?|species)$/i);
+    var scientificIsBinomial = /^[A-Z][a-z-]+\s+[a-z][a-z-]+$/.test(scientific);
     var queries = scientificIsBinomial
       ? [scientific, common, common ? common + ' plant' : scientific]
       : [common, genusMatch ? genusMatch[1] : scientific, common ? common + ' plant' : scientific];
@@ -473,7 +473,7 @@
         }) : [];
         commonsImages = pages.map(function (page) {
           var info = page.imageinfo && page.imageinfo[0] ? page.imageinfo[0] : null;
-          if (!info || !info.url || !/^image\\//i.test(info.mime || '')) return null;
+          if (!info || !info.url || !/^image\//i.test(info.mime || '')) return null;
           var meta = info.extmetadata || {};
           function metaValue(key) { return plainMetadata(meta[key] && meta[key].value || ''); }
           return {
