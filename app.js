@@ -2050,8 +2050,8 @@
       '<div class="wapor-howto-heading"><span aria-hidden="true">🗺️</span><div><div class="mini-code">START HERE</div><h4>From dataset description to real numbers</h4></div></div>' +
       '<ol><li>Choose one layer and read what it measures.</li><li>Press <b>Fetch values & trend</b> on that card to sample actual WaPOR raster values at the selected region’s representative point.</li><li>Compare the latest value with the average from the same calendar period in the previous two years.</li><li>Use the high/low guidance as a question to check in the field—not as an automatic instruction to add water or fertilizer.</li></ol>' +
       '<p class="wapor-point-selection">' + esc(pointMessage) + '</p>' +
-      '<p><b>Baseline is not a universal target.</b> Seasons, crops and landscape types differ. Some layers have a coarse pixel that may cover several fields; a value above or below the reference is a signal to investigate.</p>
-      '<p class="wapor-autoload-note"><b>Automatic on tab opening:</b> rainfall, relative soil moisture, water leaving soil/plants and estimated plant growth are loaded one at a time. The remaining variants stay on-demand to avoid downloading too many rasters at once.</p>' +' +
+      '<p><b>Baseline is not a universal target.</b> Seasons, crops and landscape types differ. Some layers have a coarse pixel that may cover several fields; a value above or below the reference is a signal to investigate.</p>' +
+      '<p class="wapor-autoload-note"><b>Automatic on tab opening:</b> rainfall, relative soil moisture, water leaving soil/plants and estimated plant growth are loaded one at a time. The remaining variants stay on-demand to avoid downloading too many rasters at once.</p>' +
       '<a class="pixel-btn green" target="_blank" rel="noopener noreferrer" href="https://wapor.apps.fao.org/">OPEN INTERACTIVE WAPOR MAP ↗</a> ' +
       '<a class="text-link" target="_blank" rel="noopener noreferrer" href="https://www.fao.org/in-action/remote-sensing-for-water-productivity/wapor-data-access/en">Read FAO’s data-access guide ↗</a>' +
       '</section>' +
