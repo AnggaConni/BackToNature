@@ -146,12 +146,26 @@ The Overview tab links to BPS's official table for harvested area, productivity 
 
 The mini-player uses the repository audio file `music/allicante-cozy-game-beats.mp3`, identified as “Cozy Game Beats — Alicante”. Playback is user-initiated only; `preload="none"` is used and the page does not autoplay the track. The player supports play/pause, volume, mute and seeking. The player links back to the track's Pixabay page for the current license terms.
 
+
+## My Plot Field Log — local field observations and editable exports
+
+Open **My Plot Field Log** from the main navigation or at `field-log.html`. This separate browser-based tool records site name, date, region, observer, optional GPS coordinates, observed soil texture, measured pH, drainage, water source, land cover, crop/species, activity, notes and up to six compressed photos per record.
+
+Records and photographs are kept locally in the current browser using IndexedDB. The app does not upload them to a server. This means records do not automatically sync across browsers or devices; export a JSON backup and import it on the other device when transferring records. Browser storage can be cleared by the user or browser, so keep backups for important fieldwork. GPS is opt-in and requires browser location permission.
+
+**Exports:** JSON backup includes photo data for restoration, while CSV exports the structured text/measurement fields and photo filenames (not image bytes). **Open Editable Report** opens the saved observations in a new tab. The report body is content-editable and supports Word-compatible `.doc`, print / Save as PDF, JSON, CSV and edited HTML exports. Word/PDF/HTML reflect edits made to the report document; JSON/CSV preserve the structured field records captured when that report was generated.
+
+The tool is a field-notes and documentation aid, not a laboratory diagnosis or an agronomic recommendation engine. Blank values remain unknown; user-entered measurements should be checked and interpreted in context.
+
 ## Files
 
-- `index.html` — page shell and retro game-inspired styles.
+- `index.html` — page shell, retro game-inspired styles, and main navigation.
+- `field-log.html` — standalone My Plot Field Log interface with GPS, soil/water fields, photos, local records and exports.
+- `field-log.js` — IndexedDB storage, record editing/import/export, image compression, and editable report generation.
 - `app.js` — map navigation, country-to-region-to-district drilldown, compact recommendation brief, full-screen tabbed fieldbook, historical climate summary, live Nature Data tab and Translate menu behavior.
 - `api.js` — FAOSTAT, FAO catalogue and WOCAT request functions; rule-based crop screening, GBIF taxonomy and nearby occurrence lookup, NASA POWER monthly climate summaries, Wikimedia Commons photos, and historical climate/planting-window functions with reference ET₀, Open-Meteo seven-day outlook, iNaturalist observations and optional Pl@ntNet photo identification.
-- `tests/crop-api.test.js` — offline smoke tests for crop screening, GBIF taxonomy and nearby occurrence records, country-aware vernacular names, Commons image metadata mapping, historical weather aggregation, NASA POWER monthly aggregation and seasonal windows.
+- `tests/crop-api.test.js` — offline smoke tests for crop screening and data connector mappings.
+- `tests/field-log.test.js` — offline smoke tests for local field-log data helpers and Word/PDF/HTML/JSON/CSV report exports.
 
 ## Try it
 
