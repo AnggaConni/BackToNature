@@ -28,7 +28,11 @@ async function main() {
   assert.ok(appSource.includes('label:\'08 NATURE AROUND US\''), 'Nature tab uses plain-language navigation');
   assert.ok(appSource.includes('api.fetchWaporMapsets(true)'), 'Sources fetches live WaPOR v3 mapset metadata');
   assert.ok(appSource.includes('This request returns dataset metadata and download links—not a measured value'), 'WaPOR panel distinguishes metadata from pixel measurements');
-  assert.equal(typeof api.searchPlantImages, 'function', 'Commons image search is exported');
+  assert.ok(appSource.includes('How to see real data for a place'), 'WaPOR catalog gives a beginner-friendly path to actual data');
+  assert.ok(appSource.includes('OPEN INTERACTIVE WAPOR MAP'), 'WaPOR has a direct route to its interactive map');
+  assert.ok(appSource.includes('function initNatureInlineMap(selection, selectionKey, point)'), 'Plant reports include an embedded biodiversity map');
+  assert.ok(appSource.includes('Where were plants reported?'), 'Plant report map explains what its points mean');
+  assert.equal(typeof api.searchPlantImages, 'function', 'GBIF-first public plant image lookup is exported');
 
   const recommendations = api.listCropRecommendations({
     soil: 'sandy',
@@ -53,6 +57,33 @@ async function main() {
     use: 'market'
   });
   assert.ok(mismatchedSoil.every((item) => item.score <= 49), 'major soil mismatches cannot get reassuringly high scores');
+
+  const gbifPhotoCalls = [];
+  global.fetch = async function (url) {
+    const parsed = new URL(String(url));
+    gbifPhotoCalls.push(parsed);
+    let payload;
+    if (parsed.pathname === '/v1/species/match') {
+      payload = { usageKey:987654, canonicalName:'Zea mays', scientificName:'Zea mays', rank:'SPECIES' };
+    } else if (parsed.pathname === '/v1/species/987654/media') {
+      payload = [{
+        type:'StillImage',
+        identifier:'https://images.example.org/maize-reference.jpg',
+        title:'Maize plant reference',
+        creator:'Test botanist',
+        license:'CC BY 4.0'
+      }];
+    } else {
+      throw new Error('Unexpected call during GBIF-first photo test: ' + parsed.href);
+    }
+    return { ok:true, status:200, text:async function () { return JSON.stringify(payload); } };
+  };
+  const gbifImages = await api.searchPlantImages({ name:'Maize', scientific:'Zea mays' }, 2);
+  assert.equal(gbifImages.length,1,'GBIF species-profile media is returned as a plant reference image');
+  assert.equal(gbifImages[0].source,'GBIF','GBIF is preferred before Commons');
+  assert.equal(gbifImages[0].artist,'Test botanist','GBIF media credit is preserved');
+  assert.ok(gbifPhotoCalls.some((url) => url.pathname === '/v1/species/match'),'image lookup resolves the species through GBIF');
+  assert.ok(gbifPhotoCalls.some((url) => url.pathname === '/v1/species/987654/media'),'image lookup reads GBIF species media first');
 
   let requestedUrl = '';
   global.fetch = async function (url) {
@@ -236,6 +267,7 @@ async function main() {
   assert.equal(nearby.records[0].key,'111','nearby records are sorted by distance');
   assert.equal(nearby.records[0].vernacularName,'Maize','common name is kept when supplied');
   assert.match(nearby.records[0].sourceUrl,/gbif\.org\/occurrence\/111/,'source occurrence URL is supplied');
+  assert.equal(nearby.observations.length,2,'the map receives every returned nearby occurrence, not only one card per taxon');
   assert.ok(occurrenceCalls[0].searchParams.get('decimalLatitude').includes(','),'GBIF is queried with coordinate range filters');
   assert.equal(occurrenceCalls[0].searchParams.get('hasCoordinate'),'true','GBIF query requests georeferenced records');
 
