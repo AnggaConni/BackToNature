@@ -2083,7 +2083,7 @@
       maxZoom:18,
       attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>'
     }).addTo(natureInlineMap);
-    natureInlineMarkerLayer = L.layerGroup().addTo(natureInlineMap);
+    natureInlineMarkerLayer = L.featureGroup().addTo(natureInlineMap);
     natureInlineMapSelectionKey = selectionKey;
     renderNatureInlineMarkers(selectionKey);
     window.setTimeout(function () {
