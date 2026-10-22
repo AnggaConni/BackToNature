@@ -1137,11 +1137,23 @@
     };
     var plan = plans[profile.kind] || plans['mixed-lowland'];
     var steps = plan.map(function (step, index) {
-      return '<article class="field-card guide-step"><div class="check-number">' + String(index + 1).padStart(2, '0') + '</div><div><span class="mini-code">FIELD DAY ' + String(index + 1).padStart(2, '0') + '</span><h3>' + esc(step[0]) + '</h3><p>' + esc(step[1]) + '</p></div></article>';
+      var n = String(index + 1).padStart(2, '0');
+      return '<article class="field-card guide-step"><div class="check-number">' + n + '</div><div><span class="mini-code">FIELD DAY ' + n + '</span><h3>' + esc(step[0]) + '</h3><p>' + esc(step[1]) + '</p>' +
+        '<details class="farming-task-details"><summary>OPEN FIELD CHECKLIST + ACTIONS</summary>' +
+        '<p><b>What to do</b></p><ul><li>Walk the plot and inspect more than one representative area; note important differences rather than assuming the whole field is uniform.</li><li>Record the date, location, weather and observations. Add a photo where useful.</li><li>Separate measured results from estimates and unknowns. Do not guess soil-test values or input rates.</li></ul>' +
+        '<p><b>Record before moving on</b></p><ul><li>What did you observe, and where?</li><li>What needs verification by a soil test, local extension officer or other qualified adviser?</li><li>What is the next action, who will do it, and when will it be reviewed?</li></ul>' +
+        '<label class="farming-note-label" for="farm-note-' + n + '">FIELD NOTES (this session)</label><textarea id="farm-note-' + n + '" class="farming-note-input" rows="3" placeholder="Record observations, measurements, questions or follow-up actions…"></textarea>' +
+        '<p class="farming-safety-note"><b>Decision check:</b> Do not scale up or apply fertilizer/pesticides solely from visual symptoms. Verify uncertain issues and use crop-specific local guidance.</p></details></div></article>';
     }).join('');
-    return '<div class="tab-intro"><div class="eyebrow">FARMING GUIDE / HOW TO CULTIVATE</div><h2>Your farm, one step at a time 🚜</h2><p>This starter workflow is adapted to the broad landscape type for ' + esc(profile.name) + '. It deliberately avoids invented seed rates, spacing or fertilizer dosages; use local crop-specific extension recommendations for those details.</p></div>' +
+    var workflowTools = '<section class="farming-workflow-tools"><div><span class="mini-code">FIELDWORK TOOLKIT</span><h3>Make each field visit useful</h3><p>Use these prompts for every stage. The notes entered here remain in the current page session; use My Plot Field Log to keep a persistent offline record.</p></div><div class="farming-tool-grid">' +
+      '<article><b>📍 Site baseline</b><p>Record plot location, area, slope, soil observations, water access, land-use history and visible risks. Mark unknowns clearly.</p></article>' +
+      '<article><b>🌱 Crop decision</b><p>Compare crop candidates with TAB 3 and seasonal timing in TAB 4. Confirm variety, planting window and management advice locally.</p></article>' +
+      '<article><b>🪴 Small trial first</b><p>Where practical, trial a limited area, define what success means, and compare results before expanding investment.</p></article>' +
+      '<article><b>📒 Close the loop</b><p>Track labour, inputs, water, harvested quantity, losses and sale price. Review both yield and costs at the end of the cycle.</p></article>' +
+      '</div><a class="pixel-btn" href="./field-log.html" target="_blank" rel="noopener noreferrer">OPEN MY PLOT FIELD LOG ↗</a></section>';
+    return '<div class="tab-intro"><div class="eyebrow">FARMING GUIDE / HOW TO CULTIVATE</div><h2>Your farm, one step at a time 🚜</h2><p>This starter workflow is adapted to the broad landscape type for ' + esc(profile.name) + '. Expand each field day for practical prompts and recording questions. Exact seed rates, spacing and fertilizer dosages are intentionally not invented; verify them with crop-specific local extension recommendations.</p></div>' +
       '<section class="soil-profile"><div class="soil-profile-icon">📍</div><div><span class="mini-code">PLANNING CONTEXT</span><h3>' + esc(profile.zone) + '</h3><p>Priority: ' + esc(profile.focus) + '. Start small, observe the response and scale only when the site, water and economics support it.</p><span class="data-tag green">CURATED STARTER WORKFLOW</span></div></section>' +
-      '<div class="guide-grid">' + steps + '</div>' +
+      '<div class="guide-grid">' + steps + '</div>' + workflowTools +
       renderFarmingSystemLibrary() +
       '<section class="source-strip"><div><span class="mini-code">LOCAL CALENDAR & EXTENSION</span><h3>Check the latest field guidance</h3><p>Exact planting month, plant spacing, seed rate, fertilizer rate and pest controls depend on crop variety and local conditions. Confirm them with extension staff and seasonal rainfall outlook.</p></div><a class="pixel-btn" target="_blank" rel="noopener noreferrer" href="' + climatePortalUrl + '">' + climatePortalLabel + ' ↗</a></section>';
   }
